@@ -1,26 +1,33 @@
 """Shared contract tests (docs/02-contracts/connector-interface.md, "Contract tests").
 
-Every connector, real, simulated or fixture, must pass these. Register a new connector by adding a
-factory to CONNECTORS. A factory returns a *seeded* connector for one source plus an `advance(event_id)`
-hook that applies a scripted change (for real connectors, drive the real API or the simulator admin
-endpoint). Tests that a given backend cannot support yet must be marked `xfail` with a reason, never deleted.
+Every connector, real, simulated or fixture, must pass these. Register a new connector by adding
+`name: (factory, [sources it serves])` to CONNECTORS. A factory returns a *seeded* connector for one source
+plus an `advance(event_id)` hook that applies a scripted change (for real connectors, drive the real API or
+the simulator admin endpoint). Backends that can change container permissions also expose
+`revoke_container(container_id, token)`, which the inheritance test uses.
+Tests that a given backend cannot support yet must be marked `xfail` with a reason, never deleted.
 """
 import pytest
 
 from connectors.stub.fixture_connector import FixtureConnector
 from fixtures.loader import load, persona_by_id
+from simulators.confluence.testing import SeededConfluence
 
 DATA = load()
 SOURCES = ["slack", "gdrive", "confluence", "jira"]
 
-# name -> factory(source) -> connector exposing advance(event_id)
-CONNECTORS = {"fixture": lambda source: FixtureConnector(source)}
+# name -> (factory(source) -> connector exposing advance(event_id), sources that backend serves)
+CONNECTORS = {
+    "fixture": (lambda source: FixtureConnector(source), SOURCES),
+    "confluence-sim": (lambda source: SeededConfluence(), ["confluence"]),
+}
 
 
-@pytest.fixture(params=[(name, s) for name in CONNECTORS for s in SOURCES], ids=lambda p: f"{p[0]}-{p[1]}")
+@pytest.fixture(params=[(name, s) for name, (_, sources) in CONNECTORS.items() for s in sources],
+                ids=lambda p: f"{p[0]}-{p[1]}")
 def conn(request):
     name, source = request.param
-    return CONNECTORS[name](source)
+    return CONNECTORS[name][0](source)
 
 
 def _docs_of(conn):
@@ -99,6 +106,16 @@ def test_revocation_flips_access_and_emits_acl_change(conn):
     assert {c.doc_id for c in changes if c.type == "acl_change"} >= {d["doc_id"] for d in affected}
 
 
-@pytest.mark.xfail(reason="Inheritance (Confluence space to page, Drive folder to file) needs the simulators", strict=False)
 def test_container_permissions_inherit_to_children(conn):
-    raise AssertionError("implement with the simulators / real connectors")
+    """Take a grant away at the container (space, folder, project): the child loses it, and says so."""
+    if not hasattr(conn, "revoke_container"):
+        pytest.xfail("this backend cannot change container permissions (needs a simulator or a real connector)")
+    doc, persona, token = next(
+        (d, p, t) for d in _docs_of(conn) for p in DATA["personas"]
+        for t in sorted(set(p["tokens"]) & set(d["acl"]["tokens"])) if not t.startswith("user:"))
+    assert conn.check_access(conn.resolve_identity(persona["email"]), doc["doc_id"]).allowed
+    cursor = conn.list_changes(None).next_cursor
+    conn.revoke_container(doc["parent_id"], token)
+    assert conn.check_access(conn.resolve_identity(persona["email"]), doc["doc_id"]).allowed is False
+    assert token not in conn.fetch(doc["doc_id"]).acl.tokens
+    assert any(c.type == "acl_change" and c.doc_id == doc["doc_id"] for c in conn.list_changes(cursor).changes)

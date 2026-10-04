@@ -1,6 +1,6 @@
 [tool.pytest.ini_options]
 pythonpath = ["."]
-testpaths = ["connectors", "evals", "brain"]
+testpaths = ["connectors", "simulators", "evals", "brain"]
 addopts = "-q"
 
 [tool.ruff]
