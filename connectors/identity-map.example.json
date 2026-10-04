@@ -1,0 +1,10 @@
+{
+  "_comment": "Copy to identity-map.local.json (gitignored) and replace the example.com addresses with the real accounts playing each persona. Keys are canonical emails from fixtures/; values are the account's address on each real platform. Leave out a persona or a source that has no account: it then has no access there.",
+  "accounts": {
+    "priya@companya.com": {"slack": "priya.account@example.com", "gdrive": "priya.account@example.com"},
+    "dana@companya.com": {"slack": "dana.account@example.com", "gdrive": "dana.account@example.com"},
+    "maya@companya.com": {"slack": "maya.account@example.com", "gdrive": "maya.account@example.com"},
+    "sam@contractor.io": {"slack": "sam.account@example.com", "gdrive": "sam.account@example.com"},
+    "jordan@companya.com": {"slack": "jordan.account@example.com"}
+  }
+}
