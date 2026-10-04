@@ -160,11 +160,14 @@ def test_connector_fails_closed_when_the_simulator_is_unreachable_or_broken():
     def garbage(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json={"hasPermission": "yes"})   # not `true`, and no grant path
 
+    def wrong_shape(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=["unexpected"])
+
     def server_error(request: httpx.Request) -> httpx.Response:
         return httpx.Response(500, text="boom")
 
     dana = PlatformIdentity("confluence", "cf-anything", "dana@companya.com", ["group:confluence:security-team"])
-    for handler in (down, garbage, server_error):
+    for handler in (down, garbage, wrong_shape, server_error):
         connector = ConfluenceConnector(httpx.Client(base_url="http://sim.invalid", transport=httpx.MockTransport(handler)))
         decision = connector.check_access(dana, f"confluence:SEC/{BREACH}")
         assert (decision.allowed, decision.proof_path) == (False, []), handler.__name__

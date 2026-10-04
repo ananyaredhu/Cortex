@@ -12,6 +12,7 @@ import pytest
 from connectors.stub.fixture_connector import FixtureConnector
 from fixtures.loader import load, persona_by_id
 from simulators.confluence.testing import SeededConfluence
+from simulators.jira.testing import SeededJira
 
 DATA = load()
 SOURCES = ["slack", "gdrive", "confluence", "jira"]
@@ -20,6 +21,7 @@ SOURCES = ["slack", "gdrive", "confluence", "jira"]
 CONNECTORS = {
     "fixture": (lambda source: FixtureConnector(source), SOURCES),
     "confluence-sim": (lambda source: SeededConfluence(), ["confluence"]),
+    "jira-sim": (lambda source: SeededJira(), ["jira"]),
 }
 
 

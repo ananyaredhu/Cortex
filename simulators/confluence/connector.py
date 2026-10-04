@@ -10,15 +10,14 @@ from datetime import datetime, timezone
 import httpx
 
 from connectors.base import AccessDecision, AclEvidence, Change, ChangeBatch, Document, PlatformIdentity, Source
+from simulators.common import DocumentNotFound
 from simulators.confluence.model import valid_id
 from simulators.confluence.tokens import group_token
 
 API = "/wiki/rest/api"
 POLICY_VERSION = "confluence-sim-0.1"
 
-
-class DocumentNotFound(LookupError):
-    """Raised by `fetch` and `version`. Moves to connectors/base.py once contract 0.2 is merged."""
+__all__ = ["ConfluenceConnector", "DocumentNotFound"]
 
 
 def _now() -> str:
@@ -58,7 +57,7 @@ class ConfluenceConnector:
             groups = self._client.get(f"{API}/user/memberof", params={"accountId": account_id})
             groups.raise_for_status()
             tokens = sorted(group_token(g["name"]) for g in groups.json()["results"])
-        except (httpx.HTTPError, KeyError, ValueError):
+        except Exception:   # fail closed on anything: network, timeout, malformed response
             return None
         return PlatformIdentity(self.source, account_id, email, tokens)
 

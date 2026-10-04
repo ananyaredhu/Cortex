@@ -1,4 +1,4 @@
-.PHONY: setup test lint fixtures stub-api sim-confluence db-up db-down
+.PHONY: setup test lint fixtures stub-api sim-confluence sim-jira db-up db-down
 
 setup:            ## create a venv, install dev dependencies, enable the secret-scan hook
 	python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt && .venv/bin/pre-commit install
@@ -17,6 +17,9 @@ stub-api:         ## run the stub Brain API on :8000 (auth: Authorization: Beare
 
 sim-confluence:   ## run the Confluence simulator on :8101, seeded with Company A
 	.venv/bin/uvicorn simulators.confluence.app:app --reload --port 8101
+
+sim-jira:         ## run the Jira simulator on :8102, seeded with Company A
+	.venv/bin/uvicorn simulators.jira.app:app --reload --port 8102
 
 db-up:            ## local Postgres + pgvector with db/init.sql
 	docker compose up -d
