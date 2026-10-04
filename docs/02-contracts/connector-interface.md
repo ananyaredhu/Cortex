@@ -1,6 +1,6 @@
 # Connector interface
 
-version: 0.1 (draft, freezes Day 3)
+version: 0.2 (draft, freezes Day 3)
 Producer: Workstream A. Consumers: B (ingestion, PDP, JIT checks).
 
 Every source (Slack, Google Drive, Confluence, Jira), real or simulated, implements the same protocol and passes the same **contract tests**. Simulators must be proven faithful by running the same tests against the real API wherever one exists.
@@ -15,20 +15,31 @@ class Connector(Protocol):
     source: Source
 
     def resolve_identity(self, email: str) -> "PlatformIdentity | None":
-        """Map a corporate email to this platform's identity (Slack user ID, Jira accountId...)."""
+        """Map the canonical (IdP) email to this platform's identity (Slack user ID, Jira accountId...).
+        The platform account may use a different address: see "Identity mapping" in acl-model.md.
+        Returns None when there is no mapping (fail closed: no access on this platform)."""
 
     def list_changes(self, cursor: str | None) -> "ChangeBatch":
-        """Incremental changes since cursor (created/updated/deleted docs AND permission changes)."""
+        """cursor=None starts a full crawl: every document that exists now is returned as an `upsert`,
+        paged with `has_more` / `next_cursor`. This is the only way to enumerate a source.
+        A non-null cursor returns incremental changes since that cursor
+        (created/updated/deleted docs AND permission changes)."""
 
     def fetch(self, doc_id: str) -> "Document":
-        """Current content, links and ACL evidence for one document."""
+        """Current content, links and ACL evidence for one document.
+        Raises DocumentNotFound if the document does not exist or was deleted."""
 
     def check_access(self, identity: "PlatformIdentity", doc_id: str) -> "AccessDecision":
         """Authoritative, live answer: may this identity read this doc right now?
         Called just-in-time by the PDP. Must be fast (<300 ms typical) and cacheable by the caller (short TTL)."""
 
     def version(self, doc_id: str) -> str:
-        """Cheap source version (etag / updated timestamp) used to detect staleness."""
+        """Cheap source version (etag / updated timestamp) used to detect staleness.
+        Raises DocumentNotFound like `fetch`."""
+
+
+class DocumentNotFound(LookupError):
+    """Raised by `fetch` and `version`. Never raised by `check_access`, which returns a deny instead."""
 ```
 
 ## Data types
@@ -36,8 +47,10 @@ class Connector(Protocol):
 class PlatformIdentity:
     source: Source
     platform_user_id: str
-    email: str
-    groups: list[str]          # platform-native groups, roles, channels, as the platform sees them
+    email: str                 # canonical (IdP) email, not the platform account's address
+    groups: list[str]          # ACL tokens this identity holds on this platform, in acl-model.md format
+                               # (channel:, group:<source>:, role:, external:, public:org).
+                               # The user: token is not included; the PDP adds it.
 
 class Document:
     doc_id: str                # globally unique: "<source>:<native id>"
@@ -48,7 +61,7 @@ class Document:
     body: str                  # text content (markdown ok)
     parent_id: str | None      # space/project/channel/folder container
     links: list[str]           # doc_ids this doc references (cross-platform links allowed)
-    author: str
+    author: str | None         # canonical email when the platform account is mapped, else None
     created_at: str
     updated_at: str
     version: str
@@ -66,13 +79,15 @@ class ChangeBatch:
     has_more: bool
 
 class Change:
-    type: Literal["upsert", "delete", "acl_change"]
-    doc_id: str
+    type: Literal["upsert", "delete", "acl_change", "principal_change"]
+    doc_id: str | None         # set for upsert, delete, acl_change; None for principal_change
+    principal: str | None      # principal_change only: "user:<canonical email>" whose token set changed
+    token: str | None          # principal_change only: the token gained or lost, e.g. "channel:C123"
     detected_at: str
 
 class AccessDecision:
     allowed: bool
-    proof_path: list[str]      # minimal grant path, e.g. ["user:priya", "group:payments-eng", "space:PAY"]
+    proof_path: list[str]      # minimal grant path, e.g. ["user:priya@companya.com", "group:confluence:payments-eng"]
     evaluated_at: str
     acl_snapshot_hash: str
     policy_version: str
@@ -95,19 +110,37 @@ class Chunk:
 ```
 Vectors carry the **same ACL tokens as their chunk** and are never shared across ACLs.
 
+On a `delete`, ingestion **removes the document's chunks** (the `documents` row may stay as a tombstone with `deleted = true`). A deleted document must not remain searchable.
+
+## Document granularity and IDs
+| Source | One `Document` is | `doc_id` | `parent_id` | `version` |
+|---|---|---|---|---|
+| Slack | One thread: the root message plus its replies. A message with no replies is a thread of one | `slack:<channel id>/<thread ts>` | `slack:<channel id>` | Timestamp of the latest reply or edit |
+| Google Drive | One file | `gdrive:<file id>` | `gdrive:<folder id>` | File version or modified time |
+| Confluence | One page | `confluence:<space>/<page id>` | `confluence:<space>` | Page version |
+| Jira | One issue, including its comments | `jira:<issue key>` | `jira:<project key>` | Updated timestamp |
+
+Real platforms assign their own IDs (Slack channel IDs, Drive file IDs), so they will not equal the IDs in `fixtures/`. A real backend ships a **seed manifest** that maps each fixture `doc_id` and container to its native ID; the contract tests translate through it.
+
 ## Behavior requirements
-- `list_changes` must also emit `acl_change` entries when permissions change (channel removal, page restriction, folder share change), not only content changes.
+- `list_changes(None)` enumerates the whole source as `upsert`s (initial load). Ingestion calls it once, then keeps the returned cursor.
+- Permission changes come in two kinds (see "Two kinds of permission change" in acl-model.md):
+  - **`acl_change`**: the document's own ACL changed (page restriction added, file unshared, channel made private). The document's tokens change, so ingestion re-fetches it and rewrites its chunks' `acl_tokens`.
+  - **`principal_change`**: a person's membership changed (removed from a channel, group or role). No document's tokens change, so there is **one** change entry, not one per document. The consumer drops cached identities and cached decisions for that principal.
 - Deleted or no-longer-visible docs must be reported so they can be dropped from the index.
 - `check_access` must never return `allowed=True` on an error or timeout: **fail closed**.
+- A deny for a forbidden document and for a nonexistent document has `allowed=False` and `proof_path=[]`. `acl_snapshot_hash` is empty when the document does not exist and may be set when it does (the audit log needs it for replay), so an `AccessDecision` **never leaves the policy plane**: it is not serialized to the LLM plane or to the user.
 - Rate limits: connectors back off and surface lag as a metric (`freshness_lag_seconds`).
 - Credentials are read-only, least-privilege, and live only in the connector process.
 
 ## Contract tests (`connectors/tests/contract/`)
 1. Seeded fixture: known docs with known ACLs, expected `fetch`, `version` and `check_access` results per persona.
-2. Revocation: change the ACL, then `list_changes` emits `acl_change` and `check_access` flips to deny within the SLA.
+2. Revocation: remove a person from a container (channel, group, role), then `list_changes` emits one `principal_change` and `check_access` flips to deny within the SLA. Restrict a document itself, then `list_changes` emits `acl_change` for it and its `fetch` returns the new tokens.
 3. Edit: change content, then `version` changes and `list_changes` emits `upsert`.
 4. Inheritance: container-level permissions apply to children (Confluence space to page, Drive folder to file).
-5. Negative: `check_access` for a nonexistent doc and for a forbidden doc return the same shape.
+5. Negative: `check_access` for a nonexistent doc and for a forbidden doc return the same shape. `fetch` and `version` raise `DocumentNotFound` for a nonexistent doc.
+6. Initial load: `list_changes(None)`, followed until `has_more` is false, returns an `upsert` for every seeded document of that source.
 
 ## Changelog
+- 0.2: `list_changes(None)` defined as a full crawl; `DocumentNotFound`; `PlatformIdentity.groups` are ACL tokens and `email` is the canonical email; `Document.author` may be None; new `principal_change` change type with `principal` and `token`; document granularity and ID table, seed manifest for real backends; chunks removed on delete; `AccessDecision` stays in the policy plane; contract tests 2 and 5 updated, test 6 added.
 - 0.1: first draft.
