@@ -3,10 +3,11 @@
 The Postgres implementation is in pg_store.py. Both follow db/init.sql: `documents`, `chunks`,
 bi-temporal `acl_snapshots`, plus a cursor per source.
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Protocol
 
 from connectors.base import Document
+from connectors.ingestion.events import IngestionEvent
 
 
 @dataclass
@@ -71,6 +72,12 @@ class Store(Protocol):
     def delete_document(self, doc_id: str, at: str) -> None:
         """Remove the chunks, keep the `documents` row as a tombstone, close the open ACL snapshot."""
 
+    def append_event(self, event: IngestionEvent) -> int:
+        """Add a permission event to the outbox. Returns its `seq`."""
+
+    def events_after(self, seq: int = 0, limit: int = 100) -> list[IngestionEvent]:
+        """Outbox events with a higher `seq`, oldest first. How a consumer reads the outbox."""
+
 
 def same_acl(snapshot_hash: str | None, tokens: list[str] | None, doc: Document) -> bool:
     return snapshot_hash == doc.acl.snapshot_hash and tokens == list(doc.acl.tokens)
@@ -84,6 +91,7 @@ class InMemoryStore:
         self.documents: dict[str, dict] = {}
         self.chunks: dict[str, list[ChunkRow]] = {}
         self.snapshots: dict[str, list[Snapshot]] = {}
+        self.events: list[IngestionEvent] = []
 
     def get_cursor(self, source: str) -> str | None:
         return self.cursors.get(source)
@@ -129,6 +137,13 @@ class InMemoryStore:
         current = self._open_snapshot(doc_id)
         if current:
             current.valid_to = at
+
+    def append_event(self, event: IngestionEvent) -> int:
+        self.events.append(replace(event, seq=len(self.events) + 1))
+        return len(self.events)
+
+    def events_after(self, seq: int = 0, limit: int = 100) -> list[IngestionEvent]:
+        return self.events[max(seq, 0):][:limit]
 
     # -- inspection (tests, debugging) ----------------------------------------------------------
     def chunks_of(self, doc_id: str) -> list[ChunkRow]:

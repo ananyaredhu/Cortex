@@ -256,7 +256,8 @@ def test_principal_change_reaches_the_sink_and_leaves_the_index_alone(store):
     report = ingestor.run_once()
     assert dict(report.actions["slack"]) == {PRINCIPAL: 1}
     [event] = sink.events
-    assert (event.source, event.principal, event.token) == ("slack", "user:priya@companya.com", "channel:C_AUTHPRIV")
+    assert (event.kind, event.source, event.principal, event.token, event.doc_id) == (
+        "principal_change", "slack", "user:priya@companya.com", "channel:C_AUTHPRIV", None)
     assert embedder.calls == embedded
     assert {d["doc_id"]: store.chunks_of(d["doc_id"]) for d in _docs("slack")} == before
     assert all(len(store.snapshots_of(d["doc_id"])) == 1 for d in _docs("slack"))
@@ -264,7 +265,7 @@ def test_principal_change_reaches_the_sink_and_leaves_the_index_alone(store):
 
 def test_a_failing_sink_leaves_the_cursor_so_the_event_is_retried(store):
     class _Down:
-        def principal_changed(self, event):
+        def emit(self, event):
             raise ConnectionError("audit service is down")
 
     slack = FixtureConnector("slack")
