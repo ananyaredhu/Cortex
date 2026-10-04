@@ -6,7 +6,8 @@ change does to the change feed.
 """
 import pytest
 
-from simulators.confluence.model import ConfluenceSim, Invalid, NotFound
+from simulators.common import Invalid, NotFound
+from simulators.confluence.model import ConfluenceSim
 from simulators.confluence.tokens import ORG_GROUP
 
 ALICE, BOB, CAROL, EVE = "alice@companya.com", "bob@companya.com", "carol@companya.com", "eve@outside.io"
@@ -38,7 +39,7 @@ def allowed(sim: ConfluenceSim, email: str, page_id: str) -> bool:
 
 
 def changes_since(sim: ConfluenceSim, cursor: str) -> set[tuple[str, str]]:
-    return {(e.type, e.page_id) for e in sim.changes(cursor)[0]}
+    return {(e.type, e.item_id) for e in sim.changes(cursor)[0]}
 
 
 def test_space_permission_is_required(sim):
@@ -97,14 +98,32 @@ def test_removing_a_restriction_restores_access(sim):
     assert ("acl_change", "detail") in changes_since(sim, cursor)
 
 
-def test_group_removal_revokes_at_once_and_reports_affected_pages(sim):
+def test_group_removal_revokes_at_once_with_a_single_principal_change(sim):
     sim.set_restrictions("design", groups=["security-team"])
     _, cursor, _ = sim.changes(None)
     assert sim.remove_member("security-team", ALICE) is True
     assert not allowed(sim, ALICE, "design") and not allowed(sim, ALICE, "detail")
     assert allowed(sim, ALICE, "root"), "she is still in the org"
-    assert changes_since(sim, cursor) == {("acl_change", "design"), ("acl_change", "detail")}
+    entries = sim.changes(cursor)[0]
+    assert [(e.type, e.principal, e.token, e.doc_id) for e in entries] == [
+        ("principal_change", f"user:{ALICE}", "group:confluence:security-team", None)], "no fan-out per page"
     assert sim.remove_member("security-team", ALICE) is False, "removing twice changes nothing"
+    assert len(sim.changes(cursor)[0]) == 1
+
+
+def test_joining_a_group_is_a_principal_change_too(sim):
+    _, cursor, _ = sim.changes(None)
+    sim.add_member("security-team", BOB)
+    assert [(e.type, e.principal, e.token) for e in sim.changes(cursor)[0]] == [
+        ("principal_change", f"user:{BOB}", "group:confluence:security-team")]
+
+
+def test_page_acl_does_not_change_when_membership_does(sim):
+    """The two kinds of permission change stay apart: tokens and snapshot describe the page, not who is in a group."""
+    sim.set_restrictions("design", groups=["security-team"])
+    before = sim.acl(sim.pages["detail"])
+    sim.remove_member("security-team", ALICE)
+    assert sim.acl(sim.pages["detail"]) == before
 
 
 def test_space_permission_change_touches_every_page_in_the_space(sim):
@@ -155,7 +174,7 @@ def test_full_crawl_pages_through_everything_then_follows_the_log(sim):
     while has_more:
         entries, cursor, has_more = sim.changes(cursor, limit=3)
         assert all(e.type == "upsert" for e in entries)
-        seen += [e.page_id for e in entries]
+        seen += [e.item_id for e in entries]
     assert seen == sorted(sim.pages)
     sim.update_page("root", body="later")
     assert changes_since(sim, cursor) == {("upsert", "root")}
@@ -168,7 +187,7 @@ def test_change_made_during_a_crawl_is_not_lost(sim):
     seen: set[str] = set()
     while has_more:
         entries, cursor, has_more = sim.changes(cursor, limit=2)
-        seen |= {e.page_id for e in entries}
+        seen |= {e.item_id for e in entries}
     assert "added-mid-crawl" in seen
 
 

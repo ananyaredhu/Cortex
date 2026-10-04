@@ -37,6 +37,13 @@ class SeededConfluence(ConfluenceConnector):
                 if kind == "group":
                     self.http.delete(f"/sim/admin/groups/{name}/members/{email}").raise_for_status()
 
+    def restrict_document(self, doc_id: str, token: str) -> None:
+        """Restrict the page itself to the one principal `token` names (document-level ACL change)."""
+        page_id = doc_id.split("/", 1)[1]
+        kind, name = principal_from_token(token) or (None, None)
+        body = {"groups": [name] if kind == "group" else [], "users": [name] if kind == "user" else []}
+        self.http.put(f"/sim/admin/pages/{page_id}/restrictions", json=body).raise_for_status()
+
     def revoke_container(self, container_id: str, token: str) -> None:
         """Take `token` off the space's view permission (container-level revocation)."""
         key = container_id.split(":", 1)[1]

@@ -17,12 +17,12 @@ import hmac
 import os
 from typing import Annotated
 
-import httpx
 from fastapi import APIRouter, BackgroundTasks, Depends, FastAPI, Header, HTTPException, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from simulators.confluence.model import ChangeEntry, ConfluenceSim, Invalid, NotFound, Page, Principals
+from simulators.common import Invalid, NotFound, deliver, webhook_payloads
+from simulators.confluence.model import ConfluenceSim, Page, Principals
 from simulators.confluence.seed import seed_company_a
 
 API = "/wiki/rest/api"
@@ -83,16 +83,6 @@ class ResetIn(BaseModel):
     seed: str = "company_a"   # company_a | empty
 
 
-def deliver(urls: list[str], payloads: list[dict]) -> None:
-    """Best-effort webhook delivery. A lost webhook is fine: the change feed is the fallback."""
-    for url in urls:
-        for payload in payloads:
-            try:
-                httpx.post(url, json=payload, timeout=2.0)
-            except httpx.HTTPError:
-                pass
-
-
 def create_app(sim: ConfluenceSim | None = None, *, admin_token: str | None = None,
                base_url: str = "http://localhost:8101") -> FastAPI:
     if sim is None:
@@ -102,7 +92,7 @@ def create_app(sim: ConfluenceSim | None = None, *, admin_token: str | None = No
     app.state.sim = sim
     app.state.deliver = deliver
     hooks: list[str] = []
-    delivered = {"pos": len(sim.log)}
+    delivered = {"pos": len(sim.changelog.entries)}
 
     @app.exception_handler(NotFound)
     def _not_found(_, exc: NotFound) -> JSONResponse:
@@ -153,19 +143,12 @@ def create_app(sim: ConfluenceSim | None = None, *, admin_token: str | None = No
             },
         }
 
-    def change_json(entry: ChangeEntry) -> dict:
-        return {"type": entry.type, "page_id": entry.page_id, "space_key": entry.space_key,
-                "doc_id": f"confluence:{entry.space_key}/{entry.page_id}", "detected_at": entry.detected_at}
-
     def flush(background: BackgroundTasks) -> None:
         """Queue webhooks for everything logged since the last flush."""
-        new = sim.log[delivered["pos"]:]
-        delivered["pos"] = len(sim.log)
+        new = sim.changelog.entries[delivered["pos"]:]
+        delivered["pos"] = len(sim.changelog.entries)
         if hooks and new:
-            payloads = [{"webhookEvent": e.event, "timestamp": e.detected_at,
-                         "page": {"id": e.page_id, "spaceKey": e.space_key},
-                         "_simulator": {"seq": e.seq, **change_json(e)}} for e in new]
-            background.add_task(app.state.deliver, list(hooks), payloads)
+            background.add_task(app.state.deliver, list(hooks), webhook_payloads(new, "page", "id"))
 
     def require_admin(authorization: Annotated[str | None, Header()] = None) -> None:
         if admin_token and not hmac.compare_digest(authorization or "", f"Bearer {admin_token}"):
@@ -248,7 +231,7 @@ def create_app(sim: ConfluenceSim | None = None, *, admin_token: str | None = No
     @app.get("/sim/changes")
     def changes(cursor: str | None = None, limit: Annotated[int, Query(ge=1, le=1000)] = 500) -> dict:
         entries, next_cursor, has_more = sim.changes(cursor, limit)
-        return {"changes": [change_json(e) for e in entries], "next_cursor": next_cursor, "has_more": has_more}
+        return {"changes": [e.as_json() for e in entries], "next_cursor": next_cursor, "has_more": has_more}
 
     # ------------------------------------------------------------------ admin (demo and test helpers)
     admin = APIRouter(prefix="/sim", dependencies=[Depends(require_admin)])
@@ -334,7 +317,7 @@ def create_app(sim: ConfluenceSim | None = None, *, admin_token: str | None = No
         sim.clear()
         if seed == "company_a":
             seed_company_a(sim)
-        delivered["pos"] = len(sim.log)
+        delivered["pos"] = len(sim.changelog.entries)
         return {"seed": seed, "pages": len(sim.pages)}
 
     app.include_router(admin)

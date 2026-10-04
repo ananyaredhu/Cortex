@@ -22,7 +22,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, FastAPI, Header, HTTPEx
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from simulators.common import ChangeEntry, Invalid, NotFound, deliver, norm_email
+from simulators.common import Invalid, NotFound, deliver, norm_email, webhook_payloads
 from simulators.jira.model import Actors, Issue, JiraSim
 from simulators.jira.seed import seed_company_a
 
@@ -182,17 +182,12 @@ def create_app(sim: JiraSim | None = None, *, admin_token: str | None = None,
             },
         }
 
-    def change_json(entry: ChangeEntry) -> dict:
-        return {"type": entry.type, "issue_key": entry.item_id, "doc_id": entry.doc_id, "detected_at": entry.detected_at}
-
     def flush(background: BackgroundTasks) -> None:
         """Queue webhooks for everything logged since the last flush."""
         new = sim.changelog.entries[delivered["pos"]:]
         delivered["pos"] = len(sim.changelog.entries)
         if hooks and new:
-            payloads = [{"webhookEvent": e.event, "timestamp": e.detected_at, "issue": {"key": e.item_id},
-                         "_simulator": {"seq": e.seq, **change_json(e)}} for e in new]
-            background.add_task(app.state.deliver, list(hooks), payloads)
+            background.add_task(app.state.deliver, list(hooks), webhook_payloads(new, "issue", "key"))
 
     def require_admin(authorization: Annotated[str | None, Header()] = None) -> None:
         if admin_token and not hmac.compare_digest(authorization or "", f"Bearer {admin_token}"):
@@ -290,10 +285,18 @@ def create_app(sim: JiraSim | None = None, *, admin_token: str | None = None,
             raise NotFound("No user found")
         return [{"project": project, "role": role} for project, role in sim.roles_of(user.email)]
 
+    @app.get("/sim/users/{account_id}/tokens")
+    def user_tokens(account_id: str) -> list[str]:
+        """The ACL tokens the user holds in Jira, as the connector reports them in PlatformIdentity.groups."""
+        user = sim.user_by_account(account_id)
+        if user is None:
+            raise NotFound("No user found")
+        return sorted(sim.identity_tokens(user.email))
+
     @app.get("/sim/changes")
     def changes(cursor: str | None = None, limit: Annotated[int, Query(ge=1, le=1000)] = 500) -> dict:
         entries, next_cursor, has_more = sim.changes(cursor, limit)
-        return {"changes": [change_json(e) for e in entries], "next_cursor": next_cursor, "has_more": has_more}
+        return {"changes": [e.as_json() for e in entries], "next_cursor": next_cursor, "has_more": has_more}
 
     # ------------------------------------------------------------------ admin (demo and test helpers)
     admin = APIRouter(prefix="/sim", dependencies=[Depends(require_admin)])

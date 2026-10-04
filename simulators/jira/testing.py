@@ -40,6 +40,16 @@ class SeededJira(JiraConnector):
                 elif kind == "role" and project in self.sim.projects:
                     self.http.delete(f"/sim/admin/projects/{project}/roles/{name}/users/{email}").raise_for_status()
 
+    def restrict_document(self, doc_id: str, token: str) -> None:
+        """Put the issue at a security level whose only member is the principal `token` names."""
+        key = doc_id.split(":", 1)[1]
+        project = key.split("-")[0]
+        kind, name, _ = principal_from_token(token) or (None, None, None)
+        members = {"roles": [name] if kind == "role" else [], "groups": [name] if kind == "group" else [],
+                   "users": [name] if kind == "user" else []}
+        self.http.put(f"/sim/admin/projects/{project}/securitylevels/contract-test", json=members).raise_for_status()
+        self.http.put(f"/sim/admin/issues/{key}/security", json={"level": "contract-test"}).raise_for_status()
+
     def revoke_container(self, container_id: str, token: str) -> None:
         """Take `token` off the project's Browse permission (container-level revocation)."""
         key = container_id.split(":", 1)[1]

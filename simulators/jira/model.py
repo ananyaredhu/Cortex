@@ -164,17 +164,32 @@ class JiraSim:
         members = self.groups.setdefault(group, set())
         if email in members:
             return False
+        before = self._tokens_held([email])
         members.add(email)
-        self._membership_changed(group=group)
+        self._emit_principal_changes(before, "group_membership_updated")
         return True
 
     def remove_member(self, group: str, email: str) -> bool:
         email = norm_email(email)
         if email not in self.groups.get(group, set()):
             return False
+        before = self._tokens_held([email])
         self.groups[group].discard(email)
-        self._membership_changed(group=group)
+        self._emit_principal_changes(before, "group_membership_updated")
         return True
+
+    def identity_tokens(self, email: str) -> set[str]:
+        """Every token the user holds in Jira: their groups, and each project role they fill (directly or via a group)."""
+        return {group_token(g) for g in self.groups_of(email)} | {role_token(p, r) for p, r in self.roles_of(email)}
+
+    def _tokens_held(self, emails: Iterable[str]) -> dict[str, set[str]]:
+        return {email: self.identity_tokens(email) for email in emails}
+
+    def _emit_principal_changes(self, before: dict[str, set[str]], event: str) -> None:
+        """One principal_change per token a user gained or lost. Leaving a group can also cost the roles it filled."""
+        for email in sorted(before):
+            for token in sorted(before[email] ^ self.identity_tokens(email)):
+                self.changelog.emit_principal(user_token(email), token, event)
 
     # ------------------------------------------------------------------ projects, roles, schemes
     def add_project(self, key: str, name: str | None = None) -> Project:
@@ -198,8 +213,9 @@ class JiraSim:
         new = Actors({self._known(u) for u in users}, set(groups))
         if project.roles.get(role) == new:
             return
+        before = self._tokens_held(self.users)
         project.roles[role] = new
-        self._membership_changed(role=(project_key, role), event="project_role_updated")
+        self._emit_principal_changes(before, "project_role_updated")
 
     def add_role_actor(self, project_key: str, role: str, email: str) -> bool:
         actors = self._project(project_key).roles.get(role, Actors())
@@ -418,20 +434,6 @@ class JiraSim:
     # ------------------------------------------------------------------ change feed
     def _emit(self, type_: str, issue: Issue, event: str) -> None:
         self.changelog.emit(type_, issue.key, doc_id(issue.key), event)
-
-    def _membership_changed(self, *, group: str | None = None, role: tuple[str, str] | None = None,
-                            event: str = "group_membership_updated") -> None:
-        # Contract 0.1: a membership change is reported as an acl_change on every issue it can reach.
-        # Contract 0.2 (PR #1) replaces this fan-out with a single principal_change.
-        for issue in sorted(self.issues.values(), key=lambda i: i.key):
-            project = self.projects[issue.project_key]
-            for gate in self._gates(issue) or []:
-                via_group = group is not None and (
-                    group in gate.groups or any(group in project.roles.get(r, Actors()).groups for r in gate.roles))
-                via_role = role is not None and role[0] == project.key and role[1] in gate.roles
-                if via_group or via_role:
-                    self._emit("acl_change", issue, event)
-                    break
 
     def changes(self, cursor: str | None, limit: int = 500) -> tuple[list[ChangeEntry], str, bool]:
         return self.changelog.read(cursor, limit, {key: doc_id(key) for key in self.issues})
