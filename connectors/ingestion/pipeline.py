@@ -6,6 +6,9 @@ Per change type (connector-interface.md v0.2):
 - delete:           remove the chunks, keep a tombstone.
 - principal_change: nothing is re-indexed; the event goes to the sink.
 
+The sink (by default the store's outbox) also gets an acl_change event whenever an indexed document's ACL
+turns out to differ from the index, so the consumer can drop what it cached for that document.
+
 Every handler is idempotent and each store write is atomic, and the cursor is saved only after a whole batch is applied, so a crash
 replays at most one batch and never skips a change. A failure (network, database, sink) stops the source
 with its cursor where it was; the next run retries.
@@ -17,7 +20,7 @@ from dataclasses import dataclass, field
 from connectors.base import Change, Connector, Document, DocumentNotFound
 from connectors.ingestion.chunking import MAX_CHARS, chunk_body
 from connectors.ingestion.embedding import Embedder
-from connectors.ingestion.events import EventSink, PrincipalChange, RecordingSink
+from connectors.ingestion.events import EventSink, IngestionEvent, OutboxSink
 from connectors.ingestion.freshness import LagTracker, lag_seconds, utc_now
 from connectors.ingestion.store import ChunkRow, Store, same_acl
 
@@ -43,7 +46,7 @@ class Ingestor:
         self.connectors = list(connectors)
         self.store = store
         self.embedder = embedder
-        self.sink = sink or RecordingSink()
+        self.sink = sink or OutboxSink(store)
         self.lag = LagTracker()
         self._clock = clock
         self._max_chars = max_chars
@@ -80,8 +83,8 @@ class Ingestor:
     # -- one change -----------------------------------------------------------------------------
     def _apply(self, connector: Connector, change: Change) -> str:
         if change.type == "principal_change":
-            self.sink.principal_changed(PrincipalChange(
-                connector.source, change.principal or "", change.token or "", change.detected_at, self._clock()))
+            self.sink.emit(IngestionEvent("principal_change", connector.source, change.detected_at, self._clock(),
+                                          principal=change.principal, token=change.token))
             return PRINCIPAL
         if change.doc_id is None:
             raise ValueError(f"{change.type} change without a doc_id from {connector.source}")
@@ -92,7 +95,7 @@ class Ingestor:
         except DocumentNotFound:
             # Gone between list_changes and fetch: the same as a delete.
             return self._delete(change.doc_id)
-        return self._sync(doc)
+        return self._sync(doc, change.detected_at)
 
     def _delete(self, doc_id: str) -> str:
         have = self.store.indexed(doc_id)
@@ -101,9 +104,15 @@ class Ingestor:
         self.store.delete_document(doc_id, self._clock())
         return DELETED
 
-    def _sync(self, doc: Document) -> str:
+    def _sync(self, doc: Document, detected_at: str) -> str:
         """Bring the index in line with `doc`, doing the least work that is correct. Used for upsert and acl_change."""
         have = self.store.indexed(doc.doc_id)
+        if (have is not None and not have.deleted and have.snapshot_hash is not None
+                and not same_acl(have.snapshot_hash, have.acl_tokens, doc)):
+            # Emitted before the index is written: if the write then fails, the replay emits it again
+            # (at least once). The other order could lose the event.
+            self.sink.emit(IngestionEvent("acl_change", doc.source, detected_at, self._clock(),
+                                          doc_id=doc.doc_id, snapshot_hash=doc.acl.snapshot_hash))
         content_current = (have is not None and not have.deleted and have.version == doc.version
                            and (have.embedding_model, have.embedding_version) == (self.embedder.model, self.embedder.version))
         if content_current:

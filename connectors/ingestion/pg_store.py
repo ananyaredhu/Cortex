@@ -5,6 +5,7 @@ import psycopg
 from psycopg.types.json import Jsonb
 
 from connectors.base import Document
+from connectors.ingestion.events import IngestionEvent
 from connectors.ingestion.store import ChunkRow, Indexed, Snapshot, same_acl
 
 DEFAULT_URL = "postgresql://brain:brain@localhost:5432/brain"   # the local docker-compose database
@@ -91,6 +92,20 @@ class PostgresStore:
             self._conn.execute("DELETE FROM chunks WHERE doc_id = %s", (doc_id,))
             self._conn.execute("UPDATE documents SET deleted = true WHERE doc_id = %s", (doc_id,))
             self._conn.execute("UPDATE acl_snapshots SET valid_to = %s WHERE doc_id = %s AND valid_to IS NULL", (at, doc_id))
+
+    def append_event(self, event: IngestionEvent) -> int:
+        row = self._conn.execute(
+            "INSERT INTO ingestion_events (kind, source, principal, token, doc_id, snapshot_hash, detected_at, observed_at)"
+            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING seq",
+            (event.kind, event.source, event.principal, event.token, event.doc_id, event.snapshot_hash,
+             event.detected_at, event.observed_at)).fetchone()
+        return row[0]
+
+    def events_after(self, seq: int = 0, limit: int = 100) -> list[IngestionEvent]:
+        rows = self._conn.execute(
+            "SELECT kind, source, detected_at, observed_at, principal, token, doc_id, snapshot_hash, seq"
+            " FROM ingestion_events WHERE seq > %s ORDER BY seq LIMIT %s", (seq, limit)).fetchall()
+        return [IngestionEvent(r[0], r[1], _iso(r[2]), _iso(r[3]), r[4], r[5], r[6], r[7], r[8]) for r in rows]
 
     # -- inspection (tests, debugging) ----------------------------------------------------------
     def chunks_of(self, doc_id: str) -> list[ChunkRow]:
