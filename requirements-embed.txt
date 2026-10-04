@@ -1,0 +1,4 @@
+# Local embedding model for ingestion (bge-m3, ADR-002). Large: pulls torch and downloads the model on
+# first use. Not needed for tests or CI, which use a fake embedder. Install only where ingestion embeds:
+#   pip install -r requirements-embed.txt
+sentence-transformers>=3.0
