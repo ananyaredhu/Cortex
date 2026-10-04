@@ -1,0 +1,17 @@
+{
+  "channels": {
+    "C_DBMIG": "C0EXAMPLE01",
+    "C_DBMIGPRIV": "C0EXAMPLE02",
+    "C_AUTH": "C0EXAMPLE03",
+    "C_AUTHPRIV": "C0EXAMPLE04",
+    "C_PAYINC": "C0EXAMPLE05"
+  },
+  "threads": {
+    "slack:C_DBMIG/thread-1": "1791619200.000100",
+    "slack:C_DBMIG/thread-2": "1791619200.000200",
+    "slack:C_DBMIGPRIV/thread-1": "1791619200.000300",
+    "slack:C_AUTHPRIV/thread-1": "1791619200.000400",
+    "slack:C_AUTH/thread-1": "1791619200.000500",
+    "slack:C_PAYINC/thread-1": "1791619200.000600"
+  }
+}
