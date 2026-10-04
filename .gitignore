@@ -7,6 +7,8 @@
 secrets/
 credentials*.json
 token*.json
+identity-map*.json
+!identity-map.example.json
 
 # python
 __pycache__/
