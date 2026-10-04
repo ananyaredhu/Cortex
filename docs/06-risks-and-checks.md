@@ -9,7 +9,7 @@ Everything marked **verify** comes from web searches or the handbook and has not
 | 2 | **Checker timing:** time the layer-2 grounding model and a 3B-8B chat model on the deployment server's CPU | B | Day 3 | |
 | 3 | **Slack:** custom internal app in our own workspace is exempt from the 2025 rate-limit cut (1 request/min, 15 objects) that targets commercially distributed non-Marketplace apps | A | Day 2 | |
 | 4 | **Google Drive:** per-user OAuth with several free Google accounts; `changes.watch` push notifications reach our webhook | A | Day 3 | |
-| 5 | **Atlassian free plan:** reportedly no space/page or project/issue permissions. Decide: paid-plan trial window, sandbox from Tencent/Aspire, or simulator only. Check trial length and which plan includes issue security | A | Day 2 | |
+| 5 | **Atlassian free plan:** reportedly no space/page or project/issue permissions. Decide: paid-plan trial window, sandbox from Tencent/Aspire, or simulator only. Check trial length and which plan includes issue security | A | Day 2 | **Simulator only** (decided Day 2). No trial or sandbox is used. Confluence and Jira are simulated with space permissions, inherited page restrictions, project roles and issue security levels; both pass the shared contract tests. See `simulators/README.md` |
 | 6 | **Embeddings:** bge-m3 speed on CPU; license check (MIT as we recall). Hunyuan embedding reachable? (listed in China regions, 5 requests/s) | B | Day 3 | |
 | 7 | **WorkBuddy MCP:** remote HTTP MCP with an `Authorization` header works end to end; scheduling works | C | Day 4 | |
 | 8 | **CodeBuddy MCP config:** `.mcp.json` with `type: http` and headers using env vars works; confirm whether it reads `CODEBUDDY.md` or `AGENTS.md` | C | Day 2 | |
