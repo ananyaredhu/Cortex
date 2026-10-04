@@ -9,8 +9,8 @@ from datetime import datetime, timezone
 
 import httpx
 
-from connectors.base import AccessDecision, AclEvidence, Change, ChangeBatch, Document, PlatformIdentity, Source
-from simulators.common import DocumentNotFound
+from connectors.base import AccessDecision, AclEvidence, ChangeBatch, Document, DocumentNotFound, PlatformIdentity, Source
+from simulators.common import to_change
 from simulators.confluence.model import valid_id
 from simulators.confluence.tokens import group_token
 
@@ -69,8 +69,7 @@ class ConfluenceConnector:
         response = self._client.get("/sim/changes", params=params)
         response.raise_for_status()
         data = response.json()
-        changes = [Change(c["type"], c["doc_id"], c["detected_at"]) for c in data["changes"]]
-        return ChangeBatch(changes, data["next_cursor"], data["has_more"])
+        return ChangeBatch([to_change(c) for c in data["changes"]], data["next_cursor"], data["has_more"])
 
     def fetch(self, doc_id: str) -> Document:
         page = self._page(doc_id)
@@ -86,7 +85,7 @@ class ConfluenceConnector:
             body=page["body"]["storage"]["value"],
             parent_id=f"confluence:{space}",
             links=list(extra["links"]),
-            author=page["history"]["createdBy"]["email"] or "",
+            author=page["history"]["createdBy"]["email"] or None,
             created_at=page["history"]["createdDate"],
             updated_at=page["version"]["when"],
             version=extra["version"],

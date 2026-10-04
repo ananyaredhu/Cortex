@@ -51,6 +51,13 @@ def acl_changes(keys: set[str]) -> set[tuple[str, str]]:
     return {("acl_change", k) for k in keys}
 
 
+def principal_changes(sim: JiraSim, cursor: str) -> list[tuple[str, str]]:
+    """(principal, token) of every entry since cursor, asserting they are all principal changes naming no document."""
+    entries = sim.changes(cursor)[0]
+    assert all(e.type == "principal_change" and e.doc_id is None and e.item_id is None for e in entries), entries
+    return [(e.principal, e.token) for e in entries]
+
+
 def test_browse_comes_from_project_roles_directly_or_through_a_group(sim):
     assert allowed(sim, ALICE, "OPS-1"), "role held directly"
     assert allowed(sim, BOB, "OPS-1"), "role held through the group devs"
@@ -104,8 +111,9 @@ def test_removing_a_role_revokes_at_once(sim):
     _, cursor, _ = sim.changes(None)
     assert sim.remove_role_actor("OPS", "developer", ALICE) is True
     assert not allowed(sim, ALICE, "OPS-1") and not allowed(sim, ALICE, "OPS-2")
-    assert changes_since(sim, cursor) == acl_changes(ALL)
+    assert principal_changes(sim, cursor) == [(f"user:{ALICE}", "role:OPS:developer")], "one entry, not one per issue"
     assert sim.remove_role_actor("OPS", "developer", ALICE) is False, "removing twice changes nothing"
+    assert len(sim.changes(cursor)[0]) == 1
 
 
 def test_leaving_a_group_drops_the_roles_it_filled(sim):
@@ -113,7 +121,8 @@ def test_leaving_a_group_drops_the_roles_it_filled(sim):
     sim.remove_member("devs", BOB)
     assert not allowed(sim, BOB, "OPS-1")
     assert sim.roles_of(BOB) == []
-    assert changes_since(sim, cursor) == acl_changes(ALL)
+    assert principal_changes(sim, cursor) == [(f"user:{BOB}", "group:jira:devs"), (f"user:{BOB}", "role:OPS:developer")], \
+        "he lost the group token and the role token the group gave him"
 
 
 def test_leaving_a_level_group_touches_only_issues_at_that_level(sim):
@@ -121,7 +130,22 @@ def test_leaving_a_level_group_touches_only_issues_at_that_level(sim):
     sim.remove_member("security-team", DANA)
     assert not allowed(sim, DANA, "OPS-2") and not allowed(sim, DANA, "OPS-3")
     assert allowed(sim, DANA, "OPS-1"), "she is still a developer"
-    assert changes_since(sim, cursor) == acl_changes({"OPS-2", "OPS-3"})
+    assert principal_changes(sim, cursor) == [(f"user:{DANA}", "group:jira:security-team")]
+
+
+def test_replacing_a_roles_actors_reports_each_person_affected(sim):
+    _, cursor, _ = sim.changes(None)
+    sim.set_role_actors("OPS", "lead", users=[CAROL], groups=["security-team"])    # Alice out; Carol, Dana, Frank in
+    assert principal_changes(sim, cursor) == [(f"user:{who}", "role:OPS:lead") for who in (ALICE, CAROL, DANA, FRANK)]
+    assert sim.identity_tokens(FRANK) == {"group:jira:security-team", "role:OPS:lead"}
+
+
+def test_issue_acl_does_not_change_when_membership_does(sim):
+    """The two kinds of permission change stay apart: tokens and snapshot describe the issue, not who fills a role."""
+    before = sim.acl(sim.issues["OPS-2"])
+    sim.remove_role_actor("OPS", "lead", ALICE)
+    sim.remove_member("security-team", DANA)
+    assert sim.acl(sim.issues["OPS-2"]) == before
 
 
 def test_changing_a_levels_members(sim):

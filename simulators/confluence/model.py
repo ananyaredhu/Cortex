@@ -15,7 +15,9 @@ Normalized tokens follow the contract's narrowing rule: a restricted page carrie
 innermost restriction; an unrestricted page carries the space's. That set is never smaller than the
 true readers, and `can_view` is the authoritative answer.
 
-Every mutation appends to a change log, which backs `list_changes` and the webhooks.
+Every mutation appends to a change log, which backs `list_changes` and the webhooks. The two kinds of
+permission change in the contract are kept apart: a page's own ACL changing is an `acl_change` on each
+affected page; a person joining or leaving a group is a single `principal_change`.
 """
 from __future__ import annotations
 
@@ -24,32 +26,18 @@ import json
 import re
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 
+from simulators.common import ChangeEntry, ChangeLog, Invalid, NotFound, norm_email, utc_now
 from simulators.confluence.tokens import group_token, user_token
+
+__all__ = ["ConfluenceSim", "Invalid", "NotFound", "Page", "Principals", "Space", "User", "ViewDecision", "doc_id", "valid_id"]
 
 _ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 _VERSION_LABEL = re.compile(r"^v(\d+)$")
 
 
-def utc_now() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
 def valid_id(value: str) -> bool:
     return bool(_ID.match(value))
-
-
-class NotFound(LookupError):
-    """Unknown space, page, user or group."""
-
-
-class Invalid(ValueError):
-    """A request the simulator cannot apply (bad id, duplicate page, bad cursor...)."""
-
-
-def _norm(email: str) -> str:
-    return email.strip().lower()
 
 
 @dataclass
@@ -98,14 +86,8 @@ class Page:
     labels: list[str] = field(default_factory=list)
 
 
-@dataclass
-class ChangeEntry:
-    seq: int
-    type: str                    # upsert | delete | acl_change
-    page_id: str
-    space_key: str
-    detected_at: str
-    event: str                   # webhook event name
+def doc_id(page: Page) -> str:
+    return f"confluence:{page.space_key}/{page.id}"
 
 
 @dataclass
@@ -122,7 +104,7 @@ class ConfluenceSim:
         self.groups: dict[str, set[str]] = {}       # group name -> member emails
         self.spaces: dict[str, Space] = {}
         self.pages: dict[str, Page] = {}
-        self.log: list[ChangeEntry] = []
+        self.changelog = ChangeLog(clock)
 
     def clear(self) -> None:
         self.users.clear()
@@ -130,11 +112,11 @@ class ConfluenceSim:
         self.groups.clear()
         self.spaces.clear()
         self.pages.clear()
-        self.log.clear()
+        self.changelog.clear()
 
     # ------------------------------------------------------------------ users and groups
     def add_user(self, email: str, display_name: str | None = None) -> User:
-        email = _norm(email)
+        email = norm_email(email)
         if email not in self.users:
             account_id = "cf-" + hashlib.sha256(email.encode()).hexdigest()[:16]
             user = User(account_id, email, display_name or email.split("@")[0])
@@ -146,42 +128,28 @@ class ConfluenceSim:
         return self._by_account.get(account_id)
 
     def groups_of(self, email: str) -> list[str]:
-        email = _norm(email)
+        email = norm_email(email)
         return sorted(g for g, members in self.groups.items() if email in members)
 
     def add_member(self, group: str, email: str) -> bool:
-        email = _norm(email)
+        email = norm_email(email)
         if email not in self.users:
             raise NotFound(f"No user with email: {email}")
         members = self.groups.setdefault(group, set())
         if email in members:
             return False
         members.add(email)
-        self._membership_changed(group)
+        self.changelog.emit_principal(user_token(email), group_token(group), "group_membership_updated")
         return True
 
     def remove_member(self, group: str, email: str) -> bool:
-        email = _norm(email)
+        """Revocation by membership: no page's ACL changes, so this is one principal_change."""
+        email = norm_email(email)
         if email not in self.groups.get(group, set()):
             return False
         self.groups[group].discard(email)
-        self._membership_changed(group)
+        self.changelog.emit_principal(user_token(email), group_token(group), "group_membership_updated")
         return True
-
-    def _membership_changed(self, group: str) -> None:
-        # Contract 0.1: a membership change is reported as an acl_change on every page the group can reach.
-        # Contract 0.2 (PR #1) replaces this fan-out with a single principal_change.
-        for page in self._pages_referencing_group(group):
-            self._emit("acl_change", page, "group_membership_updated")
-
-    def _pages_referencing_group(self, group: str) -> list[Page]:
-        out = []
-        for page in self.pages.values():
-            in_space = group in self.spaces[page.space_key].view.groups
-            in_chain = any(group in p.restrictions.groups for p in self.restriction_chain(page))
-            if in_space or in_chain:
-                out.append(page)
-        return out
 
     # ------------------------------------------------------------------ spaces
     def add_space(self, key: str, name: str | None = None) -> Space:
@@ -196,7 +164,7 @@ class ConfluenceSim:
     def set_space_view(self, key: str, groups: Iterable[str] = (), users: Iterable[str] = ()) -> None:
         """Replace who may view the space. Every page in the space gets an acl_change."""
         space = self._space(key)
-        new = Principals({_norm(u) for u in users}, set(groups))
+        new = Principals({norm_email(u) for u in users}, set(groups))
         if new == space.view:
             return
         space.view = new
@@ -225,7 +193,7 @@ class ConfluenceSim:
         page = Page(
             id=page_id, space_key=space_key, title=title, body=body, parent_id=parent_id, author=author,
             created_at=created_at or now, updated_at=updated_at or created_at or now, version=version or "v1",
-            restrictions=Principals({_norm(u) for u in users}, set(groups)), links=list(links), labels=list(labels),
+            restrictions=Principals({norm_email(u) for u in users}, set(groups)), links=list(links), labels=list(labels),
         )
         self.pages[page_id] = page
         self._emit("upsert", page, "page_created")
@@ -271,7 +239,7 @@ class ConfluenceSim:
     def set_restrictions(self, page_id: str, groups: Iterable[str] = (), users: Iterable[str] = ()) -> None:
         """Replace the page's read restriction (empty = unrestricted). The page and its whole subtree change."""
         page = self._page(page_id)
-        new = Principals({_norm(u) for u in users}, set(groups))
+        new = Principals({norm_email(u) for u in users}, set(groups))
         if new == page.restrictions:
             return
         page.restrictions = new
@@ -312,7 +280,7 @@ class ConfluenceSim:
     def can_view(self, email: str | None, page_id: str) -> ViewDecision:
         """Authoritative answer. Unknown users and unknown pages are denied the same way."""
         deny = ViewDecision(False, [])
-        user = self.users.get(_norm(email)) if email else None
+        user = self.users.get(norm_email(email)) if email else None
         page = self.pages.get(page_id)
         if user is None or page is None:
             return deny
@@ -346,42 +314,11 @@ class ConfluenceSim:
 
     # ------------------------------------------------------------------ change feed
     def _emit(self, type_: str, page: Page, event: str) -> None:
-        self.log.append(ChangeEntry(len(self.log), type_, page.id, page.space_key, self._clock(), event))
+        self.changelog.emit(type_, page.id, doc_id(page), event)
 
     def changes(self, cursor: str | None, limit: int = 500) -> tuple[list[ChangeEntry], str, bool]:
-        """Returns (entries, next_cursor, has_more).
-
-        cursor=None starts a full crawl: every existing page as an upsert, paged by page id. The crawl
-        remembers where the log stood when it began, so nothing that changes during the crawl is lost.
-        """
-        if limit < 1:
-            raise Invalid("limit must be at least 1")
-        try:
-            if cursor is None:
-                return self._crawl(len(self.log), "", limit)
-            if cursor.startswith("crawl:"):
-                _, log_pos, after = cursor.split(":", 2)
-                return self._crawl(self._position(int(log_pos)), after, limit)
-            start = self._position(int(cursor))
-        except ValueError as exc:
-            raise Invalid(f"Bad cursor: {cursor!r}") from exc
-        batch = self.log[start:start + limit]
-        end = start + len(batch)
-        return batch, str(end), end < len(self.log)
-
-    def _position(self, pos: int) -> int:
-        if not 0 <= pos <= len(self.log):
-            raise ValueError(pos)
-        return pos
-
-    def _crawl(self, log_pos: int, after: str, limit: int) -> tuple[list[ChangeEntry], str, bool]:
-        ids = sorted(i for i in self.pages if i > after)
-        batch = ids[:limit]
-        now = self._clock()
-        entries = [ChangeEntry(-1, "upsert", i, self.pages[i].space_key, now, "crawl") for i in batch]
-        if len(ids) > limit:
-            return entries, f"crawl:{log_pos}:{batch[-1]}", True
-        return entries, str(log_pos), log_pos < len(self.log)
+        """(entries, next_cursor, has_more). cursor=None starts a full crawl: every page as an upsert."""
+        return self.changelog.read(cursor, limit, {p.id: doc_id(p) for p in self.pages.values()})
 
 
 def _grant(gate: Principals, email: str, memberships: set[str]) -> str | None:

@@ -59,11 +59,15 @@ Fields under `_simulator` are not part of Confluence. `expand` is ignored: pages
 ### Freshness
 | Endpoint | Purpose |
 |---|---|
-| `GET /sim/changes?cursor=&limit=` | Change feed behind `list_changes`. No cursor = full crawl (every page as an `upsert`), then incremental `upsert`, `delete`, `acl_change` |
+| `GET /sim/changes?cursor=&limit=` | Change feed behind `list_changes`. No cursor = full crawl (every page as an `upsert`), then incremental `upsert`, `delete`, `acl_change`, `principal_change` |
 | `POST /sim/webhooks` `{"url": ...}` | Register a webhook. Each change is POSTed with `webhookEvent` = `page_created`, `page_updated`, `page_removed`, `content_permissions_updated`, `space_permissions_updated` or `group_membership_updated` |
 | `DELETE /sim/webhooks` | Remove all webhooks |
 
 Webhook delivery is best effort. The change feed is the fallback, so a lost webhook only adds lag.
+
+The two kinds of permission change in the [connector interface](../docs/02-contracts/connector-interface.md) are kept apart:
+- A page's own ACL changes (restriction set or lifted, space permission changed): one `acl_change` per affected page. Re-fetch it; its tokens changed.
+- A person joins or leaves a group: one `principal_change` with `principal` = `user:<email>` and `token` = the group's token, and no `doc_id`. No page's tokens changed; drop cached identities and decisions for that person.
 
 ### Admin endpoints (demo and test helpers, never in production)
 | Action | Endpoint |
@@ -81,8 +85,6 @@ Set the environment variable `SIM_ADMIN_TOKEN` to require `Authorization: Bearer
 and `/sim/webhooks`. Leave it unset for local development.
 
 ### Known limits (Confluence)
-- Built against contract 0.1: a group membership change is reported as an `acl_change` on every page the group
-  can reach. Contract 0.2 turns that into one `principal_change`.
 - Not simulated yet: moving a page, edit restrictions, anonymous access, personal spaces, CQL search.
 - The scale seed (12k+ pages) is a later task.
 
@@ -126,7 +128,7 @@ One document is one issue: `body` is the description, then `Status: ...` when a 
 | `GET /rest/api/2/search?jql=project = KEY&startAt=&maxResults=` | Issues. Only `project = KEY` is understood |
 | `POST /rest/api/2/permissions/check` | Which of the listed issues the account may browse: `{"accountId": ..., "projectPermissions": [{"permissions": ["BROWSE_PROJECTS"], "issues": [keys]}]}` |
 | `GET /rest/api/2/user/search?query=<email>`, `GET /rest/api/2/user/groups?accountId=` | A user; their groups |
-| `GET /sim/users/{accountId}/roles` | Every project role the user fills (simulator-only) |
+| `GET /sim/users/{accountId}/roles`, `GET /sim/users/{accountId}/tokens` | Every project role the user fills; every ACL token they hold (simulator-only) |
 
 Differences from real Jira: issues are addressed by key everywhere (real Jira's permission check takes numeric ids),
 and descriptions are plain text.
@@ -135,6 +137,9 @@ and descriptions are plain text.
 `GET /sim/changes` and `POST /sim/webhooks` work as for Confluence. Webhook events: `jira:issue_created`,
 `jira:issue_updated`, `jira:issue_deleted`, `comment_created`, `issue_security_updated`,
 `issue_security_scheme_updated`, `project_permissions_updated`, `project_role_updated`, `group_membership_updated`.
+
+A role or group membership change is a `principal_change`, one per token the person gained or lost. Leaving a group
+that fills a project role costs two tokens, the group's and the role's, so it produces two entries.
 
 ### Admin endpoints (demo and test helpers, never in production)
 | Action | Endpoint |
@@ -150,9 +155,9 @@ and descriptions are plain text.
 | Reset | `POST /sim/admin/reset` `{"seed": "company_a"}` or `"empty"` |
 
 ### Known limits (Jira)
-- Built against contract 0.1: a role or group membership change is reported as an `acl_change` on every issue it
-  can reach. Contract 0.2 turns that into one `principal_change`.
 - Not simulated: reporter and assignee as level members, permission schemes shared between projects,
   moving issues between projects, workflows, JQL beyond `project = KEY`.
-- `common.py` (change feed, errors, webhook delivery) is used by Jira only so far. Confluence keeps its own copy
-  of the change feed until its PR merges.
+
+## Shared code
+[`common.py`](common.py) holds what both simulators use: the change feed with its full crawl, webhook delivery,
+and the simulators' error types. Both follow contract 0.2.

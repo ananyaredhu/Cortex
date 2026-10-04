@@ -3,8 +3,7 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from connectors.base import PlatformIdentity
-from simulators.common import DocumentNotFound
+from connectors.base import DocumentNotFound, PlatformIdentity
 from simulators.jira.app import create_app
 from simulators.jira.connector import JiraConnector
 from simulators.jira.model import JiraSim
@@ -103,8 +102,12 @@ def test_set_security_level_then_revoke_role_over_http(conn):
     assert conn.fetch(doc_id).acl.tokens == [f"user:{MAYA}"]
     conn.http.put("/sim/admin/issues/PAYINC-9/security", json={"level": None}).raise_for_status()
     assert conn.check_access(priya, doc_id).allowed
+    cursor = conn.list_changes(None).next_cursor
     assert conn.http.delete(f"/sim/admin/projects/PAYINC/roles/developer/users/{PRIYA}").json()["changed"] is True
     assert not conn.check_access(priya, doc_id).allowed, "a stale identity object must not keep access"
+    change, = conn.list_changes(cursor).changes
+    assert (change.type, change.doc_id, change.principal, change.token) == (
+        "principal_change", None, f"user:{PRIYA}", "role:PAYINC:developer")
     assert "role:PAYINC:developer" not in conn.resolve_identity(PRIYA).groups
 
 
@@ -148,8 +151,11 @@ def test_webhooks_fire_for_each_change(conn):
     conn.http.post("/sim/webhooks", json={"url": "http://brain.invalid/hooks/jira"})
     conn.http.put("/sim/admin/issues/DBMIG-150", json={"status": "In Progress"})
     conn.http.delete(f"/sim/admin/groups/security-team/members/{DANA}")
-    events = [(p["webhookEvent"], p["_simulator"]["doc_id"]) for _, payloads in sent for p in payloads]
-    assert events == [("jira:issue_updated", "jira:DBMIG-150"), ("group_membership_updated", "jira:SEC-17")]
+    payloads = [p for _, batch in sent for p in batch]
+    assert [(p["webhookEvent"], p["_simulator"]["doc_id"]) for p in payloads] == [
+        ("jira:issue_updated", "jira:DBMIG-150"), ("group_membership_updated", None)]
+    assert payloads[0]["issue"] == {"key": "DBMIG-150"} and "issue" not in payloads[1]
+    assert (payloads[1]["_simulator"]["principal"], payloads[1]["_simulator"]["token"]) == (f"user:{DANA}", "group:jira:security-team")
     assert all(urls == ["http://brain.invalid/hooks/jira"] for urls, _ in sent)
 
 
@@ -191,3 +197,11 @@ def test_connector_fails_closed_when_the_simulator_is_unreachable_or_broken():
         decision = connector.check_access(dana, "jira:SEC-17")
         assert (decision.allowed, decision.proof_path) == (False, []), handler.__name__
         assert connector.resolve_identity(DANA) is None, handler.__name__
+
+
+def test_identity_tokens_and_unknown_reporter(conn):
+    assert conn.resolve_identity(MAYA).groups == ["public:org", "role:DBMIG:developer", "role:DBMIG:lead", "role:PAYINC:developer"]
+    assert conn.resolve_identity(SAM).groups == []
+    conn.http.post("/sim/admin/issues", json={"project": "DBMIG", "summary": "No reporter", "key": "DBMIG-200"}).raise_for_status()
+    assert conn.fetch("jira:DBMIG-200").author is None
+    assert conn.fetch("jira:DBMIG-142").author == MAYA

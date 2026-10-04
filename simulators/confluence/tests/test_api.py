@@ -3,9 +3,9 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from connectors.base import PlatformIdentity
+from connectors.base import DocumentNotFound, PlatformIdentity
 from simulators.confluence.app import create_app
-from simulators.confluence.connector import ConfluenceConnector, DocumentNotFound
+from simulators.confluence.connector import ConfluenceConnector
 from simulators.confluence.model import ConfluenceSim
 from simulators.confluence.seed import seed_company_a
 from simulators.confluence.testing import SeededConfluence
@@ -96,8 +96,12 @@ def test_restrict_then_revoke_over_http(conn):
     assert conn.http.put("/sim/admin/pages/runbook-payment-service/restrictions", json=body).status_code == 200
     assert conn.check_access(priya, doc_id).proof_path == ["user:priya@companya.com", "public:org", "group:confluence:payments-eng"]
     assert not conn.check_access(conn.resolve_identity("maya@companya.com"), doc_id).allowed
+    cursor = conn.list_changes(None).next_cursor
     assert conn.http.delete("/sim/admin/groups/payments-eng/members/priya@companya.com").json()["changed"] is True
     assert not conn.check_access(priya, doc_id).allowed, "a stale identity object must not keep access"
+    change, = conn.list_changes(cursor).changes
+    assert (change.type, change.doc_id, change.principal, change.token) == (
+        "principal_change", None, "user:priya@companya.com", "group:confluence:payments-eng")
     assert "group:confluence:payments-eng" not in conn.resolve_identity("priya@companya.com").groups
 
 
@@ -129,10 +133,15 @@ def test_webhooks_fire_for_each_change(conn):
     conn.http.post("/sim/webhooks", json={"url": "http://brain.invalid/hooks/confluence"})
     conn.http.put("/sim/admin/pages/runbook-payment-service", json={"body": "edited"})
     conn.http.put(f"/sim/admin/pages/{BREACH}/restrictions", json={"groups": [], "users": ["dana@companya.com"]})
-    assert [urls for urls, _ in sent] == [["http://brain.invalid/hooks/confluence"]] * 2
-    events = [(p["webhookEvent"], p["_simulator"]["doc_id"]) for _, payloads in sent for p in payloads]
-    assert events == [("page_updated", "confluence:PAY/runbook-payment-service"),
-                      ("content_permissions_updated", f"confluence:SEC/{BREACH}")]
+    conn.http.delete("/sim/admin/groups/security-team/members/dana@companya.com")
+    assert [urls for urls, _ in sent] == [["http://brain.invalid/hooks/confluence"]] * 3
+    payloads = [p for _, batch in sent for p in batch]
+    assert [(p["webhookEvent"], p["_simulator"]["doc_id"]) for p in payloads] == [
+        ("page_updated", "confluence:PAY/runbook-payment-service"),
+        ("content_permissions_updated", f"confluence:SEC/{BREACH}"),
+        ("group_membership_updated", None)]
+    assert payloads[0]["page"] == {"id": "runbook-payment-service"} and "page" not in payloads[2]
+    assert payloads[2]["_simulator"]["principal"] == "user:dana@companya.com"
 
 
 # ---------------------------------------------------------------------------------- connector
@@ -172,3 +181,9 @@ def test_connector_fails_closed_when_the_simulator_is_unreachable_or_broken():
         decision = connector.check_access(dana, f"confluence:SEC/{BREACH}")
         assert (decision.allowed, decision.proof_path) == (False, []), handler.__name__
         assert connector.resolve_identity("dana@companya.com") is None, handler.__name__
+
+
+def test_unknown_author_is_none(conn):
+    conn.http.post("/sim/admin/pages", json={"id": "no-author", "space": "ENG", "title": "Anonymous"}).raise_for_status()
+    assert conn.fetch("confluence:ENG/no-author").author is None
+    assert conn.fetch("confluence:PAY/runbook-payment-service").author == "maya@companya.com"

@@ -5,17 +5,16 @@ from datetime import datetime, timezone
 
 import httpx
 
+from connectors.base import Change
+from connectors.base import DocumentNotFound as DocumentNotFound  # re-exported for the simulators' connectors
+
 
 class NotFound(LookupError):
-    """Unknown project, issue, user, role..."""
+    """Unknown project, issue, page, user, role..."""
 
 
 class Invalid(ValueError):
     """A request the simulator cannot apply (bad id, duplicate, bad cursor...)."""
-
-
-class DocumentNotFound(LookupError):
-    """Raised by a connector's `fetch` and `version`. Moves to connectors/base.py once contract 0.2 is merged."""
 
 
 def utc_now() -> str:
@@ -29,11 +28,22 @@ def norm_email(email: str) -> str:
 @dataclass
 class ChangeEntry:
     seq: int
-    type: str            # upsert | delete | acl_change
-    item_id: str         # native id (issue key, page id)
-    doc_id: str          # "<source>:<native id>"
+    type: str                    # upsert | delete | acl_change | principal_change
+    item_id: str | None          # native id (issue key, page id); None for principal_change
+    doc_id: str | None           # "<source>:<native id>"; None for principal_change
     detected_at: str
-    event: str           # webhook event name
+    event: str                   # webhook event name
+    principal: str | None = None  # principal_change only: "user:<email>"
+    token: str | None = None      # principal_change only: the token gained or lost
+
+    def as_json(self) -> dict:
+        return {"type": self.type, "item_id": self.item_id, "doc_id": self.doc_id, "principal": self.principal,
+                "token": self.token, "detected_at": self.detected_at}
+
+
+def to_change(entry: dict) -> Change:
+    """A `/sim/changes` entry as the contract's Change."""
+    return Change(entry["type"], entry["doc_id"], entry["detected_at"], entry.get("principal"), entry.get("token"))
 
 
 class ChangeLog:
@@ -44,7 +54,12 @@ class ChangeLog:
         self.entries: list[ChangeEntry] = []
 
     def emit(self, type_: str, item_id: str, doc_id: str, event: str) -> None:
+        """A document was created, edited or deleted, or its own ACL changed."""
         self.entries.append(ChangeEntry(len(self.entries), type_, item_id, doc_id, self._clock(), event))
+
+    def emit_principal(self, principal: str, token: str, event: str) -> None:
+        """A person gained or lost a token. No document changed, so this is one entry however many documents it reaches."""
+        self.entries.append(ChangeEntry(len(self.entries), "principal_change", None, None, self._clock(), event, principal, token))
 
     def clear(self) -> None:
         self.entries.clear()
@@ -83,6 +98,17 @@ class ChangeLog:
         if len(ids) > limit:
             return entries, f"crawl:{log_pos}:{batch[-1]}", True
         return entries, str(log_pos), log_pos < len(self.entries)
+
+
+def webhook_payloads(entries: list[ChangeEntry], item_field: str, id_field: str) -> list[dict]:
+    """Webhook bodies for new log entries. `item_field`/`id_field` name the platform's object, e.g. ("issue", "key")."""
+    out = []
+    for e in entries:
+        payload: dict = {"webhookEvent": e.event, "timestamp": e.detected_at, "_simulator": {"seq": e.seq, **e.as_json()}}
+        if e.item_id is not None:
+            payload[item_field] = {id_field: e.item_id}
+        out.append(payload)
+    return out
 
 
 def deliver(urls: list[str], payloads: list[dict]) -> None:

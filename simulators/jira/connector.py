@@ -5,10 +5,9 @@ It talks to the simulator only over HTTP, the way a connector for a real Jira si
 """
 import httpx
 
-from connectors.base import AccessDecision, AclEvidence, Change, ChangeBatch, Document, PlatformIdentity, Source
-from simulators.common import DocumentNotFound, utc_now
+from connectors.base import AccessDecision, AclEvidence, ChangeBatch, Document, DocumentNotFound, PlatformIdentity, Source
+from simulators.common import to_change, utc_now
 from simulators.jira.model import valid_issue_key
-from simulators.jira.tokens import group_token, role_token
 
 API = "/rest/api/2"
 POLICY_VERSION = "jira-sim-0.1"
@@ -53,12 +52,9 @@ class JiraConnector:
             account_id = next((u["accountId"] for u in found.json() if u["emailAddress"].lower() == email.lower()), None)
             if account_id is None:
                 return None
-            groups = self._client.get(f"{API}/user/groups", params={"accountId": account_id})
-            groups.raise_for_status()
-            roles = self._client.get(f"/sim/users/{account_id}/roles")
-            roles.raise_for_status()
-            tokens = sorted({group_token(g["name"]) for g in groups.json()}
-                            | {role_token(r["project"], r["role"]) for r in roles.json()})
+            held = self._client.get(f"/sim/users/{account_id}/tokens")
+            held.raise_for_status()
+            tokens = sorted(str(t) for t in held.json())
         except Exception:   # fail closed on anything: network, timeout, malformed response
             return None
         return PlatformIdentity(self.source, account_id, email, tokens)
@@ -71,8 +67,7 @@ class JiraConnector:
         response = self._client.get("/sim/changes", params=params)
         response.raise_for_status()
         data = response.json()
-        changes = [Change(c["type"], c["doc_id"], c["detected_at"]) for c in data["changes"]]
-        return ChangeBatch(changes, data["next_cursor"], data["has_more"])
+        return ChangeBatch([to_change(c) for c in data["changes"]], data["next_cursor"], data["has_more"])
 
     def fetch(self, doc_id: str) -> Document:
         issue = self._issue(doc_id)
@@ -87,7 +82,7 @@ class JiraConnector:
             body=_body(fields),
             parent_id=f"jira:{fields['project']['key']}",
             links=list(extra["links"]),
-            author=(fields.get("reporter") or {}).get("emailAddress") or "",
+            author=(fields.get("reporter") or {}).get("emailAddress") or None,
             created_at=fields["created"],
             updated_at=fields["updated"],
             version=extra["version"],
