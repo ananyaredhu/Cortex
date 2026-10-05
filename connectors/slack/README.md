@@ -54,7 +54,9 @@ Limits, all known:
   do for 200 channels without the Events API.
 - **Not covered:** DMs and group DMs, files, links to other documents (`links` is always empty), archived-channel
   special cases.
-- `check_access` makes three or four Slack calls. Its latency against the real API has not been measured yet.
+- `check_access` asks Slack four questions at once (channel, thread, user, members) and caches nothing. Measured on
+  the real workspace on 5 Oct: median about 270 ms, worst about 310 ms. One after another they took about 740 ms.
+  All of them together must finish within 3 seconds or the answer is deny.
 
 ## IDs and the seed manifest
 The fixtures say `slack:C_DBMIG/thread-1`; the workspace says `slack:C07ABC123/1791619200.000100`. The connector

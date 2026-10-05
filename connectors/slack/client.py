@@ -77,10 +77,11 @@ class SlackClient:
             return body
 
     def pages(self, method: str, key: str, *, retry: bool = True, **params: str | int | bool) -> Iterator[dict | str]:
-        """Every item under `key`, following `response_metadata.next_cursor` to the end."""
+        """Every item under `key`, following `response_metadata.next_cursor` to the end.
+        Pass `cursor=` to start from a page already in hand."""
         cursor = ""
         while True:
-            body = self.call(method, retry=retry, **params, **({"cursor": cursor} if cursor else {}))
+            body = self.call(method, retry=retry, **{**params, **({"cursor": cursor} if cursor else {})})
             yield from body.get(key) or []
             cursor = (body.get("response_metadata") or {}).get("next_cursor") or ""
             if not cursor:
