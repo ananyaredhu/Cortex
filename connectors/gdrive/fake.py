@@ -85,9 +85,10 @@ class FakeDrive:
         file = self.files.get(file_id)
         return file if file is not None and self._role(actor, file) else None
 
-    @staticmethod
-    def _json(file: dict) -> dict:
-        return {"id": file["id"], "name": file["name"], "mimeType": file["mimeType"], "parents": list(file["parents"]),
+    def _json(self, actor: str, file: dict) -> dict:
+        """As Drive v3 answers: `parents` lists only the folders `actor` can see, and is left out when there are none."""
+        parents = [p for p in file["parents"] if p in self.files and self._role(actor, self.files[p])]
+        return {"id": file["id"], "name": file["name"], "mimeType": file["mimeType"], **({"parents": parents} if parents else {}),
                 "trashed": file["trashed"], "modifiedTime": file["modifiedTime"], "createdTime": file["createdTime"],
                 "webViewLink": f"https://drive.test/file/d/{file['id']}/view", "owners": [{"emailAddress": file["owner"]}]}
 
@@ -118,7 +119,7 @@ class FakeDrive:
         if path == "files":
             match = _PARENT_QUERY.search(params.get("q", ""))
             parent = match.group(1) if match else None
-            children = [self._json(f) for f in self.files.values()
+            children = [self._json(actor, f) for f in self.files.values()
                         if parent in f["parents"] and not f["trashed"] and self._role(actor, f)]
             return httpx.Response(200, json={"files": children})
         file_id, _, rest = path.removeprefix("files/").partition("/")
@@ -131,7 +132,7 @@ class FakeDrive:
             return httpx.Response(200, json={"permissions": self._effective(file)})
         if rest == "export" or params.get("alt") == "media":
             return httpx.Response(200, content=("﻿" + file["content"].replace("\n", "\r\n")).encode())
-        return httpx.Response(200, json=self._json(file))
+        return httpx.Response(200, json=self._json(actor, file))
 
 
 ADMIN = "drive.admin@example.com"     # owns the seeded files; not in the identity map, so it holds no token

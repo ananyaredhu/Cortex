@@ -83,11 +83,11 @@ Group membership lives in the config, so the connector emits no `principal_chang
 - **Not covered:** shared drives, shortcuts, files with several parents, Sheets and Slides content, `links`.
 - **No seed manifest yet.** The fake uses the fixture IDs. Real Drive assigns its own, and the contract tests and
   golden cases will need a mapping, as Slack has.
-- `check_access` latency against the real API has not been measured.
+- `check_access` against the real API takes about 0.5 s (5 Oct, three signed-in accounts, two files).
 
 ## Tests
 `fake.py` is an in-memory Drive v3 and token endpoint: per-account visibility, inherited sharing, sharing lists only
 for owners and editors. `SeededDrive` in `testing.py` is registered in the shared contract tests as `gdrive-fake` and
 passes all of them, including restriction and container revocation. `tests/` covers the Drive-specific behaviour.
 
-No test calls the real Google API, and the sign-in flow has only been tested up to the token exchange.
+No test calls the real Google API. The sign-in flow and `check_setup` have been run by hand against real Drive (5 Oct).
