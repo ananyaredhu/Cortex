@@ -61,7 +61,7 @@ A reader is anyone whose tokens overlap the document's tokens. Each persona's to
 | `C_AUTH` | `#auth-design` | public | Priya, Sam, Dana, Maya |
 | `C_PAYINC` | `#payments-incident` | public | Priya, Dana, Maya |
 
-The bot must be invited to both private channels, or it cannot read them. Real channel IDs will differ from the fixture IDs; the seed manifest (to be built with the Slack connector) maps one to the other.
+The bot must be invited to **all five channels, the public ones too** (`/invite @<app name>`): a bot can only read the history of channels it is a member of. Real channel IDs will differ from the fixture IDs; the seed manifest (to be built with the Slack connector) maps one to the other.
 
 ### Threads to post
 

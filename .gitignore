@@ -9,6 +9,8 @@ credentials*.json
 token*.json
 identity-map*.json
 !identity-map.example.json
+seed-manifest*.json
+!seed-manifest.example.json
 
 # python
 __pycache__/

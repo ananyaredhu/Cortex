@@ -9,11 +9,15 @@ Backends that can change permissions also expose two optional hooks:
 - `revoke_container(container_id, token)`: take a grant off the container (space, project, folder, channel).
 - `restrict_document(doc_id, token)`: restrict one document to the principal that `token` names.
 A backend without a hook is an expected failure for the test that needs it.
+
+A real platform assigns its own IDs and versions. Such a backend translates IDs through its seed manifest
+and exposes `seed_version(doc)`, the version the seeded document has there.
 Tests that a given backend cannot support yet must be marked `xfail` with a reason, never deleted.
 """
 import pytest
 
 from connectors.base import Change, DocumentNotFound, PlatformIdentity
+from connectors.slack.testing import SeededSlack
 from connectors.stub.fixture_connector import FixtureConnector
 from fixtures.loader import load, persona_by_id
 from simulators.confluence.testing import SeededConfluence
@@ -27,6 +31,7 @@ CONNECTORS = {
     "fixture": (lambda source: FixtureConnector(source), SOURCES),
     "confluence-sim": (lambda source: SeededConfluence(), ["confluence"]),
     "jira-sim": (lambda source: SeededJira(), ["jira"]),
+    "slack-fake": (lambda source: SeededSlack(), ["slack"]),   # the real connector over an in-memory Slack
 }
 
 
@@ -65,7 +70,8 @@ def test_fetch_and_version_match_seed(conn):
     for d in _docs_of(conn):
         got = conn.fetch(d["doc_id"])
         assert got.doc_id == d["doc_id"]
-        assert got.version == conn.version(d["doc_id"]) == d["version"]
+        expected_version = conn.seed_version(d) if hasattr(conn, "seed_version") else d["version"]
+        assert got.version == conn.version(d["doc_id"]) == expected_version
         assert got.acl.tokens == d["acl"]["tokens"]
         assert got.acl.snapshot_hash.startswith("sha256:")
 
