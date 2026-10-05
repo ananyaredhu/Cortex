@@ -80,7 +80,11 @@ def test_fetch_and_version_match_seed(conn):
 def test_check_access_matches_expected_visibility(conn, persona_id):
     persona = persona_by_id(DATA, persona_id)
     ident = conn.resolve_identity(persona["email"])
-    assert ident is not None and ident.source == conn.source
+    if ident is None:
+        # No account on this platform (Sam on Slack): acceptable only for someone who may read nothing here.
+        assert not any(set(persona["tokens"]) & set(d["acl"]["tokens"]) for d in _docs_of(conn)), persona_id
+        return
+    assert ident.source == conn.source
     assert set(ident.groups) <= set(persona["tokens"]), "identity groups are ACL tokens the persona really holds"
     for d in _docs_of(conn):
         expected = bool(set(persona["tokens"]) & set(d["acl"]["tokens"]))
@@ -167,12 +171,14 @@ def test_container_permissions_inherit_to_children(conn):
 # 5. Negative ---------------------------------------------------------------------------------------
 def test_negative_forbidden_and_nonexistent_look_alike(conn):
     """Forbidden and nonexistent documents must give the same response shape (no existence side channel)."""
-    sam = conn.resolve_identity("sam@contractor.io")
-    forbidden = next((d for d in _docs_of(conn) if not set(persona_by_id(DATA, "sam")["tokens"]) & set(d["acl"]["tokens"])), None)
+    # Sam first (the scenario-3 asker); anyone else who has an account here when Sam has none (Slack).
+    personas = sorted(DATA["personas"], key=lambda p: p["id"] != "sam")
+    asker, forbidden = next(((ident, d) for p in personas if (ident := conn.resolve_identity(p["email"]))
+                             for d in _docs_of(conn) if not set(p["tokens"]) & set(d["acl"]["tokens"])), (None, None))
     if forbidden is None:
-        pytest.skip("no document forbidden to Sam in this source")
-    a = conn.check_access(sam, forbidden["doc_id"])
-    b = conn.check_access(sam, f"{conn.source}:does-not-exist")
+        pytest.skip("no document forbidden to anyone with an account in this source")
+    a = conn.check_access(asker, forbidden["doc_id"])
+    b = conn.check_access(asker, f"{conn.source}:does-not-exist")
     assert a.allowed is False and b.allowed is False
     assert a.proof_path == b.proof_path == []
     assert set(vars(a)) == set(vars(b))

@@ -186,18 +186,26 @@ class FakeSlack:
         return self._page([self._root_json(channel["id"], message), *replies], form, "messages")
 
 
-def seed_company_a(fake: FakeSlack, data: dict) -> tuple[IdentityMap, SeedManifest]:
+def seed_company_a(fake: FakeSlack, data: dict, *, guests: dict[str, str] | None = None) -> tuple[IdentityMap, SeedManifest]:
     """Build the Company A story in `fake`, the way the real workspace is meant to be set up.
 
-    Every persona gets an account with a non-canonical address. Sam is a single-channel guest. The bot is in
-    all five channels. Returns the identity map and the seed manifest that describe what was built.
+    Every persona that holds a Slack token gets an account with a non-canonical address; one that holds none
+    (Sam) has no account, as on the real workspace. The bot is in all five channels. `guests` adds
+    single-channel guests who are not personas, {canonical email: fixture channel}, for testing guest rules.
+    Returns the identity map and the seed manifest that describe what was built.
     """
     accounts: dict[str, dict[str, str]] = {}
     user_of: dict[str, str] = {}
     for persona in data["personas"]:
+        if not any(t == "public:org" or t.startswith("channel:") for t in persona["tokens"]):
+            continue
         address = f"{persona['id']}.account@example.com"
         accounts[persona["email"]] = {"slack": address}
         user_of[persona["email"]] = fake.add_user(address, guest="public:org" not in persona["tokens"])
+    for email in guests or {}:
+        address = f"{email.split('@')[0]}.account@example.com"
+        accounts[email] = {"slack": address}
+        user_of[email] = fake.add_user(address, guest=True)
     outsider = fake.add_user("someone.unmapped@example.com")    # posts the message whose author is not a persona
 
     manifest = SeedManifest()
@@ -206,6 +214,7 @@ def seed_company_a(fake: FakeSlack, data: dict) -> tuple[IdentityMap, SeedManife
         if fixture_channel not in manifest.channels:
             real = "C0" + "".join(ch for ch in fixture_channel.upper() if ch.isalnum())[1:]
             members = tuple(user_of[p["email"]] for p in data["personas"] if f"channel:{fixture_channel}" in p["tokens"])
+            members += tuple(user_of[email] for email, channel in (guests or {}).items() if channel == fixture_channel)
             fake.add_channel(real, doc["title"].split(" ")[0].lstrip("#"), private=doc["acl"]["native"]["private"], members=members)
             manifest.channels[fixture_channel] = real
         author = user_of.get(doc["author"], outsider)

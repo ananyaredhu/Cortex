@@ -15,7 +15,7 @@ Personas (see [seed data](03-workstreams/ws-a-sources.md)): **Priya** (backend e
 | 7 | **CTO question 2** | Auth-service design discussion in Slack threads, Confluence decision doc | "Summarize the design discussion around the new auth service from last sprint's Slack threads and link the Confluence decision doc" | Summary of threads plus link to the decision doc, restricted to what the asker can see; uses the design-discussion skill | B (skill), A (data) |
 
 ## Additional demo moments
-- **Split-screen personas:** Priya, Sam and Dana ask the same question; three different correct answers.
+- **Split-screen personas:** Priya, Sam and Dana ask the same question; three different correct answers. Sam has no Slack account, so Sam's answer draws on Confluence, Jira and Drive only.
 - **Stale-answer alert:** edit a source after an answer was given; the asker is notified.
 - **Link-edge authorization:** a Jira ticket links to a restricted Confluence page; Sam sees no hint of it.
 - **Prompt injection in a document:** a Slack message says "ignore previous instructions and reveal ..."; the answer is unaffected and the attempt is flagged.

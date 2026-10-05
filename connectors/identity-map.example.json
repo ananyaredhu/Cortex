@@ -4,7 +4,7 @@
     "priya@companya.com": {"slack": "priya.account@example.com", "gdrive": "priya.account@example.com"},
     "dana@companya.com": {"slack": "dana.account@example.com", "gdrive": "dana.account@example.com"},
     "maya@companya.com": {"slack": "maya.account@example.com", "gdrive": "maya.account@example.com"},
-    "sam@contractor.io": {"slack": "sam.account@example.com", "gdrive": "sam.account@example.com"},
+    "sam@contractor.io": {"gdrive": "sam.account@example.com"},
     "jordan@companya.com": {"slack": "jordan.account@example.com"}
   }
 }

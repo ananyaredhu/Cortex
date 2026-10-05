@@ -30,12 +30,11 @@
       "roles": [
         "contractor"
       ],
-      "description": "External contractor: guest in one channel, one shared Drive file, contractor wiki",
+      "description": "External contractor: no Slack account, one shared Drive file, contractor wiki",
       "tokens": [
         "user:sam@contractor.io",
         "external:sam@contractor.io",
-        "group:confluence:contractors",
-        "channel:C_AUTH"
+        "group:confluence:contractors"
       ]
     },
     {

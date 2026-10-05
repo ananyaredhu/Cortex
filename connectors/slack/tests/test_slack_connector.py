@@ -14,12 +14,14 @@ from connectors.slack.fake import FakeSlack, seed_company_a
 from fixtures.loader import load
 
 DATA = load()
+GUEST = "guest@contractor.io"   # a single-channel guest in #auth-design; not a persona (Sam has no Slack account)
+EMAILS = {p["id"]: p["email"] for p in DATA["personas"]} | {"guest": GUEST}
 
 
 class World:
     def __init__(self, **client_kwargs):
         self.slack = FakeSlack()
-        self.identities, self.manifest = seed_company_a(self.slack, DATA)
+        self.identities, self.manifest = seed_company_a(self.slack, DATA, guests={GUEST: "C_AUTH"})
         self.conn = SlackConnector(self.slack.client(**client_kwargs), self.identities)
 
     def channel(self, fixture_id: str) -> str:
@@ -32,8 +34,7 @@ class World:
         return self.slack.user_id(f"{persona}.account@example.com")
 
     def identity(self, persona: str) -> PlatformIdentity:
-        email = next(p["email"] for p in DATA["personas"] if p["id"] == persona)
-        return self.conn.resolve_identity(email)
+        return self.conn.resolve_identity(EMAILS[persona])
 
     def allowed(self, persona: str, doc_id: str) -> bool:
         return self.conn.check_access(self.identity(persona), doc_id).allowed
@@ -106,11 +107,16 @@ def test_joins_and_other_system_messages_are_not_documents(w):
 
 # -- who may read -------------------------------------------------------------------------------
 def test_guest_reads_only_the_channels_they_are_in(w):
-    sam = w.identity("sam")
-    assert sam.groups == [f"channel:{w.channel('C_AUTH')}"], "a guest never holds public:org"
-    decision = w.conn.check_access(sam, w.doc("slack:C_AUTH/thread-1"))
-    assert decision.allowed and decision.proof_path == ["user:sam@contractor.io", f"channel:{w.channel('C_AUTH')}"]
-    assert not w.allowed("sam", w.doc("slack:C_DBMIG/thread-1")), "public, but Sam is a guest and not a member"
+    guest = w.identity("guest")
+    assert guest.groups == [f"channel:{w.channel('C_AUTH')}"], "a guest never holds public:org"
+    decision = w.conn.check_access(guest, w.doc("slack:C_AUTH/thread-1"))
+    assert decision.allowed and decision.proof_path == [f"user:{GUEST}", f"channel:{w.channel('C_AUTH')}"]
+    assert not w.allowed("guest", w.doc("slack:C_DBMIG/thread-1")), "public, but a guest who is not a member"
+
+
+def test_a_persona_without_a_slack_account_has_no_access(w):
+    assert w.conn.resolve_identity("sam@contractor.io") is None, "Sam is not on the workspace"
+    assert w.identities.platform_account("slack", "sam@contractor.io") is None
 
 
 def test_full_member_reads_any_public_channel_without_joining(w):
@@ -141,8 +147,8 @@ def test_membership_changes_are_principal_changes(w):
     changes, cursor = w.changes(cursor)
     assert changes == [("principal_change", None, "user:dana@companya.com", f"channel:{channel}")]
     assert w.allowed("dana", doc_id) and f"channel:{channel}" in w.identity("dana").groups
-    w.slack.users[w.user("sam")].update(is_restricted=False, is_ultra_restricted=False)   # the guest becomes a full member
-    assert w.changes(cursor)[0] == [("principal_change", None, "user:sam@contractor.io", "public:org")]
+    w.slack.users[w.user("guest")].update(is_restricted=False, is_ultra_restricted=False)   # the guest becomes a full member
+    assert w.changes(cursor)[0] == [("principal_change", None, f"user:{GUEST}", "public:org")]
 
 
 def test_deactivated_or_unmapped_accounts_have_no_access(w):
@@ -184,7 +190,7 @@ def test_crawl_is_stable_and_a_foreign_cursor_resyncs(w):
 def test_paging_is_followed_everywhere(w):
     w.slack.page_size = 1
     assert len(w.changes(None)[0]) == 6
-    assert w.allowed("sam", w.doc("slack:C_AUTH/thread-1")), "the member is not on the first page of members"
+    assert w.allowed("guest", w.doc("slack:C_AUTH/thread-1")), "the member is not on the first page of members"
     assert len(w.identity("priya").groups) == 5
     w.slack.post(w.channel("C_AUTH"), w.user("dana"), "A reply.", thread_ts=w.doc("slack:C_AUTH/thread-1").split("/")[1])
     assert w.conn.fetch(w.doc("slack:C_AUTH/thread-1")).body.endswith("A reply.")
@@ -221,10 +227,10 @@ def test_everything_fails_closed_when_slack_is_unreachable(w):
 
 def test_access_check_asks_slack_in_parallel_and_denies_when_out_of_time(w):
     doc_id = w.doc("slack:C_AUTH/thread-1")
-    sam, priya = w.identity("sam"), w.identity("priya")
+    guest, priya = w.identity("guest"), w.identity("priya")
     w.slack.delay = 0.2
     started = time.perf_counter()
-    assert w.conn.check_access(sam, doc_id).allowed, "a guest: all four questions are needed"
+    assert w.conn.check_access(guest, doc_id).allowed, "a guest: all four questions are needed"
     assert time.perf_counter() - started < 0.6, "four 0.2 s calls one after another would take 0.8 s"
     hurried = SlackConnector(w.slack.client(), w.identities, access_timeout=0.05)
     decision = hurried.check_access(priya, doc_id)
