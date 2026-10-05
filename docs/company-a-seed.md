@@ -9,7 +9,7 @@ Company A is the fictional company every source is seeded with. This page says w
 | Persona | Canonical email | Role | Who they are |
 |---|---|---|---|
 | Priya | `priya@companya.com` | engineer | Backend engineer on payments and the DB migration; member of a private auth design channel |
-| Sam | `sam@contractor.io` | contractor | External contractor: guest in one channel, one shared Drive file, contractor wiki |
+| Sam | `sam@contractor.io` | contractor | External contractor: no Slack account, one shared Drive file, contractor wiki |
 | Dana | `dana@companya.com` | security-lead | Security lead: security spaces, security-level Jira issues, incident channels |
 | Jordan | `jordan@companya.com` | compliance | Compliance officer: may query the audit trail; org-wide content only |
 | Maya | `maya@companya.com` | manager | Engineering manager: DB migration lead, member of the private leads channel |
@@ -22,7 +22,7 @@ The canonical email is what tokens and authorship use everywhere. The real Slack
 2. **Payment outage.** Last quarter's outage (`PAYINC-9`) has two follow-ups (`PAYINC-10`, `PAYINC-11`), a timeline in `#payments-incident`, a postmortem in Drive, and an incident runbook in Confluence.
 3. **Auth service design.** A public design thread in `#auth-design`, a decision record in Confluence, and open threat-model concerns in the private `#auth-private`.
 4. **Q3 security breach.** A restricted Confluence report and a security-level Jira issue (`SEC-17`), visible to the security team only. Both carry canary strings.
-5. **Contractors.** Sam is an external contractor: one Slack channel, one shared Drive file, the contractor wiki.
+5. **Contractors.** Sam is an external contractor: one shared Drive file and the contractor wiki. Sam is not on Slack (see the end of this page).
 
 ## Every document and who can read it
 
@@ -38,7 +38,7 @@ The canonical email is what tokens and authorship use everywhere. The real Slack
 | `jira:SEC-17` | SEC-17 Auth token replay vulnerability | `group:jira:security-team` | Dana |
 | `confluence:HR/contractor-onboarding` | Contractor onboarding guide | `group:confluence:contractors`, `public:org` | Priya, Sam, Dana, Jordan, Maya |
 | `slack:C_AUTHPRIV/thread-1` | #auth-private thread: threat model concerns | `channel:C_AUTHPRIV` | Priya |
-| `slack:C_AUTH/thread-1` | #auth-design thread: token format | `channel:C_AUTH`, `public:org` | Priya, Sam, Dana, Jordan, Maya |
+| `slack:C_AUTH/thread-1` | #auth-design thread: token format | `channel:C_AUTH`, `public:org` | Priya, Dana, Jordan, Maya |
 | `confluence:ENG/auth-service-decision` | Decision: auth service token format | `public:org` | Priya, Dana, Jordan, Maya |
 | `jira:PAYINC-9` | PAYINC-9 Payment outage last quarter: root cause | `role:PAYINC:developer` | Priya, Maya |
 | `jira:PAYINC-10` | PAYINC-10 Add circuit breaker to payment client | `role:PAYINC:developer` | Priya, Maya |
@@ -58,7 +58,7 @@ A reader is anyone whose tokens overlap the document's tokens. Each persona's to
 | `C_DBMIG` | `#db-migration` | public | Priya, Dana, Maya |
 | `C_DBMIGPRIV` | `#dbmig-leads` | private | Maya |
 | `C_AUTHPRIV` | `#auth-private` | private | Priya |
-| `C_AUTH` | `#auth-design` | public | Priya, Sam, Dana, Maya |
+| `C_AUTH` | `#auth-design` | public | Priya, Dana, Maya |
 | `C_PAYINC` | `#payments-incident` | public | Priya, Dana, Maya |
 
 The bot must be invited to **all five channels, the public ones too** (`/invite @<app name>`): a bot can only read the history of channels it is a member of. Real channel IDs will differ from the fixture IDs; the seed manifest (to be built with the Slack connector) maps one to the other.
@@ -148,7 +148,7 @@ Copy `connectors/identity-map.example.json` to `connectors/identity-map.local.js
 
 ## Where real platforms cannot match the story
 
-- **Sam on Slack.** Guest accounts are paid-only. On a free workspace Sam would be a full member and could read every public channel, which contradicts the table above.
+- **Sam on Slack: decided 5 Oct, Sam has no Slack account.** Guest accounts are paid-only, and on a free workspace Sam would be a full member who could read every public channel. So Sam is left out of the workspace and out of the Slack part of the identity map: no Slack access at all, which fails closed. The fixtures follow (Sam no longer holds `channel:C_AUTH`). Scenario 3 is unaffected: it runs on Confluence and Jira. Guest handling is still tested in the Slack connector's own tests, with a guest who is not a persona.
 - **`public:org` on Drive.** Personal Gmail has no organisation, so nothing native backs it.
 - **Drive groups.** See the note under Google Drive.
 - **Drive owners.** The fixtures make Maya the author of the postmortem, yet her tokens do not let her read it. On

@@ -6,7 +6,8 @@ Edit this file (not the JSON) to change the fixtures, then regenerate and commit
 The corpus is fictional. It covers the five handbook scenarios plus the two CTO questions
 (see docs/04-scenarios.md). Token format follows docs/02-contracts/acl-model.md (v0.2): a public Slack
 channel is readable by every full org member, so its threads carry `public:org` as well as the channel
-token (the channel token is what a guest such as Sam holds).
+token (the channel token is what a guest holds). Sam has no Slack account: the free workspace has no guest
+accounts, and as a full member Sam could read every public channel.
 """
 import hashlib
 import json
@@ -57,9 +58,9 @@ personas = [
     },
     {
         "id": "sam", "email": "sam@contractor.io", "display_name": "Sam", "roles": ["contractor"],
-        "description": "External contractor: guest in one channel, one shared Drive file, contractor wiki",
+        "description": "External contractor: no Slack account, one shared Drive file, contractor wiki",
         "tokens": [
-            "user:sam@contractor.io", "external:sam@contractor.io", "group:confluence:contractors", "channel:C_AUTH",
+            "user:sam@contractor.io", "external:sam@contractor.io", "group:confluence:contractors",
         ],
     },
     {

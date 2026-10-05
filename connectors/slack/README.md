@@ -32,7 +32,8 @@ All three read `.env` themselves. None prints the token or any message text.
 
 Guests (`is_restricted`, `is_ultra_restricted`) never hold `public:org`, so they read only the channels they are in.
 On a free workspace there are no guest accounts: everyone invited is a full member and can read every public
-channel.
+channel. That is why Sam, the contractor persona, has no account on our workspace and no Slack access (decided
+5 Oct). The guest rules are still tested, in `tests/`, with a guest who is not a persona.
 
 ## Changes
 `list_changes` polls. Every call scans the workspace (users, channels, members, channel history) and compares it

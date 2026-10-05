@@ -67,7 +67,8 @@ def test_file_is_found_through_the_environment(tmp_path, monkeypatch):
 def test_example_file_is_valid_fictional_and_covers_only_fixture_personas():
     m = IdentityMap.load(EXAMPLE)
     personas = {p["email"] for p in load()["personas"]}
-    assert set(m.canonical_emails("slack")) == personas
+    on_slack = {p["email"] for p in load()["personas"] if any(t == "public:org" or t.startswith("channel:") for t in p["tokens"])}
+    assert set(m.canonical_emails("slack")) == on_slack and "sam@contractor.io" not in on_slack, "Sam has no Slack account"
     assert set(m.canonical_emails("gdrive")) <= personas
     for source in ("slack", "gdrive"):
         for email in m.canonical_emails(source):
