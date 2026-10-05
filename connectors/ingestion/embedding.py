@@ -58,8 +58,11 @@ class BgeM3Embedder:
     model = "bge-m3"
     version = "1"
 
-    def __init__(self, model_name: str = "BAAI/bge-m3") -> None:
+    def __init__(self, model_name: str = "BAAI/bge-m3", *, batch_size: int = 8) -> None:
+        """The model (about 2.3 GB) is downloaded on first use into the Hugging Face cache; set `HF_HOME` to move it.
+        A small batch keeps memory down on a laptop."""
         self._model_name = model_name
+        self._batch_size = batch_size
         self._encoder = None
 
     def embed(self, texts: list[str]) -> list[list[float] | None]:
@@ -71,8 +74,8 @@ class BgeM3Embedder:
             except ImportError as exc:
                 raise RuntimeError("bge-m3 needs `pip install -r requirements-embed.txt`, "
                                    "or set EMBEDDING_BACKEND=none to index without vectors") from exc
-            self._encoder = SentenceTransformer(self._model_name)
-        vectors = self._encoder.encode(texts, normalize_embeddings=True)
+            self._encoder = SentenceTransformer(self._model_name, device="cpu")
+        vectors = self._encoder.encode(texts, normalize_embeddings=True, batch_size=self._batch_size)
         return [[float(x) for x in v] for v in vectors]
 
 
