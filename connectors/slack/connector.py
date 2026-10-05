@@ -17,7 +17,9 @@ files, and the Events API.
 import hashlib
 import json
 import re
+import time
 import uuid
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
@@ -26,6 +28,7 @@ from connectors.identity_map import IdentityMap
 from connectors.slack.client import SlackClient, SlackError
 
 POLICY_VERSION = "slack-0.1"
+ACCESS_TIMEOUT = 3.0   # seconds for one check_access, all Slack calls together; past it the answer is deny
 CHANNEL_TYPES = "public_channel,private_channel"
 PUBLIC_ORG = "public:org"
 
@@ -104,8 +107,11 @@ class _Scan:
 class SlackConnector:
     source: Source = "slack"
 
-    def __init__(self, client: SlackClient, identities: IdentityMap, *, policy_version: str = POLICY_VERSION) -> None:
+    def __init__(self, client: SlackClient, identities: IdentityMap, *, policy_version: str = POLICY_VERSION,
+                 access_timeout: float = ACCESS_TIMEOUT) -> None:
         self._client = client
+        self._access_timeout = access_timeout
+        self._pool = ThreadPoolExecutor(max_workers=8, thread_name_prefix="slack-access")   # check_access asks in parallel
         self._identities = identities
         self._policy_version = policy_version
         self._workspace_url: str | None = None
@@ -173,28 +179,47 @@ class SlackConnector:
         )
 
     def check_access(self, identity: PlatformIdentity, doc_id: str) -> AccessDecision:
-        """Live answer from Slack. Membership and guest status are read now: `identity.groups` is not trusted."""
+        """Live answer from Slack. Membership and guest status are read now: `identity.groups` is not trusted.
+
+        The questions it asks Slack do not depend on each other, so they go out together and the answer takes
+        about as long as the slowest one. Nothing is cached.
+        """
         deny = AccessDecision(False, [], _now(), "", self._policy_version)
         try:
             parsed = _parse(doc_id)
             if parsed is None or identity.source != self.source:
                 return deny
             channel_id, ts = parsed
-            channel = self._client.call("conversations.info", retry=False, channel=channel_id)["channel"]
-            if channel.get("is_im") or channel.get("is_mpim") or not self._root(channel_id, ts, retry=False):
+            deadline = time.monotonic() + self._access_timeout
+
+            def ask(method: str, **params: str | int | bool) -> Future:
+                return self._pool.submit(self._client.call, method, retry=False, **params)
+
+            def answer(future: Future):
+                return future.result(timeout=max(0.0, deadline - time.monotonic()))   # raises on error or when out of time
+
+            asked_channel = ask("conversations.info", channel=channel_id)
+            asked_root = self._pool.submit(self._root, channel_id, ts, retry=False)
+            asked_user = ask("users.info", user=identity.platform_user_id)
+            asked_members = ask("conversations.members", channel=channel_id, limit=1000)   # only read if needed below
+
+            channel = answer(asked_channel)["channel"]
+            if channel.get("is_im") or channel.get("is_mpim") or not answer(asked_root):
                 return deny
             acl = _acl(channel)
             denied = AccessDecision(False, [], _now(), acl.snapshot_hash, self._policy_version)
 
-            user = self._client.call("users.info", retry=False, user=identity.platform_user_id)["user"]
+            user = answer(asked_user)["user"]
             canonical = self._identities.canonical_email(self.source, (user.get("profile") or {}).get("email") or "")
             if not _is_person(user) or canonical is None or canonical != identity.email.strip().lower():
                 return denied
             principal = f"user:{canonical}"
             if not channel.get("is_private") and _is_full_member(user):
                 return AccessDecision(True, [principal, PUBLIC_ORG], _now(), acl.snapshot_hash, self._policy_version)
-            members = self._client.pages("conversations.members", "members", retry=False, channel=channel_id, limit=200)
-            if user["id"] in members:
+            first_page = answer(asked_members)
+            more = (first_page.get("response_metadata") or {}).get("next_cursor")
+            if user["id"] in (first_page.get("members") or []) or (more and user["id"] in self._client.pages(
+                    "conversations.members", "members", retry=False, channel=channel_id, limit=1000, cursor=more)):
                 return AccessDecision(True, [principal, channel_token(channel_id)], _now(), acl.snapshot_hash, self._policy_version)
             return denied
         except Exception:   # fail closed on anything: network, timeout, rate limit, malformed response

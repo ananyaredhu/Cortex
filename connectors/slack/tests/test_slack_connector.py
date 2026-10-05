@@ -3,6 +3,8 @@
 The shared contract tests (connectors/tests/contract) cover the seeded story. These cover what is specific to
 Slack: guests, the bot's own membership, public/private flips, threads, paging, rate limits and failure.
 """
+import time
+
 import pytest
 
 from connectors.base import DocumentNotFound, PlatformIdentity
@@ -215,6 +217,18 @@ def test_everything_fails_closed_when_slack_is_unreachable(w):
     assert (decision.allowed, decision.proof_path) == (False, [])
     with pytest.raises(Exception):   # noqa: B017  ingestion must see the failure, not an empty feed
         w.conn.list_changes(None)
+
+
+def test_access_check_asks_slack_in_parallel_and_denies_when_out_of_time(w):
+    doc_id = w.doc("slack:C_AUTH/thread-1")
+    sam, priya = w.identity("sam"), w.identity("priya")
+    w.slack.delay = 0.2
+    started = time.perf_counter()
+    assert w.conn.check_access(sam, doc_id).allowed, "a guest: all four questions are needed"
+    assert time.perf_counter() - started < 0.6, "four 0.2 s calls one after another would take 0.8 s"
+    hurried = SlackConnector(w.slack.client(), w.identities, access_timeout=0.05)
+    decision = hurried.check_access(priya, doc_id)
+    assert (decision.allowed, decision.proof_path, decision.acl_snapshot_hash) == (False, [], "")
 
 
 # -- into the index -----------------------------------------------------------------------------

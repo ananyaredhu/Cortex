@@ -7,6 +7,7 @@ guests are flagged `is_restricted`.
 
 It is a test double, not a simulator: no events, no files, no DMs.
 """
+import time
 from collections import Counter
 from urllib.parse import parse_qs
 
@@ -34,6 +35,7 @@ class FakeSlack:
         self.retry_after = "1"
         self.page_size: int | None = None   # force small pages to exercise cursor paging
         self.down = False                   # every request fails at the transport
+        self.delay = 0.0                    # seconds every request takes
         self._clock = 1_791_619_200         # 2026-10-10T08:00:00Z
         self._tick = 0
 
@@ -91,6 +93,8 @@ class FakeSlack:
     def _handle(self, request: httpx.Request) -> httpx.Response:
         if self.down:
             raise httpx.ConnectError("fake Slack is down", request=request)
+        if self.delay:
+            time.sleep(self.delay)
         method = request.url.path.rsplit("/", 1)[-1]
         self.calls[method] += 1
         if self.throttle > 0:
