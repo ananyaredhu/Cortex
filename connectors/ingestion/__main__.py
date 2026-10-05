@@ -4,10 +4,11 @@
     python -m connectors.ingestion --poll 5
     python -m connectors.ingestion --once --recrawl      (after restarting a simulator)
 
-    python -m connectors.ingestion --once --sources confluence,jira,slack
+    python -m connectors.ingestion --once --sources confluence,jira,slack,gdrive
 
 Environment (read from the shell, then from .env): DATABASE_URL, EMBEDDING_BACKEND (bge-m3 | none),
-CONFLUENCE_SIM_URL, JIRA_SIM_URL, and for Slack SLACK_BOT_TOKEN plus the identity map file.
+CONFLUENCE_SIM_URL, JIRA_SIM_URL; for Slack SLACK_BOT_TOKEN; for Drive the OAuth client, the token files and
+gdrive.local.json; for both the identity map file.
 """
 import argparse
 import json
@@ -16,6 +17,7 @@ import os
 import time
 
 from connectors.env import load_dotenv
+from connectors.gdrive import DriveConnector
 from connectors.ingestion.embedding import from_env
 from connectors.ingestion.pg_store import DEFAULT_URL, PostgresStore
 from connectors.ingestion.pipeline import Ingestor
@@ -27,6 +29,7 @@ SOURCES = {
     "confluence": lambda: ConfluenceConnector.from_url(os.environ.get("CONFLUENCE_SIM_URL") or "http://localhost:8101"),
     "jira": lambda: JiraConnector.from_url(os.environ.get("JIRA_SIM_URL") or "http://localhost:8102"),
     "slack": SlackConnector.from_env,   # real workspace: needs SLACK_BOT_TOKEN, so it is not in the default set
+    "gdrive": DriveConnector.from_env,  # real Drive: needs signed-in accounts and gdrive.local.json
 }
 DEFAULT_SOURCES = "confluence,jira"
 

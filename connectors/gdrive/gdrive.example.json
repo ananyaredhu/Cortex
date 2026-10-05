@@ -1,0 +1,8 @@
+{
+  "_comment": "Copy to gdrive.local.json (gitignored). root_folders: the Drive folder IDs the connector may read (the long ID in the folder's URL); nothing outside them is ever read. groups: who is in each group, by canonical email; add \"address\" only if files are shared with a real Google Group. org_domains: canonical-email domains that are inside the organisation.",
+  "root_folders": ["REPLACE_WITH_incidents_FOLDER_ID", "REPLACE_WITH_vendor_FOLDER_ID"],
+  "groups": {
+    "payments-eng": {"members": ["priya@companya.com", "dana@companya.com"]}
+  },
+  "org_domains": ["companya.com"]
+}
