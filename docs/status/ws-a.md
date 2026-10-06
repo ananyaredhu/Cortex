@@ -5,7 +5,8 @@ Update at the end of each day. Newest first. Keep it short: done, next, blockers
 ## Mon 5 Oct (Day 4)
 - **Done:** Slack connector merged (PR #9) and verified on the real "Company A" workspace: all 5 channels and 6 threads found, tokens and text match the fixtures, access matches for Priya, Dana and Maya. Check #3: exempt from the 1-request-per-minute cut. `check_access` now asks Slack in parallel: median about 270 ms, down from 740 ms.
 - **Done, later the same day:** Drive connector built and tested against an in-memory Drive (`connectors/gdrive/`); it passes the shared contract tests. Not yet run on real Drive.
-- **Next:** finish the Google set-up (OAuth client, sign the three accounts in) and run the Drive connector on it; install bge-m3 and run it once; do scripted event `e2` by hand on real Slack.
+- **Done, evening:** Google set-up finished: OAuth client, Priya, Dana and Maya signed in. On real Drive, `check_setup` matches the fixtures and all 10 persona-by-file access checks are right (about 0.5 s each). Fixed a bug found there: a file read through an account that cannot see its folder looked out of scope (PR for `ws-a/gdrive-parent-fix`).
+- **Next:** Drive seed manifest; run ingestion with `--sources ...,gdrive`; install bge-m3 and run it once; do scripted event `e2` by hand on real Slack.
 - **Decided:** Sam gets no Slack account (free Slack has no guests). Fixtures, Slack fake, tests and docs updated to match. Jordan joins Slack as a full member in no channels.
 - **Blockers:** The golden cases cite fixture IDs while real Slack has its own; `evals/` needs the seed manifest (for C). `chunks` schema still to be agreed with B.
 

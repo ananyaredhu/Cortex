@@ -4,6 +4,7 @@ The shared contract tests (connectors/tests/contract) cover the seeded story, in
 cover what is specific to Drive on personal accounts: the root-folder boundary, who can read a sharing list,
 groups declared in config, unmapped and public sharing, content, rate limits and failure.
 """
+import copy
 import time
 from pathlib import Path
 
@@ -67,6 +68,19 @@ def test_files_that_are_not_text_have_no_body_and_folders_are_not_documents(d):
 
 
 # -- the boundary -------------------------------------------------------------------------------
+def test_a_file_is_read_through_an_account_that_can_see_its_folder(d):
+    """Drive names a file's folder only to accounts that can see that folder. Maya is shared one file in the vendor
+    folder but not the folder, so her answer has no parent; asking her first must not put the file out of scope."""
+    d.drive.add("maya-note", "Note for Maya", owner=ADMIN, parent="folder-vendor", content="hello Maya")
+    d.drive.share("maya-note", account("maya"))
+    maya_first = {"maya@companya.com": d._sessions["maya@companya.com"], "admin": d._sessions["admin"]}
+    conn = DriveConnector(maya_first, d.identities, d.config)
+    doc = conn.fetch("gdrive:maya-note")
+    assert (doc.parent_id, doc.body) == ("gdrive:folder-vendor", "hello Maya")
+    assert allowed(conn, "maya@companya.com", "gdrive:maya-note") and allowed(conn, "priya@companya.com", "gdrive:maya-note")
+    assert not allowed(conn, "jordan@companya.com", "gdrive:maya-note")
+
+
 def test_nothing_outside_the_root_folders_exists(d):
     """The persona accounts are people's own Google accounts. Their other files must stay invisible."""
     d.drive.add("private-diary", "My diary", owner=account("priya"), content="not Company A's business")
@@ -290,8 +304,16 @@ def test_setup_check_compares_drive_with_the_fixtures(d):
     d.drive.unshare("vendor-integration-notes", account("sam"))
     d.drive.files["postmortem-pay-outage"]["name"] = "Postmortem (draft)"
     lines, problems = report(d, DATA)
-    assert len(problems) == 2 and "no readable file titled" in problems[0] and "tokens are" in problems[1]
+    assert len(problems) == 2 and "no readable file titled" in problems[0] and "readable by ['dana', 'priya']" in problems[1]
     assert not any(doc["body"] in text for text in lines + problems for doc in DATA["documents"]), "file text is never printed"
+
+
+def test_setup_check_accepts_other_tokens_that_let_in_the_same_people(d):
+    """On real Drive, Dana shared one by one and also in payments-eng comes out as the group token alone."""
+    data = copy.deepcopy(DATA)
+    vendor = next(x for x in data["documents"] if x["doc_id"] == VENDOR)
+    vendor["acl"]["tokens"] = ["external:sam@contractor.io", "group:gdrive:payments-eng", "user:dana@companya.com"]
+    assert report(d, data)[1] == []
 
 
 # -- into the index -----------------------------------------------------------------------------

@@ -3,11 +3,17 @@
     python -m connectors.gdrive.check_setup
 
 Reports who is signed in, which files the connector finds under the configured root folders, the tokens it gives
-each, and, for every fixture Drive file, whether a file with that title exists and whether its tokens match.
+each, and, for every fixture Drive file, whether a file with that title exists and whether the same personas can read it.
 Prints titles, canonical emails and tokens only: no tokens of the OAuth kind, no real addresses, no file text.
 """
 from connectors.gdrive.connector import DriveConnector
 from fixtures.loader import load
+
+
+def readers(data: dict, tokens: list[str]) -> list[str]:
+    """The personas whose tokens overlap `tokens`. Two token lists can differ and still let in the same people, e.g.
+    when a person is also covered by a group they belong to, so the check compares readers, not tokens."""
+    return sorted(p["id"] for p in data["personas"] if set(p["tokens"]) & set(tokens))
 
 
 def report(connector: DriveConnector, data: dict) -> tuple[list[str], list[str]]:
@@ -23,8 +29,10 @@ def report(connector: DriveConnector, data: dict) -> tuple[list[str], list[str]]
         if doc is None:
             problems.append(f"{fixture['doc_id']}: no readable file titled {fixture['title']!r} under the root folders")
             continue
-        if doc.acl.tokens != fixture["acl"]["tokens"]:
-            problems.append(f"{fixture['doc_id']}: tokens are {doc.acl.tokens}, the fixture has {fixture['acl']['tokens']}")
+        real, wanted = readers(data, doc.acl.tokens), readers(data, fixture["acl"]["tokens"])
+        if real != wanted:
+            problems.append(f"{fixture['doc_id']}: readable by {real or 'nobody'}, the fixture has {wanted or 'nobody'} "
+                            f"(tokens {doc.acl.tokens}, the fixture has {fixture['acl']['tokens']})")
         if doc.body.strip() != fixture["body"].strip():
             problems.append(f"{fixture['doc_id']}: the text differs from the fixture")
     return lines, problems

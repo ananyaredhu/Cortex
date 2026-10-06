@@ -180,11 +180,13 @@ class DriveConnector:
         return self._document(doc_id)[1].get("modifiedTime") or ""
 
     # -- reading Drive through whichever account can ----------------------------------------------
-    def _try(self, what: str, file_id: str, call):
+    def _try(self, what: str, file_id: str, call, *, complete=lambda result: True):
         """Run `call(session)` with each signed-in account, the one that worked last time first.
-        Returns (label, result). Raises _NotVisible when none of them may."""
+        Returns (label, result) from the first account whose result is `complete`, else from the first that answered.
+        Raises _NotVisible when none of them may."""
         preferred = self._via.get((what, file_id))
         labels = ([preferred] if preferred in self._sessions else []) + [label for label in self._sessions if label != preferred]
+        partial = None
         for label in labels:
             try:
                 result = call(self._sessions[label])
@@ -192,12 +194,19 @@ class DriveConnector:
                 if exc.not_visible:
                     continue
                 raise
-            self._via[(what, file_id)] = label
-            return label, result
+            if complete(result):
+                self._via[(what, file_id)] = label
+                return label, result
+            partial = partial or (label, result)
+        if partial is not None:
+            return partial
         raise _NotVisible(file_id)
 
     def _meta(self, file_id: str, *, retry: bool = True) -> tuple[str, dict]:
-        return self._try("meta", file_id, lambda s: s.json(f"files/{file_id}", retry=retry, fields=FILE_FIELDS))
+        """Drive names a file's folder only to accounts that can see that folder, and without it the root-folder
+        check fails. So prefer an account that sees the folder over one that sees only the file."""
+        return self._try("meta", file_id, lambda s: s.json(f"files/{file_id}", retry=retry, fields=FILE_FIELDS),
+                         complete=lambda meta: bool(meta.get("parents")))
 
     def _permissions(self, file_id: str, *, retry: bool = True) -> list[dict]:
         return self._try("permissions", file_id, lambda s: list(s.pages(
