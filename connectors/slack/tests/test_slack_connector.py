@@ -187,6 +187,35 @@ def test_crawl_is_stable_and_a_foreign_cursor_resyncs(w):
     assert restarted.list_changes("garbage").changes != []
 
 
+def test_a_restarted_connector_reports_what_changed_while_it_was_down(w):
+    """Ingestion run with --once is a new process each time: the cursor it saved must be enough to see scenario 4."""
+    _, cursor = w.changes(None)
+    authpriv, payinc = w.channel("C_AUTHPRIV"), w.channel("C_PAYINC")
+    gone = w.doc("slack:C_PAYINC/thread-1")
+    w.slack.leave(authpriv, w.user("priya"))
+    w.slack.delete(payinc, gone.split("/")[1])
+    restarted = SlackConnector(w.slack.client(), w.identities)
+    batch = restarted.list_changes(cursor)
+    changes = [(c.type, c.doc_id, c.principal, c.token) for c in batch.changes]
+    assert ("principal_change", None, "user:priya@companya.com", f"channel:{authpriv}") in changes
+    assert ("delete", gone, None, None) in changes
+    assert sorted(c[1] for c in changes if c[0] == "upsert") == sorted(
+        w.doc(d["doc_id"]) for d in DATA["documents"] if d["source"] == "slack" and w.doc(d["doc_id"]) != gone)
+    assert restarted.list_changes(batch.next_cursor).changes == []
+    w.slack.join(authpriv, w.user("priya"))   # and back again, seen by a third process
+    again = SlackConnector(w.slack.client(), w.identities).list_changes(batch.next_cursor)
+    assert [(c.principal, c.token) for c in again.changes if c.type == "principal_change"] == [
+        ("user:priya@companya.com", f"channel:{authpriv}")]
+
+
+def test_a_cursor_without_a_readable_saved_scan_falls_back_to_a_crawl(w):
+    _, cursor = w.changes(None)
+    w.slack.leave(w.channel("C_AUTHPRIV"), w.user("priya"))
+    for stale in (cursor.partition("~")[0], cursor.partition("~")[0] + "~not-base64!", "garbage"):
+        batch = SlackConnector(w.slack.client(), w.identities).list_changes(stale)
+        assert {c.type for c in batch.changes} == {"upsert"} and len(batch.changes) == 6
+
+
 def test_paging_is_followed_everywhere(w):
     w.slack.page_size = 1
     assert len(w.changes(None)[0]) == 6

@@ -43,10 +43,10 @@ Day 1 = Fri 2 Oct. Day 3 = contracts freeze. Day 8 = demoable build.
 ### Days 5 to 7 (Tue 6 to Thu 8 Oct)
 - [x] Identity mapping across platforms (`resolve_identity`); fail closed when unmapped (loader PR #7; the Slack and Drive connectors use it and give unmapped accounts no access, PRs #9 and #11)
 - [x] Ingestion service: chunking, local bge-m3 embedding (store model and version), ACL tokens, deletes, `acl_change` handling (PRs #5, #6 and #14; bge-m3 run on CPU 6 Oct, check #6)
-- [ ] Seed Company A data in all four sources, including the scenario fixtures (breach report in a security-only space, private channel, runbook, DB-migration project, auth-service thread)
+- [x] Seed Company A data in all four sources, including the scenario fixtures (breach report in a security-only space, private channel, runbook, DB-migration project, auth-service thread): all 18 documents indexed and checked with `check_index`, 6 Oct
 
 ### Day 8 (Fri 9 Oct): demoable build
-- [ ] Data flows from all four sources into the index with correct ACL tokens
+- [x] Data flows from all four sources into the index with correct ACL tokens (6 Oct: 18 documents, bge-m3; checked with `python -m connectors.ingestion.check_index`)
 - [x] Simulator admin actions work (revoke, restrict, edit)
 
 ### Days 9 to 10 (Sat 10 to Sun 11 Oct)
