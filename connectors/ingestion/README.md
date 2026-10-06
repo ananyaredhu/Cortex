@@ -36,6 +36,8 @@ local database with `docker compose down -v` then `docker compose up -d`, and re
 | `acl_snapshots` | `db/init.sql` | The document's ACL over time. Exactly one row per live document has `valid_to IS NULL`. `valid_from` and `valid_to` are ingestion's clock, not the connector's `observed_at` |
 | `ingestion_events` | `schema.sql` here | The outbox of permission events, below |
 | `ingestion_cursors` | `schema.sql` here | Ingestion's own state. Nothing else should read it |
+| `ingestion_lag` | `schema.sql` here | One freshness sample per change that altered the index. See "Freshness" |
+| `ingestion_sources` | `schema.sql` here | The last pass over each source: when, the last success, the last error (exception class only) |
 
 The two tables in `schema.sql` are created at start-up if missing. They are kept out of `db/init.sql` so
 that file did not need to change; they can move there whenever the shared schema is next edited.
@@ -75,6 +77,40 @@ Guarantees and limits:
 - There is one writer (one ingestion process). With several writers `seq` order would no longer be commit order.
 - Rows are never removed. Trimming old rows is not built.
 
+## Freshness
+Two lags, both in seconds (`freshness.py`):
+
+| Metric | From | To | Counts |
+|---|---|---|---|
+| `freshness_lag_seconds` | the edit, as the source dates it (`Document.updated_at`) | the index | New content found incrementally, and only when the source's time moved forward |
+| `pipeline_lag_seconds` | the connector seeing the change | the index | Every change that altered the index: content, ACL rewrites, deletes, membership changes |
+
+Freshness is the SLA metric ("a content edit appears in the index within 5 minutes"). It leaves out:
+- **a full crawl:** an old document would count as years of lag;
+- **a re-embed for a new model:** same version;
+- **an edit whose source time did not move forward:** deleting a Slack reply takes the thread's time back to an
+  older message, and a Google Doc's modified time stays put for later edits in one editing session.
+
+These still count in the pipeline lag. Pipeline lag leaves out the poll interval, because a polled source sees a
+change only at its next scan.
+
+Each sample also records what started the pass: `poll`, `event` (a Slack event or Drive notification) or `crawl`.
+```
+python -m connectors.ingestion.freshness_report                 # JSON, the last 24 hours
+python -m connectors.ingestion.freshness_report --since 2026-10-06T14:00:00Z
+```
+The report is the response proposed for `GET /v1/freshness` (`docs/02-contracts/api.md`). B's API can call
+`connectors.ingestion.freshness_report.report(store)` or read the two tables directly.
+```json
+{"as_of": "...", "window_hours": 24, "sources": {"slack": {
+  "last_run_at": "...", "last_ok_at": "...", "last_error": null,
+  "freshness_lag_seconds": {"count": 3, "p50": 7.6, "p95": 14.9, "max": 14.9},
+  "pipeline_lag_seconds": {"count": 5, "p50": 0.9, "p95": 9.9, "max": 9.9},
+  "by_trigger": {"event": {"freshness_lag_seconds": {}, "pipeline_lag_seconds": {}}, "poll": {}}}}}
+```
+Percentiles are nearest-rank over the samples in the window. `last_error` is an exception class and never a
+message, which could hold IDs. The printed run report has both lags too, for this process only.
+
 ## How changes are applied
 | Change | What ingestion does |
 |---|---|
@@ -88,5 +124,5 @@ source with its cursor unmoved; there is no retry or back-off yet.
 
 ## Code map
 `pipeline.py` the loop · `chunking.py` passages · `embedding.py` embedders · `store.py` the store interface and an
-in-memory one · `pg_store.py` Postgres · `events.py` events and sinks · `freshness.py` lag p50/p95 · `tests/`
+in-memory one · `pg_store.py` Postgres · `events.py` events and sinks · `freshness.py` and `freshness_report.py` lag samples and the report · `tests/`
 run on both stores and skip Postgres when the database is down.

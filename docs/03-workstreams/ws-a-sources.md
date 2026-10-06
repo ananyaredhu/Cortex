@@ -24,8 +24,8 @@ Get real data, with faithful permissions, from the four platforms into the index
 Day 1 = Fri 2 Oct. Day 3 = contracts freeze. Day 8 = demoable build.
 
 ### Days 1 to 2 (Fri 2 to Sat 3 Oct)
-- [x] Create the Slack workspace and a custom internal app; verify rate limits for an internal app (check #3 in [06-risks](../06-risks-and-checks.md)): exempt from the 1-request-per-minute cut; the 15-objects cap is not yet confirmed
-- [ ] Create 4 to 5 Google accounts for personas; set up OAuth client; verify `changes.watch` reaches a webhook (check #4) (accounts and OAuth done: Priya, Dana and Maya signed in, 5 Oct; `changes.watch` not built yet)
+- [x] Create the Slack workspace and a custom internal app; verify rate limits for an internal app (check #3 in [06-risks](../06-risks-and-checks.md)): exempt from the 1-request-per-minute cut; not capped at 15 objects either (confirmed 6 Oct, PR #22)
+- [x] Create 4 to 5 Google accounts for personas; set up OAuth client; verify `changes.watch` reaches a webhook (check #4) (accounts and OAuth: Priya, Dana and Maya signed in, 5 Oct, which covers the owner or an editor of every seeded file; `changes.watch` reached the webhook through a tunnel and check #4 closed, 6 Oct, PR #19)
 - [x] Decide the Atlassian approach: trial window, sandbox, or simulator only (check #5). Decided: simulator only
 - [x] Design the "Company A" seed corpus and personas (Priya, Sam, Dana, Jordan, manager); write it down in `docs/` for the team: [company-a-seed.md](../company-a-seed.md)
 - [x] Draft contract changes you need (PRs to `docs/02-contracts/`): contracts 0.2, PR #1
@@ -35,8 +35,8 @@ Day 1 = Fri 2 Oct. Day 3 = contracts freeze. Day 8 = demoable build.
 - [x] Postgres schema for `chunks` (pgvector, FTS, GIN on `acl_tokens`) agreed with B: connector-interface 0.3, "Reading the index" (6 Oct; written by A because B has not started; B reviews the PR)
 
 ### Days 3 to 5 (Sun 4 to Tue 6 Oct)
-- [ ] Slack connector: public/private channels, membership, threads, DMs; Events API plus poll fallback; `check_access` via channel membership (merged and run on real Slack, PRs #9, #10, #12; Events API through Socket Mode added 6 Oct, with polling as the fallback, and run on real Slack; left unticked because DMs are not built: they need wider scopes)
-- [ ] Drive connector: folders, files, sharing roles, inheritance, shared drives, external sharing; `changes.watch`; `check_access` via permissions API (merged and run on real Drive, PRs #11 and #13; seed manifest and `changes.watch` push notifications added 6 Oct; left unticked because shared drives are not built)
+- [ ] Slack connector: public/private channels, membership, threads, DMs; Events API plus poll fallback; `check_access` via channel membership (merged and run on real Slack, PRs #9, #10, #12; Events API through Socket Mode added 6 Oct, PR #20, with polling as the fallback, and run on real Slack; left unticked because DMs are not built: they need wider scopes)
+- [ ] Drive connector: folders, files, sharing roles, inheritance, shared drives, external sharing; `changes.watch`; `check_access` via permissions API (merged and run on real Drive, PRs #11 and #13; seed manifest and `changes.watch` push notifications added 6 Oct, PR #19; left unticked because shared drives are not built)
 - [x] Confluence simulator: spaces, nested pages, space permissions, inherited page restrictions, webhooks, REST shapes similar to the real API
 - [x] Jira simulator: projects, role schemes, groups, **issue security levels**, issues with links, webhooks
 
@@ -50,9 +50,9 @@ Day 1 = Fri 2 Oct. Day 3 = contracts freeze. Day 8 = demoable build.
 - [x] Simulator admin actions work (revoke, restrict, edit)
 
 ### Days 9 to 10 (Sat 10 to Sun 11 Oct)
-- [x] Contract tests pass on real and simulated backends (inheritance, revocation, edit, negative case) (6 Oct: real Slack and real Drive registered, opt-in with `CONTRACT_REAL`; all pass, except restriction and container revocation, which are expected failures because the scopes are read-only, and Slack's revocation needs a hand step; simulators and fakes pass all)
+- [x] Contract tests pass on real and simulated backends (inheritance, revocation, edit, negative case) (6 Oct, PR #21: real Slack and real Drive registered, opt-in with `CONTRACT_REAL`; all pass, except restriction and container revocation, which are expected failures because the scopes are read-only, and Slack's revocation needs a hand step; simulators and fakes pass all)
 - [ ] Scale seed generator: 12k+ pages, 200+ channels; measure ingestion throughput
-- [ ] Measure and expose freshness lag (`freshness_lag_seconds`, p50/p95)
+- [x] Measure and expose freshness lag (`freshness_lag_seconds`, p50/p95) (6 Oct, PR #22: samples in `ingestion_lag`, last run per source in `ingestion_sources`, report for `GET /v1/freshness` proposed; measured on all four sources, see the status file)
 
 ### Days 11 to 12 (Mon 12 to Tue 13 Oct)
 - [ ] Hidden-document add/remove/edit tooling for Leak-CI (with C)

@@ -20,3 +20,25 @@ CREATE TABLE IF NOT EXISTS ingestion_events (
     detected_at    timestamptz NOT NULL,            -- when the connector saw the change
     observed_at    timestamptz NOT NULL             -- when ingestion processed it
 );
+
+-- Freshness (freshness.py): one sample per change that altered the index. Append-only; rows older than any window
+-- anyone asks for can be deleted at will.
+CREATE TABLE IF NOT EXISTS ingestion_lag (
+    id           bigserial PRIMARY KEY,
+    source       text NOT NULL,
+    action       text NOT NULL,                     -- indexed | acl_rewritten | deleted | principal_change
+    trigger      text NOT NULL,                     -- poll | event | crawl
+    detected_at  timestamptz NOT NULL,              -- when the connector saw the change
+    applied_at   timestamptz NOT NULL,              -- when the index reflected it
+    source_at    timestamptz                        -- the source's own time of the edit; new content only
+);
+CREATE INDEX IF NOT EXISTS ingestion_lag_applied ON ingestion_lag (applied_at);
+
+-- The last pass over each source, for "last sync" and to show a source that keeps failing.
+CREATE TABLE IF NOT EXISTS ingestion_sources (
+    source        text PRIMARY KEY,
+    last_run_at   timestamptz NOT NULL,
+    last_ok_at    timestamptz,
+    last_error    text,                             -- exception class only: never a message, which could hold IDs
+    last_actions  jsonb NOT NULL DEFAULT '{}'
+);

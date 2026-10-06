@@ -1,6 +1,6 @@
 """The two command-line helpers, against the fake workspace."""
 from connectors.slack.build_manifest import build
-from connectors.slack.check_rate_limit import measure, verdict
+from connectors.slack.check_rate_limit import cap_verdict, measure, verdict
 from connectors.slack.fake import FakeSlack, seed_company_a
 from fixtures.loader import load
 
@@ -44,3 +44,9 @@ def test_rate_limit_check_tells_the_three_outcomes_apart():
     assert (cut["ok"], cut["rate_limited"], cut["retry_after_seconds"]) == (0, 4, [60.0] * 4)
     assert "APPLY" in verdict(cut)
     assert "ordinary tier limit" in verdict({"ok": 8, "rate_limited": 4})
+
+
+def test_rate_limit_check_only_judges_the_cap_with_more_than_15_messages():
+    assert "does NOT apply" in cap_verdict({"messages_per_call": [16, 16]})
+    assert "not enough to tell" in cap_verdict({"messages_per_call": [15]})
+    assert "not enough to tell" in cap_verdict({"messages_per_call": []})

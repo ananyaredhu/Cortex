@@ -26,6 +26,7 @@ import time
 from connectors.env import load_dotenv
 from connectors.gdrive import DriveConnector, watch, webhook
 from connectors.ingestion.embedding import from_env
+from connectors.ingestion.freshness import METRIC, PIPELINE_METRIC
 from connectors.ingestion.pg_store import DEFAULT_URL, PostgresStore
 from connectors.ingestion.pipeline import Ingestor
 from connectors.slack import SlackConnector
@@ -131,10 +132,10 @@ def main() -> None:
                 for name in sorted(pending | wake.take()):    # and whatever arrived while settling
                     if name == "slack":
                         connectors["slack"].quick_next()
-                    actions = ingestor.run_source(connectors[name])
-                    lag = ingestor.lag.summary().get(name)
+                    actions = ingestor.run_source(connectors[name], trigger="event")
                     print(json.dumps({"trigger": TRIGGERS[name], "actions": {name: dict(actions)},
-                                      "freshness_lag_seconds": {name: lag}}), flush=True)
+                                      METRIC: {name: ingestor.freshness.summary().get(name)},
+                                      PIPELINE_METRIC: {name: ingestor.lag.summary().get(name)}}), flush=True)
             print(json.dumps(ingestor.run_once().as_json()), flush=True)
     except KeyboardInterrupt:
         pass

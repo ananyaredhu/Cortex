@@ -69,7 +69,8 @@ Two seconds after an event (so a burst becomes one pass), ingestion runs Slack a
 arrived, it fetches just those threads (two calls each) without scanning: this is what lets events scale to
 200 channels. A structural event, a reconnect (events may have been missed) or a fresh process with nothing in
 memory makes that pass a full scan instead. The scheduled `--poll` pass always scans, as the fallback for a lost
-event. The change is dated from when the event arrived, so `freshness_lag_seconds` counts from the event.
+event. The change is dated from when the event arrived, so `pipeline_lag_seconds` counts from the event;
+`freshness_lag_seconds` counts from the edit's own time in Slack (`connectors/ingestion/README.md`, "Freshness").
 
 Bot events to subscribe to (Event Subscriptions, all covered by the read scopes above): `message.channels`,
 `message.groups`, `member_joined_channel`, `member_left_channel`, `channel_created`, `channel_deleted`,
