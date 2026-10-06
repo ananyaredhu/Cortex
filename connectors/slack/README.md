@@ -6,6 +6,8 @@ A real Slack workspace through a read-only bot token. Implements `docs/02-contra
 1. **A custom internal app** in the workspace with these bot token scopes, all read-only: `channels:read`,
    `channels:history`, `groups:read`, `groups:history`, `users:read`, `users:read.email`.
 2. **`SLACK_BOT_TOKEN`** in `.env` (the `xoxb-` token). Never paste it into a chat, a prompt, an issue or a screenshot.
+   For events, also **`SLACK_APP_TOKEN`** (the `xapp-` app-level token, scope `connections:write`), with Socket Mode
+   on and the bot events listed under "Events" below subscribed.
 3. **The bot invited to every channel it should read, public ones too** (`/invite @<app name>`). A bot can only read
    the history of channels it is a member of. A channel without the bot does not exist for this connector.
 4. **The identity map**, `connectors/identity-map.local.json`: canonical email to the address of the Slack account
@@ -36,7 +38,7 @@ channel. That is why Sam, the contractor persona, has no account on our workspac
 5 Oct). The guest rules are still tested, in `tests/`, with a guest who is not a persona.
 
 ## Changes
-`list_changes` polls. Every call scans the workspace (users, channels, members, channel history) and compares it
+`list_changes` scans: every call reads the workspace (users, channels, members, channel history) and compares it
 with the previous scan. The previous scan is kept in memory and also saved in the cursor (thread IDs, which channels
 are private, and which mapped people are in each channel, as canonical emails), so a new process, such as ingestion
 run with `--once`, still sees what changed since the last run.
@@ -44,20 +46,55 @@ run with `--once`, still sees what changed since the last run.
 | What happened in Slack | Change emitted |
 |---|---|
 | New thread, new reply, root message edited, reply deleted | `upsert` |
+| Reply edited | `upsert`, only through an event (a scan cannot see it) |
 | Thread deleted, or the bot removed from the channel | `delete` |
 | Channel made private or public | `acl_change` for each of its threads |
 | Someone joins or leaves a channel, or changes between guest and full member | `principal_change` with the token |
 
+## Events (Socket Mode)
+```
+python -m connectors.ingestion --poll 600 --sources confluence,jira,slack,gdrive --slack-events
+```
+`events.py` keeps a Socket Mode websocket open from inside the ingestion process: outbound only, so no public URL
+and no tunnel, and still one writer. It acknowledges every envelope at once and keeps only IDs from an event; it
+never logs message text, the token or the websocket URL. An event is a hint, not data:
+
+| Event | What it does |
+|---|---|
+| `message` in a channel the bot reads (new, reply, edit, delete, `message_replied`) | `note_thread`: that thread is re-sent as an `upsert`. A deleted thread becomes `DocumentNotFound` on fetch, so ingestion deletes it |
+| `member_joined_channel`, `member_left_channel`, `channel_*`, `group_*`, `user_change`, `team_join`, join and leave messages | `note_structure`: the next pass scans the whole workspace and diffs, as above |
+| Anything else, DMs included | Nothing |
+
+Two seconds after an event (so a burst becomes one pass), ingestion runs Slack alone. If only thread events
+arrived, it fetches just those threads (two calls each) without scanning: this is what lets events scale to
+200 channels. A structural event, a reconnect (events may have been missed) or a fresh process with nothing in
+memory makes that pass a full scan instead. The scheduled `--poll` pass always scans, as the fallback for a lost
+event. The change is dated from when the event arrived, so `freshness_lag_seconds` counts from the event.
+
+Bot events to subscribe to (Event Subscriptions, all covered by the read scopes above): `message.channels`,
+`message.groups`, `member_joined_channel`, `member_left_channel`, `channel_created`, `channel_deleted`,
+`channel_rename`, `channel_archive`, `channel_unarchive`, `group_rename`, `group_archive`, `group_unarchive`,
+`group_left`, `user_change`, `team_join`.
+
+If the log says `Slack events: connected` but edits never wake ingestion, the subscriptions are not active: check
+that Enable Events is on, that the bot events are listed, that Save Changes at the bottom of the page was clicked,
+and reinstall the app if Slack shows a banner asking for it (6 Oct: events started only after this).
+
+Measured on the real workspace, 6 Oct: a reply, an edit to that reply and its deletion each reached the index
+4 to 5 seconds after the event arrived, 2 of them the settle wait. A Socket Mode reconnect in the middle of the test
+lost nothing. Without events the edit would have waited for the next poll and then been missed.
+
 Limits, all known:
-- **Edits to a reply are not detected** by polling. The Events API would see them; it is not built.
+- **Without events, edits to a reply are not detected.** A scan sees only the root's edit and reply count.
 - **After a restart** every thread is re-sent as an `upsert` (ingestion skips what is unchanged), because the saved
   scan has thread IDs but not their versions. Deletes and membership changes since the saved cursor are reported.
   A cursor from before 6 Oct, or an unreadable one, falls back to a plain crawl without them. `check_access` is
   live, so access itself is never stale.
-- **Cost of a scan:** two calls plus two per channel, more with paging. Fine for a handful of channels. It will not
-  do for 200 channels without the Events API.
-- **Not covered:** DMs and group DMs, files, links to other documents (`links` is always empty), archived-channel
-  special cases.
+- **Cost of a scan:** two calls plus two per channel, more with paging. Events avoid it for content changes; the
+  scheduled poll still pays it, so with 200 channels keep `--poll` long (10 minutes or more).
+- **A channel made private or public** sends no event of its own that we rely on; the scheduled scan catches it.
+- **Not covered:** DMs and group DMs (would need `im:history` and `mpim:history`, wider scopes), files, links to
+  other documents (`links` is always empty), archived-channel special cases.
 - `check_access` asks Slack four questions at once (channel, thread, user, members) and caches nothing. Measured on
   the real workspace on 5 Oct: median about 270 ms, worst about 310 ms. One after another they took about 740 ms.
   All of them together must finish within 3 seconds or the answer is deny.
@@ -72,5 +109,8 @@ always uses the real ones. `seed-manifest.local.json` (gitignored, built by `bui
 connector runs over it through real HTTP code. `SeededSlack` in `testing.py` is registered in the shared contract
 tests as `slack-fake`. Two contract tests are expected failures for Slack: restricting a single document and
 revoking a container grant have no Slack equivalent. `tests/` covers the Slack-specific behaviour instead.
+
+`tests/test_events.py` runs the listener against a local websocket server speaking Socket Mode (hello, envelopes,
+acks, disconnect and reconnect) and checks what the connector does with each kind of hint.
 
 No test calls the real Slack API yet.

@@ -6,18 +6,19 @@ Public channels carry `channel:<id>` and `public:org`; private channels carry `c
 The bot token is read-only. It can only read channels the bot has been added to, public ones included, so a
 channel without the bot does not exist as far as this connector is concerned.
 
-Changes are found by polling: each `list_changes` call scans the workspace and compares it with the previous
-scan, which this connector keeps in memory. After a restart there is nothing to compare with, so the first call
-returns every thread as an upsert again (harmless: ingestion skips what has not changed). Deletes that happened
-while it was down are only cleaned up by a full crawl (`cursor=None`).
+Changes are found by scanning: each `list_changes` call scans the workspace and compares it with the previous
+scan, kept in memory and in the cursor. Events (connectors/slack/events.py, Socket Mode) add what a scan cannot
+see and make it cheaper: `note_thread` names a thread that changed (a reply edit is invisible to a scan), and
+after `quick_next` the next call checks only the noted threads instead of scanning, unless `note_structure`
+said memberships or channels changed. A scheduled poll still scans everything, as the fallback.
 
-Not covered: DMs and group DMs, edits to a reply (only the root's edit and reply count are visible to a poll),
-files, and the Events API.
+Not covered: DMs and group DMs, files.
 """
 import base64
 import hashlib
 import json
 import re
+import threading
 import time
 import uuid
 import zlib
@@ -140,6 +141,10 @@ class SlackConnector:
         self._epoch = uuid.uuid4().hex[:8]             # cursors from another process are recognisable as stale
         self._baseline: _Scan | None = None
         self._log: list[Change] = []
+        self._noted = threading.Lock()                 # events arrive on another thread
+        self._touched: dict[str, str] = {}             # threads named by events since the last list_changes -> when
+        self._structure = False                        # an event said memberships or channels changed
+        self._quick = False                            # the next list_changes may skip the scan
 
     @classmethod
     def from_env(cls) -> "SlackConnector":
@@ -170,15 +175,63 @@ class SlackConnector:
 
         The cursor carries the scan it ends at, so a new process (ingestion restarted, or run with --once) still
         reports the memberships and deletes that changed in between, and re-sends every thread as an upsert.
+        Threads named by `note_thread` are re-sent as upserts even when the scan shows no difference.
         """
+        with self._noted:
+            touched, quick, structure = self._touched, self._quick, self._structure
+            self._touched, self._quick, self._structure = {}, False, False
+        try:
+            position = self._position(cursor)
+            if quick and not structure and position is not None and self._baseline is not None:
+                return self._quick_changes(position, touched)
+            return self._scanned_changes(cursor, position, touched)
+        except BaseException:
+            with self._noted:          # nothing was reported: keep the notes for the next call
+                self._touched = touched | self._touched
+                self._structure |= structure
+            raise
+
+    # -- events (connectors/slack/events.py) ----------------------------------------------------
+    def note_thread(self, channel_id: str, thread_ts: str) -> None:
+        """An event said this thread changed: a message, reply, edit or delete in it. Safe from any thread.
+        The change it leads to is dated from the first such note, so freshness lag counts from the event."""
+        doc_id = f"slack:{channel_id}/{thread_ts}"
+        if _parse(doc_id) is not None:
+            with self._noted:
+                self._touched.setdefault(doc_id, _now())
+
+    def note_structure(self) -> None:
+        """An event said memberships, channels or accounts changed: the next list_changes must scan."""
+        with self._noted:
+            self._structure = True
+
+    def quick_next(self) -> None:
+        """Let the next list_changes check only the noted threads, without scanning the workspace, if nothing
+        structural is pending and this process has a scan to build on. Otherwise it scans as usual."""
+        with self._noted:
+            self._quick = True
+
+    def _quick_changes(self, position: int, touched: dict[str, str]) -> ChangeBatch:
+        baseline = self._baseline
+        assert baseline is not None
+        readable = [d for d in sorted(touched) if d.split(":", 1)[1].split("/", 1)[0] in baseline.private]
+        # An upsert for a thread that is gone becomes DocumentNotFound on fetch, which ingestion treats as a delete.
+        self._log += [Change("upsert", doc_id, touched[doc_id]) for doc_id in readable]
+        for doc_id in readable:
+            baseline.docs.setdefault(doc_id, None)    # a new thread: the next scan reports it deleted if it goes
+        return ChangeBatch(self._log[position:], f"{self._epoch}:{len(self._log)}{_SAVED}{baseline.saved()}", False)
+
+    def _scanned_changes(self, cursor: str | None, position: int | None, touched: dict[str, str]) -> ChangeBatch:
         scan = self._scan()
-        position = self._position(cursor)
         if position is None and self._baseline is None and cursor:
             saved = _Scan.restore(cursor.partition(_SAVED)[2])
             if saved is not None:
                 self._baseline, position = saved, len(self._log)
         if self._baseline is not None:
-            self._log += self._diff(self._baseline, scan)
+            changes = self._diff(self._baseline, scan)
+            sent = {c.doc_id for c in changes if c.type in ("upsert", "delete")}
+            changes += [Change("upsert", d, touched[d]) for d in sorted(touched.keys() & scan.docs.keys() - sent)]   # e.g. a reply edit
+            self._log += changes
         self._baseline = scan
         end = f"{self._epoch}:{len(self._log)}{_SAVED}{scan.saved()}"
         if position is None:

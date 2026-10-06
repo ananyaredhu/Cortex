@@ -12,7 +12,7 @@ python -m connectors.ingestion --once --recrawl    # forget cursors and crawl ag
 python -m connectors.ingestion --once --sources confluence,jira,slack,gdrive   # all four (Slack and Drive are real)
 python -m connectors.ingestion.check_index         # compare the index with the fixtures, through the seed manifests
 ```
-With `--poll`, add `--drive-webhook PORT` to have Drive push notifications wake ingestion early (`connectors/gdrive/README.md`, "Push notifications").
+With `--poll`, add `--drive-webhook PORT` to have Drive push notifications wake ingestion early (`connectors/gdrive/README.md`, "Push notifications"), and `--slack-events` to have Slack events through Socket Mode do the same for Slack (`connectors/slack/README.md`, "Events").
 The simulators must be running for Confluence and Jira (`make sim-confluence`, `make sim-jira`).
 `check_index` checks, read-only, that every seeded document is indexed with the current ACL snapshot and a vector
 from `EMBEDDING_BACKEND`, that the right personas can read it, and that each persona's prefilter finds exactly what

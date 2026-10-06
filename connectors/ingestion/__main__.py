@@ -5,13 +5,15 @@
     python -m connectors.ingestion --once --recrawl      (after restarting a simulator)
 
     python -m connectors.ingestion --once --sources confluence,jira,slack,gdrive
-    python -m connectors.ingestion --poll 600 --sources confluence,jira,slack,gdrive --drive-webhook 8110
+    python -m connectors.ingestion --poll 600 --sources confluence,jira,slack,gdrive --drive-webhook 8110 --slack-events
 
 With --drive-webhook, Drive push notifications (connectors/gdrive/watch.py) wake the loop early to ingest Drive
-alone; the poll still runs every source on schedule, as the fallback when a notification is lost.
+alone. With --slack-events, Slack events through Socket Mode (connectors/slack/events.py) wake it to ingest the
+threads they name, without a full Slack scan unless memberships or channels changed. Either way the poll still
+runs every source on schedule, as the fallback when a notification or event is lost.
 
 Environment (read from the shell, then from .env): DATABASE_URL, EMBEDDING_BACKEND (bge-m3 | none),
-CONFLUENCE_SIM_URL, JIRA_SIM_URL; for Slack SLACK_BOT_TOKEN; for Drive the OAuth client, the token files and
+CONFLUENCE_SIM_URL, JIRA_SIM_URL; for Slack SLACK_BOT_TOKEN, and SLACK_APP_TOKEN for events; for Drive the OAuth client, the token files and
 gdrive.local.json; for both the identity map file.
 """
 import argparse
@@ -27,6 +29,7 @@ from connectors.ingestion.embedding import from_env
 from connectors.ingestion.pg_store import DEFAULT_URL, PostgresStore
 from connectors.ingestion.pipeline import Ingestor
 from connectors.slack import SlackConnector
+from connectors.slack.events import Hint, SocketModeListener
 from simulators.confluence import ConfluenceConnector
 from simulators.jira import JiraConnector
 
@@ -37,8 +40,32 @@ SOURCES = {
     "gdrive": DriveConnector.from_env,  # real Drive: needs signed-in accounts and gdrive.local.json
 }
 DEFAULT_SOURCES = "confluence,jira"
-SETTLE_SECONDS = 10.0  # after a Drive notification, before scanning: Drive sends bursts, and a Google Doc's exported
-                       # text was seen to lag its version counter by about 3 s (6 Oct)
+# Seconds to wait after a wake-up before ingesting, so a burst becomes one pass.
+SETTLE_SECONDS = {
+    "gdrive": 10.0,   # Drive sends bursts, and a Google Doc's exported text was seen to lag its version counter by about 3 s (6 Oct)
+    "slack": 2.0,     # one event per message, but an edit or a paste can come as several
+}
+TRIGGERS = {"gdrive": "drive_notification", "slack": "slack_event"}
+
+
+class Wakeups:
+    """Which sources a notification or event asked to ingest early. Rung from listener threads, read by the loop."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._pending: set[str] = set()
+        self.event = threading.Event()
+
+    def ring(self, source: str) -> None:
+        with self._lock:
+            self._pending.add(source)
+        self.event.set()
+
+    def take(self) -> set[str]:
+        with self._lock:
+            pending, self._pending = self._pending, set()
+            self.event.clear()
+        return pending
 
 
 def main() -> None:
@@ -50,6 +77,8 @@ def main() -> None:
                         help=f"comma-separated, from: {', '.join(SOURCES)} (default: {DEFAULT_SOURCES})")
     parser.add_argument("--drive-webhook", type=int, metavar="PORT",
                         help="with --poll and gdrive: listen on 127.0.0.1:PORT for Drive push notifications")
+    parser.add_argument("--slack-events", action="store_true",
+                        help="with --poll and slack: receive Slack events through Socket Mode (SLACK_APP_TOKEN)")
     parser.add_argument("--recrawl", action="store_true",
                         help="forget the saved cursors and crawl from scratch. Needed after a simulator restart: "
                              "its change log starts again, so an old cursor no longer means anything")
@@ -64,34 +93,56 @@ def main() -> None:
         parser.error(f"unknown source(s): {', '.join(unknown)}")
     if args.drive_webhook is not None and (args.once or "gdrive" not in names):
         parser.error("--drive-webhook needs --poll and gdrive in --sources")
+    if args.slack_events and (args.once or "slack" not in names):
+        parser.error("--slack-events needs --poll and slack in --sources")
     store = PostgresStore.connect(os.environ.get("DATABASE_URL") or DEFAULT_URL)
     if args.recrawl:
         for name in names:
             store.clear_cursor(name)
     connectors = {n: SOURCES[n]() for n in names}
-    ingestor = Ingestor(connectors.values(), store, from_env())
-    wake = threading.Event()
-    server = None
+    embedder = from_env()
+    ingestor = Ingestor(connectors.values(), store, embedder)
+    wake = Wakeups()
+    server = listener = None
     if args.drive_webhook is not None:
-        receiver = webhook.Receiver(watch.webhook_token(), lambda: {c.id for c in watch.load_channels()}, wake.set)
+        receiver = webhook.Receiver(watch.webhook_token(), lambda: {c.id for c in watch.load_channels()}, lambda: wake.ring("gdrive"))
         server = webhook.serve(receiver, args.drive_webhook)
+    if args.slack_events:
+        slack = connectors["slack"]
+
+        def on_hint(hint: Hint) -> None:
+            if hint.structure:
+                slack.note_structure()
+            else:
+                slack.note_thread(hint.channel, hint.thread_ts)
+            wake.ring("slack")
+
+        listener = SocketModeListener.from_env(on_hint).start()
     try:
+        if server is not None or listener is not None:
+            # The model loads on first use, which took about 90 s on 6 Oct. Pay it now, not on the first event.
+            embedder.embed(["warm up"])
         print(json.dumps(ingestor.run_once().as_json()), flush=True)
         while not args.once:
             due = time.monotonic() + args.poll
-            while wake.wait(max(0.0, due - time.monotonic())):
-                time.sleep(SETTLE_SECONDS)
-                wake.clear()
-                actions = ingestor.run_source(connectors["gdrive"])
-                lag = ingestor.lag.summary().get("gdrive")
-                print(json.dumps({"trigger": "drive_notification", "actions": {"gdrive": dict(actions)},
-                                  "freshness_lag_seconds": {"gdrive": lag}}), flush=True)
+            while wake.event.wait(max(0.0, due - time.monotonic())):
+                pending = wake.take()
+                time.sleep(max((SETTLE_SECONDS[n] for n in pending), default=0.0))
+                for name in sorted(pending | wake.take()):    # and whatever arrived while settling
+                    if name == "slack":
+                        connectors["slack"].quick_next()
+                    actions = ingestor.run_source(connectors[name])
+                    lag = ingestor.lag.summary().get(name)
+                    print(json.dumps({"trigger": TRIGGERS[name], "actions": {name: dict(actions)},
+                                      "freshness_lag_seconds": {name: lag}}), flush=True)
             print(json.dumps(ingestor.run_once().as_json()), flush=True)
     except KeyboardInterrupt:
         pass
     finally:
         if server is not None:
             server.shutdown()
+        if listener is not None:
+            listener.stop()
         store.close()
 
 
