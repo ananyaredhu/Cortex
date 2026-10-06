@@ -37,7 +37,8 @@ SOURCES = {
     "gdrive": DriveConnector.from_env,  # real Drive: needs signed-in accounts and gdrive.local.json
 }
 DEFAULT_SOURCES = "confluence,jira"
-SETTLE_SECONDS = 2.0   # Drive sends notifications in bursts: wait this long after one before scanning
+SETTLE_SECONDS = 10.0  # after a Drive notification, before scanning: Drive sends bursts, and a Google Doc's exported
+                       # text was seen to lag its version counter by about 3 s (6 Oct)
 
 
 def main() -> None:

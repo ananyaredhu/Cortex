@@ -44,8 +44,8 @@ class FakeDrive:
     def add(self, file_id: str, name: str, *, owner: str, parent: str | None = None, mime: str = GOOGLE_DOC, content: str = "",
             modified: str = "2026-10-10T08:00:00Z") -> str:
         self.files[file_id] = {"id": file_id, "name": name, "mimeType": mime, "parents": [parent] if parent else [], "owner": owner,
-                               "permissions": [], "content": content, "modifiedTime": modified, "createdTime": "2026-10-10T00:00:00Z",
-                               "trashed": False}
+                               "permissions": [], "content": content, "version": 1, "modifiedTime": modified,
+                               "createdTime": "2026-10-10T00:00:00Z", "trashed": False}
         return file_id
 
     def add_folder(self, folder_id: str, name: str, *, owner: str, parent: str | None = None) -> str:
@@ -58,8 +58,10 @@ class FakeDrive:
     def unshare(self, file_id: str, address: str) -> None:
         self.files[file_id]["permissions"] = [p for p in self.files[file_id]["permissions"] if p.get("emailAddress") != address]
 
-    def edit(self, file_id: str, content: str, modified: str) -> None:
-        self.files[file_id].update(content=content, modifiedTime=modified)
+    def edit(self, file_id: str, content: str, modified: str | None = None) -> None:
+        """Like Docs: `version` goes up on every edit; pass `modified=None` to leave the modified time where it was."""
+        file = self.files[file_id]
+        file.update(content=content, version=file["version"] + 1, modifiedTime=modified or file["modifiedTime"])
 
     def notifications(self, state: str = "change") -> list[dict[str, str]]:
         """The headers Google would send to each open channel's address when something changes."""
@@ -97,8 +99,9 @@ class FakeDrive:
         """As Drive v3 answers: `parents` lists only the folders `actor` can see, and is left out when there are none."""
         parents = [p for p in file["parents"] if p in self.files and self._role(actor, self.files[p])]
         return {"id": file["id"], "name": file["name"], "mimeType": file["mimeType"], **({"parents": parents} if parents else {}),
-                "trashed": file["trashed"], "modifiedTime": file["modifiedTime"], "createdTime": file["createdTime"],
-                "webViewLink": f"https://drive.test/file/d/{file['id']}/view", "owners": [{"emailAddress": file["owner"]}]}
+                "trashed": file["trashed"], "version": str(file["version"]), "modifiedTime": file["modifiedTime"],
+                "createdTime": file["createdTime"], "webViewLink": f"https://drive.test/file/d/{file['id']}/view",
+                "owners": [{"emailAddress": file["owner"]}]}
 
     # -- the API --------------------------------------------------------------------------------------
     def _handle(self, request: httpx.Request) -> httpx.Response:

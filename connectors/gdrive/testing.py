@@ -27,6 +27,10 @@ class SeededDrive(DriveConnector):
     def advance(self, event_id: str) -> None:
         """Neither scripted event touches Drive."""
 
+    def seed_version(self, doc: dict) -> str:
+        """Drive assigns its own version counter, so a seeded file's version is the counter it started at."""
+        return "1"
+
     def _address(self, token: str) -> tuple[str, str]:
         """(permission type, address) for the principal `token` names."""
         kind, _, name = token.partition(":")

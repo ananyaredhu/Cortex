@@ -1,7 +1,8 @@
 """Connector for Google Drive on personal accounts (docs/02-contracts/connector-interface.md, acl-model.md).
 
-One document is one file. `doc_id` is `gdrive:<file id>`, `parent_id` is `gdrive:<folder id>`, `version` is the
-file's modified time (so a sharing change alone does not look like a content change).
+One document is one file. `doc_id` is `gdrive:<file id>`, `parent_id` is `gdrive:<folder id>`, `version` is
+Drive's version counter for the file. Not its modified time: for a Google Doc that moves once per editing session,
+so later edits in the session would never look like a change (seen on real Drive, 6 Oct).
 
 How it gets at Drive: through the read-only OAuth grants of the persona accounts that signed in (client.py). A
 file exists for the connector when it sits under a configured root folder (config.py) and at least one of those
@@ -42,7 +43,7 @@ POLICY_VERSION = "gdrive-0.1"
 ACCESS_TIMEOUT = 3.0
 FOLDER = "application/vnd.google-apps.folder"
 GOOGLE_DOC = "application/vnd.google-apps.document"
-FILE_FIELDS = "id,name,mimeType,parents,trashed,modifiedTime,createdTime,webViewLink,owners(emailAddress)"
+FILE_FIELDS = "id,name,mimeType,parents,trashed,version,modifiedTime,createdTime,webViewLink,owners(emailAddress)"
 PERMISSION_FIELDS = "nextPageToken,permissions(id,type,role,emailAddress,deleted)"
 MAX_DEPTH = 25
 
@@ -170,7 +171,7 @@ class DriveConnector:
             author=self._identities.canonical_email(self.source, owner) if owner else None,
             created_at=meta.get("createdTime") or "",
             updated_at=meta.get("modifiedTime") or "",
-            version=meta.get("modifiedTime") or "",
+            version=str(meta.get("version") or ""),
             acl=acl.evidence,
         )
 
@@ -205,7 +206,7 @@ class DriveConnector:
             return deny
 
     def version(self, doc_id: str) -> str:
-        return self._document(doc_id)[1].get("modifiedTime") or ""
+        return str(self._document(doc_id)[1].get("version") or "")
 
     # -- reading Drive through whichever account can ----------------------------------------------
     def _try(self, what: str, file_id: str, call, *, complete=lambda result: True):
@@ -362,7 +363,7 @@ class DriveConnector:
                 acl = self._evaluate(meta, self._permissions(file_id))
             except _NotVisible:
                 continue   # nobody signed in can read its sharing: not indexed
-            scan[f"gdrive:{file_id}"] = (meta.get("modifiedTime"), acl.evidence.snapshot_hash, tuple(acl.evidence.tokens))
+            scan[f"gdrive:{file_id}"] = (str(meta.get("version") or ""), acl.evidence.snapshot_hash, tuple(acl.evidence.tokens))
         return scan
 
     @staticmethod
@@ -370,9 +371,11 @@ class DriveConnector:
         now = _now()
         changes: list[Change] = []
         for doc_id in sorted(new):
-            if doc_id not in old or old[doc_id][0] != new[doc_id][0]:
-                changes.append(Change("upsert", doc_id, now))
+            if doc_id not in old or old[doc_id][1] is None:
+                changes.append(Change("upsert", doc_id, now))       # new, or after a restart
             elif old[doc_id][1:] != new[doc_id][1:]:
                 changes.append(Change("acl_change", doc_id, now))   # shared, unshared, or a folder's sharing changed
+            elif old[doc_id][0] != new[doc_id][0]:
+                changes.append(Change("upsert", doc_id, now))
         changes += [Change("delete", doc_id, now) for doc_id in sorted(set(old) - set(new))]
         return changes

@@ -47,7 +47,8 @@ def changes(conn, cursor):
 def test_document_shape(d):
     doc = d.fetch(POSTMORTEM)
     fixture = next(x for x in DATA["documents"] if x["doc_id"] == POSTMORTEM)
-    assert (doc.kind, doc.title, doc.parent_id, doc.version) == ("file", fixture["title"], "gdrive:folder-incidents", fixture["updated_at"])
+    assert (doc.kind, doc.title, doc.parent_id, doc.version) == ("file", fixture["title"], "gdrive:folder-incidents", "1")
+    assert doc.updated_at == fixture["updated_at"]
     assert doc.body == fixture["body"], "exported text: byte-order mark and Windows line endings removed"
     assert doc.author is None, "the owner is not in the identity map"
     assert doc.acl.tokens == ["group:gdrive:payments-eng", "user:dana@companya.com"]
@@ -191,13 +192,17 @@ def test_edit_unshare_and_trash(d):
     assert changes(d, cursor) == ([], cursor)
     d.drive.edit("postmortem-pay-outage", "Revised postmortem.", "2026-10-11T09:00:00Z")
     found, cursor = changes(d, cursor)
-    assert found == [("upsert", POSTMORTEM)] and d.version(POSTMORTEM) == "2026-10-11T09:00:00Z"
+    assert found == [("upsert", POSTMORTEM)] and d.version(POSTMORTEM) == "2"
     assert d.fetch(POSTMORTEM).body == "Revised postmortem."
+    d.drive.edit("postmortem-pay-outage", "Revised again, same editing session.")   # Docs leaves the modified time
+    found, cursor = changes(d, cursor)
+    assert found == [("upsert", POSTMORTEM)] and d.version(POSTMORTEM) == "3"
+    assert d.fetch(POSTMORTEM).updated_at == "2026-10-11T09:00:00Z"
 
     before = d.fetch(VENDOR).acl
     d.drive.unshare("vendor-integration-notes", account("sam"))
     found, cursor = changes(d, cursor)
-    assert found == [("acl_change", VENDOR)] and d.version(VENDOR) == "2026-10-10T08:00:00Z", "sharing is not a content change"
+    assert found == [("acl_change", VENDOR)], "a sharing change is reported as one, whatever the version does"
     after = d.fetch(VENDOR).acl
     assert after.tokens == ["group:gdrive:payments-eng"] and after.snapshot_hash != before.snapshot_hash
     assert not allowed(d, "sam@contractor.io", VENDOR)

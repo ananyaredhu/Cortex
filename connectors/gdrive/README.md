@@ -41,7 +41,7 @@ check on it is a deny. **So the owner or an editor of every seeded file must be 
 |---|---|
 | Document | One file. Folders are containers, not documents |
 | `doc_id`, `parent_id` | `gdrive:<file id>`, `gdrive:<folder id>` |
-| `version` | The file's modified time. Sharing a file does not change it |
+| `version` | Drive's version counter for the file. Not the modified time: a Google Doc's moves once per editing session, so later edits in the session would be missed (seen 6 Oct) |
 | Body | Google Docs as plain text; `text/*` files as they are. Anything else has no body and is indexed by its title |
 | `native` | Folder, and the sharing list with canonical emails and group names only. Real addresses are not stored |
 | `resolve_identity` | From the identity map and the config: the person's groups, plus `external:` if outside the organisation. Not a live lookup |
@@ -78,11 +78,31 @@ Group membership lives in the config, so the connector emits no `principal_chang
 - **A person in a configured group that the file is shared with by address is allowed on the config's word.**
 - **"Anyone with the link" is ignored**, so such a file is only served to people it is also shared with by name.
 - **Polling cost:** one listing per folder per signed-in account, plus one sharing read per file. Fine for a few
-  folders. Not built: `changes.watch` push notifications (check #4) and `changes.list`.
-- **After a restart** every file is re-sent as an `upsert`; run ingestion with `--recrawl` to clean up deletes missed
-  while it was down.
+  folders. `changes.list` is not used: push notifications only wake the same scan.
+- **After a restart** every file is re-sent as an `upsert` (ingestion skips the unchanged ones). The cursor carries the
+  file IDs, so files deleted or unshared while it was down are reported as deletes.
+- **Exported text can lag the version counter** by a few seconds (about 3 s seen). Ingestion waits 10 s after a
+  notification; a fetch that still lands in the gap keeps the old text until the file's next change.
 - **Not covered:** shared drives, shortcuts, files with several parents, Sheets and Slides content, `links`.
 - `check_access` against the real API takes about 0.5 s (5 Oct, three signed-in accounts, two files).
+
+## Push notifications
+```
+python -m connectors.gdrive.watch start https://<public host>/drive/notify   # a channel per signed-in account, 7 days
+python -m connectors.gdrive.watch status
+python -m connectors.gdrive.watch stop
+python -m connectors.ingestion --poll 600 --sources confluence,jira,slack,gdrive --drive-webhook 8110
+```
+`watch.py` opens a `changes.watch` channel for each signed-in account; `start` again renews them (they last a week).
+Google calls the address on any change in that account's Drive. `webhook.py`, inside the ingestion process, accepts a
+notification only if it carries `GDRIVE_WEBHOOK_TOKEN` (in `.env`) and the ID of an open channel; it never reads the
+body and never calls Drive, it only wakes ingestion, which scans Drive alone 10 s later. Polling stays as the fallback.
+The receiver listens on 127.0.0.1; put HTTPS in front of it (a tunnel, or the deployment's reverse proxy). Google
+needs a valid certificate and no domain verification.
+
+Run on real Drive, 6 Oct, through a temporary Cloudflare tunnel: 3 channels opened; a request without the token got
+404; an added line reached the index 18 s after the edit, and its deletion, which left the modified time unchanged,
+was picked up too.
 
 ## IDs and the seed manifest
 The fixtures name files and folders by readable IDs (`gdrive:postmortem-pay-outage`, `gdrive:folder-incidents`); real
