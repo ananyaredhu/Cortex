@@ -28,7 +28,10 @@ class ManifestSlack:
         identity = self.inner.resolve_identity(email)
         if identity is None:
             return None
-        return replace(identity, groups=sorted(self.manifest.fixture_token(t) for t in identity.groups))
+        # Channels the manifest does not map (#general and the like on a real workspace) hold no seeded documents
+        # and do not exist in the fixture world: their tokens are left out. That only narrows access.
+        groups = [self.manifest.fixture_token(t) for t in identity.groups]
+        return replace(identity, groups=sorted(t for t in groups if not t.startswith("channel:") or t[8:] in self.manifest.channels))
 
     def list_changes(self, cursor: str | None) -> ChangeBatch:
         batch = self.inner.list_changes(cursor)
@@ -83,3 +86,51 @@ class SeededSlack(ManifestSlack):
     # No `restrict_document`: Slack cannot restrict one thread. No `revoke_container`: a channel has no grant
     # to take away other than its own membership. Both contract tests are expected failures for Slack; making a
     # channel private and removing a member are covered in connectors/slack/tests/.
+
+
+HAND_ENV = "CONTRACT_REAL_HAND"   # set to 1 to let a test wait for a change made by hand in Slack
+HAND_TIMEOUT = 600.0               # seconds to wait for it
+
+
+class RealSlack(ManifestSlack):
+    """The connector on the real workspace, through the seed manifest. Opt-in: see connectors/tests/contract.
+
+    The bot token is read-only, so a scripted permission change has to be made by a person in Slack. `advance`
+    says what to do and waits until the live `check_access` shows it; without CONTRACT_REAL_HAND=1 (and pytest
+    run with `-s`, so the instruction is visible) it is an expected failure instead. Prints fixture IDs,
+    persona names and channel names only.
+    """
+    why_no_permission_hooks = "the bot token is read-only and Slack has no per-thread restriction or channel grant"
+
+    def __init__(self) -> None:
+        from connectors.env import load_dotenv
+        load_dotenv()
+        self.data = load()
+        super().__init__(SlackConnector.from_env(), SeedManifest.load())
+
+    def advance(self, event_id: str) -> None:
+        import os
+        import time
+
+        import pytest
+
+        event = next(e for e in self.data["events"] if e["id"] == event_id)
+        if event["type"] != "acl_change":
+            return   # the scripted edit is Confluence's
+        if os.environ.get(HAND_ENV) != "1":
+            pytest.xfail(f"event {event_id} must be made by hand in Slack: run with {HAND_ENV}=1 and pytest -s")
+        persona = next(p for p in self.data["personas"] if p["id"] == event["persona"])
+        identity = self.resolve_identity(persona["email"])
+        assert identity is not None, f"{persona['id']} has no Slack identity"
+        for token in event["remove_tokens"]:
+            channel = token.split(":", 1)[1]
+            doc_id = next(d["doc_id"] for d in self.data["documents"] if d["source"] == "slack" and token in d["acl"]["tokens"])
+            name = self.fetch(doc_id).title.split(" ", 1)[0]
+            print(f"\n>>> BY HAND in Slack: remove {persona['id'].title()} from {name} (fixture {channel}), "
+                  f"signed in as an account that can, e.g. outsider. Waiting up to {HAND_TIMEOUT:.0f} s...", flush=True)
+            deadline = time.monotonic() + HAND_TIMEOUT
+            while self.check_access(identity, doc_id).allowed:
+                if time.monotonic() > deadline:
+                    pytest.fail(f"{persona['id']} still reads {doc_id} after {HAND_TIMEOUT:.0f} s")
+                time.sleep(3)
+            print(f">>> seen: {persona['id']} no longer reads {doc_id}", flush=True)

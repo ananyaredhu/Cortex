@@ -113,4 +113,16 @@ revoking a container grant have no Slack equivalent. `tests/` covers the Slack-s
 `tests/test_events.py` runs the listener against a local websocket server speaking Socket Mode (hello, envelopes,
 acks, disconnect and reconnect) and checks what the connector does with each kind of hint.
 
-No test calls the real Slack API yet.
+`RealSlack` registers the real workspace in the shared contract tests as `slack-real`, opt-in because it needs
+`.env` and the seed manifest. The workspace must be in the "before" state (Priya in `#auth-private`):
+```
+CONTRACT_REAL=slack python -m pytest connectors/tests/contract -k slack-real
+CONTRACT_REAL=slack CONTRACT_REAL_HAND=1 python -m pytest connectors/tests/contract -k slack-real -s
+```
+The bot token is read-only, so the revocation test (scripted event `e2`) needs a person: with `CONTRACT_REAL_HAND=1`
+it prints what to do (remove Priya from `#auth-private`, e.g. as `outsider`) and waits until the live `check_access`
+shows it; without it the test is an expected failure. Re-invite Priya afterwards. Channels the manifest does not map
+(`#general` and the like) are left out of identities seen through it: they hold no seeded documents.
+Run 6 Oct with the hand step: 11 passed, 1 skipped (no scripted Slack edit), 2 expected failures (no per-thread
+restriction or channel grant in Slack). The revocation flipped Priya to deny and the feed emitted exactly one
+`principal_change`. The default test run never calls the real Slack API.

@@ -171,7 +171,7 @@ Real platforms assign their own IDs (Slack channel IDs, Drive file IDs), so they
 - Credentials are read-only, least-privilege, and live only in the connector process.
 
 ## Contract tests (`connectors/tests/contract/`)
-1. Seeded fixture: known docs with known ACLs, expected `fetch`, `version` and `check_access` results per persona.
+1. Seeded fixture: known docs with known ACLs, expected `fetch`, `version` and `check_access` results per persona. A real backend whose native model expresses the same ACL in other tokens (Drive on personal accounts: a group inferred from shares to each of its members, in place of their own tokens) may be compared by readers, the personas the tokens let in, instead of token by token. `check_access` is still compared exactly.
 2. Revocation: remove a person from a container (channel, group, role), then `list_changes` emits one `principal_change` and `check_access` flips to deny within the SLA. Restrict a document itself, then `list_changes` emits `acl_change` for it and its `fetch` returns the new tokens.
 3. Edit: change content, then `version` changes and `list_changes` emits `upsert`.
 4. Inheritance: container-level permissions apply to children (Confluence space to page, Drive folder to file).
@@ -179,6 +179,7 @@ Real platforms assign their own IDs (Slack channel IDs, Drive file IDs), so they
 6. Initial load: `list_changes(None)`, followed until `has_more` is false, returns an `upsert` for every seeded document of that source.
 
 ## Changelog
+- 0.3, 6 Oct addition: contract test 1 may compare a real backend's ACL by readers when its native model uses other tokens for the same people (real Drive's inferred groups). No change to the interface.
 - 0.3: the `chunks` schema agreed (`db/init.sql`): new `source` column, `embedding` may be null; new section "Reading the index" with the rules and reference queries for B's retrieval.
 - 0.2: `list_changes(None)` defined as a full crawl; `DocumentNotFound`; `PlatformIdentity.groups` are ACL tokens and `email` is the canonical email; `Document.author` may be None; new `principal_change` change type with `principal` and `token`; document granularity and ID table, seed manifest for real backends; chunks removed on delete; `AccessDecision` stays in the policy plane; contract tests 2 and 5 updated, test 6 added.
 - 0.1: first draft.

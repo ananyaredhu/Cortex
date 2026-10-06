@@ -13,12 +13,24 @@ A backend without a hook is an expected failure for the test that needs it.
 A real platform assigns its own IDs and versions. Such a backend translates IDs through its seed manifest
 and exposes `seed_version(doc)`, the version the seeded document has there.
 Tests that a given backend cannot support yet must be marked `xfail` with a reason, never deleted.
+A backend that can never have a permission hook says why in `why_no_permission_hooks`.
+
+The real Slack workspace and real Drive are opt-in, since they need `.env`, signed-in accounts and the seed
+manifests, and they read live data:
+
+    CONTRACT_REAL=slack,gdrive python -m pytest connectors/tests/contract -p no:warnings
+    CONTRACT_REAL=slack CONTRACT_REAL_HAND=1 python -m pytest connectors/tests/contract -s -k "slack-real"
+
+Real Slack must be in the seeded "before" state: Priya in the private auth channel. With CONTRACT_REAL_HAND=1 the
+revocation test asks for her to be removed by hand and waits for it; re-invite her afterwards.
 """
+import os
+
 import pytest
 
 from connectors.base import Change, DocumentNotFound, PlatformIdentity
-from connectors.gdrive.testing import RenamedSeededDrive, SeededDrive
-from connectors.slack.testing import SeededSlack
+from connectors.gdrive.testing import RealDrive, RenamedSeededDrive, SeededDrive
+from connectors.slack.testing import RealSlack, SeededSlack
 from connectors.stub.fixture_connector import FixtureConnector
 from fixtures.loader import load, persona_by_id
 from simulators.confluence.testing import SeededConfluence
@@ -36,6 +48,12 @@ CONNECTORS = {
     "gdrive-fake": (lambda source: SeededDrive(), ["gdrive"]),   # the real connector over an in-memory Drive
     "gdrive-manifest": (lambda source: RenamedSeededDrive(), ["gdrive"]),   # the same with its own IDs, via the seed manifest
 }
+REAL = {
+    "slack-real": (lambda source: RealSlack(), ["slack"]),       # the real workspace, via the seed manifest
+    "gdrive-real": (lambda source: RealDrive(), ["gdrive"]),     # real Drive, via the seed manifest
+}
+_REAL_WANTED = {s.strip() for s in (os.environ.get("CONTRACT_REAL") or "").split(",") if s.strip()}
+CONNECTORS |= {name: entry for name, entry in REAL.items() if name.split("-")[0] in _REAL_WANTED}
 
 
 @pytest.fixture(params=[(name, s) for name, (_, sources) in CONNECTORS.items() for s in sources],
@@ -51,6 +69,10 @@ def _docs_of(conn):
 
 def _readers(doc):
     return [p for p in DATA["personas"] if set(p["tokens"]) & set(doc["acl"]["tokens"])]
+
+
+def _reader_ids(tokens) -> list[str]:
+    return sorted(p["id"] for p in DATA["personas"] if set(p["tokens"]) & set(tokens))
 
 
 def _drain(conn, cursor=None) -> tuple[list[Change], str]:
@@ -75,7 +97,12 @@ def test_fetch_and_version_match_seed(conn):
         assert got.doc_id == d["doc_id"]
         expected_version = conn.seed_version(d) if hasattr(conn, "seed_version") else d["version"]
         assert got.version == conn.version(d["doc_id"]) == expected_version
-        assert got.acl.tokens == d["acl"]["tokens"]
+        if getattr(conn, "compare_acl_by_readers", False):
+            # The native model says the same thing in other tokens (real Drive: a group inferred from shares to
+            # each member stands in for those members' own tokens). What must match is who it lets in.
+            assert _reader_ids(got.acl.tokens) == _reader_ids(d["acl"]["tokens"]), d["doc_id"]
+        else:
+            assert got.acl.tokens == d["acl"]["tokens"]
         assert got.acl.snapshot_hash.startswith("sha256:")
 
 
@@ -127,7 +154,8 @@ def test_membership_revocation_flips_access_and_emits_one_principal_change(conn)
 def test_restricting_a_document_emits_acl_change_and_new_tokens(conn):
     """A document's own ACL changes: one reader keeps access, another loses it, and the feed names the document."""
     if not hasattr(conn, "restrict_document"):
-        pytest.xfail("this backend cannot restrict a single document (needs a simulator or a real connector)")
+        pytest.xfail("this backend cannot restrict a single document: "
+                     + getattr(conn, "why_no_permission_hooks", "needs a simulator or a real connector"))
     doc = next(d for d in _docs_of(conn) if len(_readers(d)) >= 2)
     keeps, loses = _readers(doc)[:2]
     token = f"user:{keeps['email']}"
@@ -158,7 +186,8 @@ def test_edit_changes_version_and_emits_upsert(conn):
 def test_container_permissions_inherit_to_children(conn):
     """Take a grant away at the container (space, folder, project): the child loses it, and says so."""
     if not hasattr(conn, "revoke_container"):
-        pytest.xfail("this backend cannot change container permissions (needs a simulator or a real connector)")
+        pytest.xfail("this backend cannot change container permissions: "
+                     + getattr(conn, "why_no_permission_hooks", "needs a simulator or a real connector"))
     doc, persona, token = next(
         (d, p, t) for d in _docs_of(conn) for p in DATA["personas"]
         for t in sorted(set(p["tokens"]) & set(d["acl"]["tokens"])) if not t.startswith("user:"))
