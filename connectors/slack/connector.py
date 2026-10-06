@@ -14,11 +14,13 @@ while it was down are only cleaned up by a full crawl (`cursor=None`).
 Not covered: DMs and group DMs, edits to a reply (only the root's edit and reply count are visible to a poll),
 files, and the Events API.
 """
+import base64
 import hashlib
 import json
 import re
 import time
 import uuid
+import zlib
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -103,6 +105,25 @@ class _Scan:
         held = {channel_token(c) for c in channels if email in self.members.get(c, set())}
         return held | ({PUBLIC_ORG} if email in self.org else set())
 
+    def saved(self) -> str:
+        """What a later process needs to diff against this scan: thread IDs and who held what. Not the thread
+        signatures, so after a restart every thread is re-sent as an upsert (ingestion skips the unchanged ones)."""
+        data = {"docs": sorted(self.docs), "private": self.private, "members": {c: sorted(m) for c, m in self.members.items()},
+                "org": sorted(self.org), "people": sorted(self.people)}
+        return base64.urlsafe_b64encode(zlib.compress(json.dumps(data, sort_keys=True, separators=(",", ":")).encode())).decode()
+
+    @classmethod
+    def restore(cls, text: str) -> "_Scan | None":
+        try:
+            data = json.loads(zlib.decompress(base64.urlsafe_b64decode(text.encode())))
+            return cls({d: None for d in data["docs"]}, {c: bool(v) for c, v in data["private"].items()},
+                       {c: set(m) for c, m in data["members"].items()}, set(data["org"]), set(data["people"]))
+        except (ValueError, KeyError, TypeError, AttributeError, zlib.error):
+            return None
+
+
+_SAVED = "~"   # in a cursor, separates "<epoch>:<position>" from the saved scan
+
 
 class SlackConnector:
     source: Source = "slack"
@@ -145,13 +166,21 @@ class SlackConnector:
             return None
 
     def list_changes(self, cursor: str | None) -> ChangeBatch:
-        """cursor=None is the full crawl: every thread as an upsert. Otherwise what changed since that cursor."""
+        """cursor=None is the full crawl: every thread as an upsert. Otherwise what changed since that cursor.
+
+        The cursor carries the scan it ends at, so a new process (ingestion restarted, or run with --once) still
+        reports the memberships and deletes that changed in between, and re-sends every thread as an upsert.
+        """
         scan = self._scan()
+        position = self._position(cursor)
+        if position is None and self._baseline is None and cursor:
+            saved = _Scan.restore(cursor.partition(_SAVED)[2])
+            if saved is not None:
+                self._baseline, position = saved, len(self._log)
         if self._baseline is not None:
             self._log += self._diff(self._baseline, scan)
         self._baseline = scan
-        end = f"{self._epoch}:{len(self._log)}"
-        position = self._position(cursor)
+        end = f"{self._epoch}:{len(self._log)}{_SAVED}{scan.saved()}"
         if position is None:
             now = _now()
             return ChangeBatch([Change("upsert", doc_id, now) for doc_id in sorted(scan.docs)], end, False)
@@ -283,7 +312,7 @@ class SlackConnector:
         """Index into the change log, or None when the cursor is absent or not ours (then: crawl)."""
         if cursor is None:
             return None
-        epoch, _, raw = cursor.partition(":")
+        epoch, _, raw = cursor.partition(_SAVED)[0].partition(":")
         if epoch != self._epoch or not raw.isdigit() or int(raw) > len(self._log):
             return None
         return int(raw)

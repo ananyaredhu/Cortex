@@ -37,7 +37,9 @@ channel. That is why Sam, the contractor persona, has no account on our workspac
 
 ## Changes
 `list_changes` polls. Every call scans the workspace (users, channels, members, channel history) and compares it
-with the previous scan, which is kept in memory.
+with the previous scan. The previous scan is kept in memory and also saved in the cursor (thread IDs, which channels
+are private, and which mapped people are in each channel, as canonical emails), so a new process, such as ingestion
+run with `--once`, still sees what changed since the last run.
 
 | What happened in Slack | Change emitted |
 |---|---|
@@ -48,9 +50,10 @@ with the previous scan, which is kept in memory.
 
 Limits, all known:
 - **Edits to a reply are not detected** by polling. The Events API would see them; it is not built.
-- **After a restart** the previous scan is gone. The next call returns every thread as an `upsert` (ingestion skips
-  what is unchanged). Deletes and membership changes that happened while it was down are not reported; run
-  ingestion with `--recrawl` to clean up. `check_access` is live, so access itself is never stale.
+- **After a restart** every thread is re-sent as an `upsert` (ingestion skips what is unchanged), because the saved
+  scan has thread IDs but not their versions. Deletes and membership changes since the saved cursor are reported.
+  A cursor from before 6 Oct, or an unreadable one, falls back to a plain crawl without them. `check_access` is
+  live, so access itself is never stale.
 - **Cost of a scan:** two calls plus two per channel, more with paging. Fine for a handful of channels. It will not
   do for 200 channels without the Events API.
 - **Not covered:** DMs and group DMs, files, links to other documents (`links` is always empty), archived-channel
