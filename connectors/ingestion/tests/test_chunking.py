@@ -50,3 +50,11 @@ def test_lag_is_never_negative_and_percentiles_are_nearest_rank():
     for v in (1.0, 3.0, 2.0):
         tracker.record("jira", v)
     assert tracker.summary() == {"jira": {"count": 3, "p50": 2.0, "p95": 3.0, "max": 3.0}}
+
+
+def test_embed_check_measures_any_embedder():
+    from connectors.ingestion.embed_check import measure
+    result = measure(FakeEmbedder(), ["one", "two", "three"], repeat=2)
+    assert (result["model"], result["chunks"], result["dimensions"], result["fits_schema"]) == ("fake@1", 6, [DIM], True)
+    assert result["characters"] == 22 and result["seconds_per_chunk"] is not None
+    assert measure(NullEmbedder(), ["one"])["dimensions"] == []
