@@ -15,10 +15,13 @@ Environment: `DATABASE_URL`, `EMBEDDING_BACKEND` (`bge-m3`, or `none` for no vec
 only embedded locally.
 
 ## What it writes
+The database applies `db/init.sql` only when its volume is first created. After a change to that file, rebuild the
+local database with `docker compose down -v` then `docker compose up -d`, and re-run ingestion with `--recrawl`.
+
 | Table | Declared in | What B can rely on |
 |---|---|---|
 | `documents` | `db/init.sql` | One row per document. A deleted document stays as a tombstone with `deleted = true` |
-| `chunks` | `db/init.sql` | The indexed passages. `chunk_id` is `<doc_id>#<position>`. `acl_tokens` and `acl_snapshot_hash` are the document's current ACL. A deleted document has **no chunks**, so retrieval does not need to look at `documents.deleted`. `embedding` is `NULL` when `EMBEDDING_BACKEND=none` |
+| `chunks` | `db/init.sql` | The indexed passages. `chunk_id` is `<doc_id>#<position>`. `acl_tokens` and `acl_snapshot_hash` are the document's current ACL. A deleted document has **no chunks**, so retrieval does not need to look at `documents.deleted`. `embedding` is `NULL` when `EMBEDDING_BACKEND=none`. `source` is filled in by the database from `doc_id`. How to query it: "Reading the index" in `docs/02-contracts/connector-interface.md` |
 | `acl_snapshots` | `db/init.sql` | The document's ACL over time. Exactly one row per live document has `valid_to IS NULL`. `valid_from` and `valid_to` are ingestion's clock, not the connector's `observed_at` |
 | `ingestion_events` | `schema.sql` here | The outbox of permission events, below |
 | `ingestion_cursors` | `schema.sql` here | Ingestion's own state. Nothing else should read it |

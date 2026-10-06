@@ -1,6 +1,6 @@
 # Connector interface
 
-version: 0.2 (draft, freezes Day 3)
+version: 0.3
 Producer: Workstream A. Consumers: B (ingestion, PDP, JIT checks).
 
 Every source (Slack, Google Drive, Confluence, Jira), real or simulated, implements the same protocol and passes the same **contract tests**. Simulators must be proven faithful by running the same tests against the real API wherever one exists.
@@ -96,14 +96,15 @@ class AccessDecision:
 ## Chunk (indexed unit, written by A's ingestion, read by B's retrieval)
 ```python
 class Chunk:
-    chunk_id: str
+    chunk_id: str              # "<doc_id>#<position>"
     doc_id: str
+    source: Source             # derived from doc_id by the database
     position: int
     text: str
     acl_tokens: list[str]      # copied from the document's AclEvidence
     acl_snapshot_hash: str
     source_version: str        # Document.version at index time
-    embedding: list[float]
+    embedding: list[float] | None   # 1024 dimensions; None when indexed without a model (EMBEDDING_BACKEND=none)
     embedding_model: str       # e.g. "bge-m3"
     embedding_version: str
     ingested_at: str
@@ -111,6 +112,42 @@ class Chunk:
 Vectors carry the **same ACL tokens as their chunk** and are never shared across ACLs.
 
 On a `delete`, ingestion **removes the document's chunks** (the `documents` row may stay as a tombstone with `deleted = true`). A deleted document must not remain searchable.
+
+## Reading the index (B's retrieval)
+The tables are in `db/init.sql`: `documents`, `chunks`, `acl_snapshots`. A writes them (ingestion, the only writer); B reads them. Ingestion's outbox of permission events, `ingestion_events`, is described in `connectors/ingestion/README.md`. `connectors/ingestion/tests/test_index_reads.py` runs the queries below against what ingestion writes.
+
+What B can rely on:
+- `chunks.acl_tokens` and `acl_snapshot_hash` are the document's current ACL; every chunk of a document has the same ones. A document nobody may read has `acl_tokens = '{}'`.
+- A deleted document has no chunks, so retrieval does not need to check `documents.deleted`.
+- `source_version` is `Document.version` at index time: compare it with the connector's `version(doc_id)` for freshness read-through.
+- For a context-packet item: `title` and `url` come from `documents`; `as_of` is `documents.updated_at`, or `chunks.ingested_at` when that is null.
+
+Rules for every read:
+1. **Prefilter on every query:** `acl_tokens && :asker_tokens`. No query reads `chunks` without it, and the JIT `check_access` still runs on what it returns.
+2. **Vectors:** only rows with `embedding IS NOT NULL` and `embedding_model` equal to the model that embedded the query.
+3. **Iterative index scan:** run vector queries with `SET LOCAL hnsw.iterative_scan = relaxed_order` (pgvector 0.8 or later), inside a transaction. Without it the HNSW index returns its nearest candidates first and the ACL filter can discard all of them: in the test, a persona with a narrow ACL got 0 of 5 results. `relaxed_order` can return rows slightly out of order, so re-sort.
+4. **Per-source fan-out** filters on `chunks.source`.
+
+Reference queries:
+```sql
+-- vector leg (in a transaction, after SET LOCAL hnsw.iterative_scan = relaxed_order)
+WITH relaxed AS MATERIALIZED (
+    SELECT chunk_id, doc_id, embedding <=> :query_vector AS distance
+    FROM chunks
+    WHERE acl_tokens && :asker_tokens AND embedding_model = :model AND embedding IS NOT NULL
+      AND source = :source                      -- per-source fan-out
+    ORDER BY distance
+    LIMIT :k
+)
+SELECT chunk_id, doc_id, distance FROM relaxed ORDER BY distance;
+
+-- keyword leg (Postgres full-text search, English configuration, over chunks.text)
+SELECT chunk_id, doc_id, ts_rank_cd(tsv, query) AS rank
+FROM chunks, websearch_to_tsquery('english', :question) AS query
+WHERE tsv @@ query AND acl_tokens && :asker_tokens AND source = :source
+ORDER BY rank DESC
+LIMIT :k;
+```
 
 ## Document granularity and IDs
 | Source | One `Document` is | `doc_id` | `parent_id` | `version` |
@@ -142,5 +179,6 @@ Real platforms assign their own IDs (Slack channel IDs, Drive file IDs), so they
 6. Initial load: `list_changes(None)`, followed until `has_more` is false, returns an `upsert` for every seeded document of that source.
 
 ## Changelog
+- 0.3: the `chunks` schema agreed (`db/init.sql`): new `source` column, `embedding` may be null; new section "Reading the index" with the rules and reference queries for B's retrieval.
 - 0.2: `list_changes(None)` defined as a full crawl; `DocumentNotFound`; `PlatformIdentity.groups` are ACL tokens and `email` is the canonical email; `Document.author` may be None; new `principal_change` change type with `principal` and `token`; document granularity and ID table, seed manifest for real backends; chunks removed on delete; `AccessDecision` stays in the policy plane; contract tests 2 and 5 updated, test 6 added.
 - 0.1: first draft.
