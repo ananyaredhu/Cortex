@@ -9,6 +9,7 @@ It is a test double, not a simulator: no change feed, no shared drives, no uploa
 import re
 import time
 from collections import Counter
+from collections.abc import Callable
 
 import httpx
 
@@ -139,28 +140,35 @@ ADMIN = "drive.admin@example.com"     # owns the seeded files; not in the identi
 GROUP_ADDRESS = "payments-eng@groups.example.com"
 
 
-def seed_company_a(drive: FakeDrive, data: dict) -> tuple[dict[str, DriveSession], IdentityMap, DriveConfig]:
+def seed_company_a(drive: FakeDrive, data: dict, *, rename: Callable[[str], str] | None = None
+                   ) -> tuple[dict[str, DriveSession], IdentityMap, DriveConfig]:
     """Build the Company A story in `drive`. Returns (sessions, identity map, config) for a connector over it.
 
     Folders `incidents` and `vendor` are shared with the payments-eng group, so their files inherit it. The
     postmortem is also shared with Dana and the vendor notes with Sam, an outside address. Priya, Dana and Maya
     have signed in; the admin account that owns everything has too, which is how the sharing lists can be read.
+
+    `rename` maps a fixture file or folder ID to the ID the fake gives it, so the fake can play a real Drive whose
+    IDs differ from the fixtures (the seed manifest's case). By default the fixture IDs are used as they are.
     """
+    rename = rename or (lambda native_id: native_id)
     accounts = {p["email"]: {"gdrive": f"{p['id']}.account@example.com"} for p in data["personas"]}
     address = {email: per["gdrive"] for email, per in accounts.items()}
     members = [p["email"] for p in data["personas"] if "group:gdrive:payments-eng" in p["tokens"]]
     drive.group_members[GROUP_ADDRESS] = {address[m] for m in members}
     for doc in (d for d in data["documents"] if d["source"] == "gdrive"):
-        folder = doc["parent_id"].split(":", 1)[1]
+        folder = rename(doc["parent_id"].split(":", 1)[1])
         if folder not in drive.files:
             drive.add_folder(folder, doc["acl"]["native"]["folder"], owner=ADMIN)
             drive.share(folder, GROUP_ADDRESS, kind="group")
-        drive.add(doc["doc_id"].split(":", 1)[1], doc["title"], owner=ADMIN, parent=folder, content=doc["body"], modified=doc["updated_at"])
+        file_id = rename(doc["doc_id"].split(":", 1)[1])
+        drive.add(file_id, doc["title"], owner=ADMIN, parent=folder, content=doc["body"], modified=doc["updated_at"])
         for token in doc["acl"]["tokens"]:
             kind, _, who = token.partition(":")
             if kind in ("user", "external"):
-                drive.share(doc["doc_id"].split(":", 1)[1], address[who])
-    config = DriveConfig(root_folders=sorted({d["parent_id"].split(":", 1)[1] for d in data["documents"] if d["source"] == "gdrive"}),
+                drive.share(file_id, address[who])
+    folders = {rename(d["parent_id"].split(":", 1)[1]) for d in data["documents"] if d["source"] == "gdrive"}
+    config = DriveConfig(root_folders=sorted(folders),
                          groups={"payments-eng": Group(frozenset(members), GROUP_ADDRESS)}, org_domains=["companya.com"])
     signed_in = [p["email"] for p in data["personas"] if p["id"] in ("priya", "dana", "maya")]
     sessions = {email: drive.session(address[email]) for email in signed_in} | {"admin": drive.session(ADMIN)}

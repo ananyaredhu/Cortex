@@ -17,7 +17,7 @@ Tests that a given backend cannot support yet must be marked `xfail` with a reas
 import pytest
 
 from connectors.base import Change, DocumentNotFound, PlatformIdentity
-from connectors.gdrive.testing import SeededDrive
+from connectors.gdrive.testing import RenamedSeededDrive, SeededDrive
 from connectors.slack.testing import SeededSlack
 from connectors.stub.fixture_connector import FixtureConnector
 from fixtures.loader import load, persona_by_id
@@ -34,6 +34,7 @@ CONNECTORS = {
     "jira-sim": (lambda source: SeededJira(), ["jira"]),
     "slack-fake": (lambda source: SeededSlack(), ["slack"]),   # the real connector over an in-memory Slack
     "gdrive-fake": (lambda source: SeededDrive(), ["gdrive"]),   # the real connector over an in-memory Drive
+    "gdrive-manifest": (lambda source: RenamedSeededDrive(), ["gdrive"]),   # the same with its own IDs, via the seed manifest
 }
 
 
