@@ -5,6 +5,10 @@
     python -m connectors.ingestion --once --recrawl      (after restarting a simulator)
 
     python -m connectors.ingestion --once --sources confluence,jira,slack,gdrive
+    python -m connectors.ingestion --poll 600 --sources confluence,jira,slack,gdrive --drive-webhook 8110
+
+With --drive-webhook, Drive push notifications (connectors/gdrive/watch.py) wake the loop early to ingest Drive
+alone; the poll still runs every source on schedule, as the fallback when a notification is lost.
 
 Environment (read from the shell, then from .env): DATABASE_URL, EMBEDDING_BACKEND (bge-m3 | none),
 CONFLUENCE_SIM_URL, JIRA_SIM_URL; for Slack SLACK_BOT_TOKEN; for Drive the OAuth client, the token files and
@@ -14,10 +18,11 @@ import argparse
 import json
 import logging
 import os
+import threading
 import time
 
 from connectors.env import load_dotenv
-from connectors.gdrive import DriveConnector
+from connectors.gdrive import DriveConnector, watch, webhook
 from connectors.ingestion.embedding import from_env
 from connectors.ingestion.pg_store import DEFAULT_URL, PostgresStore
 from connectors.ingestion.pipeline import Ingestor
@@ -32,6 +37,7 @@ SOURCES = {
     "gdrive": DriveConnector.from_env,  # real Drive: needs signed-in accounts and gdrive.local.json
 }
 DEFAULT_SOURCES = "confluence,jira"
+SETTLE_SECONDS = 2.0   # Drive sends notifications in bursts: wait this long after one before scanning
 
 
 def main() -> None:
@@ -41,6 +47,8 @@ def main() -> None:
     mode.add_argument("--poll", type=float, metavar="SECONDS", help="keep draining, sleeping this long between passes")
     parser.add_argument("--sources", default=DEFAULT_SOURCES,
                         help=f"comma-separated, from: {', '.join(SOURCES)} (default: {DEFAULT_SOURCES})")
+    parser.add_argument("--drive-webhook", type=int, metavar="PORT",
+                        help="with --poll and gdrive: listen on 127.0.0.1:PORT for Drive push notifications")
     parser.add_argument("--recrawl", action="store_true",
                         help="forget the saved cursors and crawl from scratch. Needed after a simulator restart: "
                              "its change log starts again, so an old cursor no longer means anything")
@@ -53,20 +61,36 @@ def main() -> None:
     unknown = [n for n in names if n not in SOURCES]
     if unknown:
         parser.error(f"unknown source(s): {', '.join(unknown)}")
+    if args.drive_webhook is not None and (args.once or "gdrive" not in names):
+        parser.error("--drive-webhook needs --poll and gdrive in --sources")
     store = PostgresStore.connect(os.environ.get("DATABASE_URL") or DEFAULT_URL)
     if args.recrawl:
         for name in names:
             store.clear_cursor(name)
-    ingestor = Ingestor([SOURCES[n]() for n in names], store, from_env())
+    connectors = {n: SOURCES[n]() for n in names}
+    ingestor = Ingestor(connectors.values(), store, from_env())
+    wake = threading.Event()
+    server = None
+    if args.drive_webhook is not None:
+        receiver = webhook.Receiver(watch.webhook_token(), lambda: {c.id for c in watch.load_channels()}, wake.set)
+        server = webhook.serve(receiver, args.drive_webhook)
     try:
-        while True:
+        print(json.dumps(ingestor.run_once().as_json()), flush=True)
+        while not args.once:
+            due = time.monotonic() + args.poll
+            while wake.wait(max(0.0, due - time.monotonic())):
+                time.sleep(SETTLE_SECONDS)
+                wake.clear()
+                actions = ingestor.run_source(connectors["gdrive"])
+                lag = ingestor.lag.summary().get("gdrive")
+                print(json.dumps({"trigger": "drive_notification", "actions": {"gdrive": dict(actions)},
+                                  "freshness_lag_seconds": {"gdrive": lag}}), flush=True)
             print(json.dumps(ingestor.run_once().as_json()), flush=True)
-            if args.once:
-                return
-            time.sleep(args.poll)
     except KeyboardInterrupt:
         pass
     finally:
+        if server is not None:
+            server.shutdown()
         store.close()
 
 

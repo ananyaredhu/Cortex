@@ -11,6 +11,7 @@ identity-map*.json
 !identity-map.example.json
 seed-manifest*.json
 gdrive.local.json
+watch-channels*.json
 !seed-manifest.example.json
 
 # python

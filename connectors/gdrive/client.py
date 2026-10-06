@@ -62,15 +62,18 @@ class DriveSession:
                 self._expires_at = time.monotonic() + float(body.get("expires_in", 3600)) - 60
             return self._access_token
 
-    def request(self, path: str, *, retry: bool = True, **params: str | int | bool) -> httpx.Response:
-        """GET `path` under the API. Raises DriveError on a refusal. `retry=False` never waits (the query path)."""
+    def request(self, path: str, *, retry: bool = True, method: str = "GET", body: dict | None = None,
+                **params: str | int | bool) -> httpx.Response:
+        """GET (or `method`, with a JSON `body`) `path` under the API. Raises DriveError on a refusal.
+        `retry=False` never waits (the query path)."""
         query = {k: (str(v).lower() if isinstance(v, bool) else str(v)) for k, v in params.items()}
         attempts = self._max_retries if retry else 0
         refreshed = False
         delay = 1.0
         while True:
-            response = self._http.get(self._api_url + path, params=query, headers={"Authorization": f"Bearer {self._token()}"})
-            if response.status_code == 200:
+            response = self._http.request(method, self._api_url + path, params=query, json=body,
+                                          headers={"Authorization": f"Bearer {self._token()}"})
+            if 200 <= response.status_code < 300:
                 return response
             reason = _reason(response)
             if response.status_code == 401 and not refreshed:

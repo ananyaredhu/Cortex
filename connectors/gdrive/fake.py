@@ -6,6 +6,7 @@ list is only shown to people who can share the file (owner or editor).
 
 It is a test double, not a simulator: no change feed, no shared drives, no uploads.
 """
+import json
 import re
 import time
 from collections import Counter
@@ -36,6 +37,7 @@ class FakeDrive:
         self.expire_tokens = 0        # answer this many API requests with HTTP 401 first
         self.down = False
         self.delay = 0.0
+        self.channels: dict[str, dict] = {}   # push-notification channels opened with changes.watch, by channel id
         self._ids = 0
 
     # -- building and changing the drive ------------------------------------------------------------
@@ -58,6 +60,11 @@ class FakeDrive:
 
     def edit(self, file_id: str, content: str, modified: str) -> None:
         self.files[file_id].update(content=content, modifiedTime=modified)
+
+    def notifications(self, state: str = "change") -> list[dict[str, str]]:
+        """The headers Google would send to each open channel's address when something changes."""
+        return [{"X-Goog-Channel-ID": c["id"], "X-Goog-Channel-Token": c.get("token", ""), "X-Goog-Resource-State": state,
+                 "X-Goog-Resource-ID": c["resourceId"], "X-Goog-Message-Number": "1"} for c in self.channels.values()]
 
     def session(self, account: str, **kwargs) -> DriveSession:
         """A session signed in as `account`."""
@@ -117,6 +124,23 @@ class FakeDrive:
             return _error(401, "authError")
         actor = request.headers.get("Authorization", "").removeprefix("Bearer at:")
         params = request.url.params
+        if path == "changes/startPageToken":
+            return httpx.Response(200, json={"startPageToken": "1"})
+        if path == "changes/watch" and request.method == "POST":
+            body = json.loads(request.content)
+            if body.get("type") != "web_hook" or not str(body.get("address", "")).startswith("https://") or not params.get("pageToken"):
+                return _error(400, "badRequest")
+            channel = {"kind": "api#channel", "id": body["id"], "resourceId": f"changes-{actor}", "token": body.get("token", ""),
+                       "resourceUri": f"{API}changes", "expiration": str(body.get("expiration") or 3_600_000)}
+            self.channels[body["id"]] = {**channel, "address": body["address"], "account": actor}
+            return httpx.Response(200, json={k: v for k, v in channel.items() if k != "token"})
+        if path == "channels/stop" and request.method == "POST":
+            body = json.loads(request.content)
+            channel = self.channels.get(body.get("id"))
+            if channel is None or channel["resourceId"] != body.get("resourceId") or channel["account"] != actor:
+                return _error(404, "notFound")
+            del self.channels[body["id"]]
+            return httpx.Response(204)
         if path == "files":
             match = _PARENT_QUERY.search(params.get("q", ""))
             parent = match.group(1) if match else None
