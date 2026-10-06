@@ -3,8 +3,12 @@ docs/02-contracts/api.md. Used by the stub API tests now and by CI against the r
 
 `client` is anything with httpx-style `.post(path, json=..., headers=...)` (starlette TestClient or httpx.Client).
 `advance(event_id)` applies a scripted change (stub: POST /sim/advance; real: simulator admin endpoint).
+`ids` translates the real system's Slack and Drive document IDs back to the fixture IDs the cases use
+(`SeedIds.from_manifests()`); the default, for the stub API, leaves IDs as they are. See evals/ids.py.
 """
 import json
+
+from evals.ids import SeedIds
 
 
 def _headers(persona_id: str) -> dict:
@@ -33,8 +37,14 @@ def _check(resp: dict, rules: dict) -> list[str]:
     return errs
 
 
-def run_case(client, case: dict, advance) -> list[str]:
-    ask = lambda: client.post("/v1/ask", json={"question": case["question"]}, headers=_headers(case["persona"])).json()
+def run_case(client, case: dict, advance, ids: SeedIds | None = None) -> list[str]:
+    ids = ids or SeedIds.fixture()
+    ids.require([case])
+
+    def ask() -> dict:
+        resp = client.post("/v1/ask", json={"question": case["question"]}, headers=_headers(case["persona"])).json()
+        return ids.response_in_fixture_ids(resp)
+
     errs: list[str] = []
     if "after_event" in case:
         errs += [f"before: {e}" for e in _check(ask(), case.get("before_event", {}))]
@@ -45,9 +55,12 @@ def run_case(client, case: dict, advance) -> list[str]:
     return errs
 
 
-def run_all(client, cases: list[dict], advance, reset) -> dict[str, list[str]]:
+def run_all(client, cases: list[dict], advance, reset, ids: SeedIds | None = None) -> dict[str, list[str]]:
+    """Refuses to start (`UnmappedDocuments`) if `ids` cannot translate a document the cases name."""
+    ids = ids or SeedIds.fixture()
+    ids.require(cases)
     results = {}
     for case in cases:
         reset()
-        results[case["id"]] = run_case(client, case, advance)
+        results[case["id"]] = run_case(client, case, advance, ids)
     return results
