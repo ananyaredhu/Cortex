@@ -119,6 +119,14 @@ passes all of them, including restriction and container revocation. `RenamedSeed
 IDs, spoken to through a manifest built by `build_manifest`; it is registered as `gdrive-manifest` and passes them too.
 `tests/` covers the Drive-specific behaviour.
 
-No test calls the real Google API. The sign-in flow and `check_setup` have been run by hand against real Drive (5 Oct),
-and `build_manifest` plus read-only checks through `ManifestDrive` (6 Oct): IDs, folders, versions, readers and all 10
-persona-by-file access checks match.
+`RealDrive` registers real Drive in the shared contract tests as `gdrive-real`, opt-in because it needs the signed-in
+accounts and the seed manifest:
+```
+CONTRACT_REAL=gdrive python -m pytest connectors/tests/contract -k gdrive-real
+```
+Run 6 Oct: 10 passed, 2 skipped (neither scripted event touches Drive), 2 expected failures (restricting a file and
+revoking a folder grant need write scopes, which the connector does not ask for). Real Drive writes the postmortem's
+ACL as `group:gdrive:payments-eng` alone where the fixture also has `user:dana@companya.com` (the group is inferred
+from shares to each member), so this backend is compared by readers, as contract test 1 now allows. A version
+counter moves on every edit, even one undone later, so rebuild the manifest (`build_manifest`) after editing a seeded
+file. The default test run never calls the real Google API.

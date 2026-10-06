@@ -113,3 +113,21 @@ class RenamedSeededDrive(ManifestDrive):
 
     def revoke_container(self, container_id: str, token: str) -> None:
         self.inner.revoke_container(self.manifest.real_container(container_id) or container_id, token)
+
+
+class RealDrive(ManifestDrive):
+    """The connector on real Drive (the signed-in accounts), through the seed manifest. Opt-in: see
+    connectors/tests/contract. Neither scripted event touches Drive. Permission changes would need write
+    scopes, which the connector does not ask for, so there are no permission hooks."""
+    why_no_permission_hooks = "the Drive scopes are read-only, so a test cannot change sharing"
+    # Personal accounts have no Google Groups: files are shared with payments-eng's members one by one, and the
+    # connector writes that as `group:gdrive:payments-eng` without the members' own tokens. Same readers, other tokens.
+    compare_acl_by_readers = True
+
+    def __init__(self) -> None:
+        from connectors.env import load_dotenv
+        load_dotenv()
+        super().__init__(DriveConnector.from_env(), SeedManifest.load())
+
+    def advance(self, event_id: str) -> None:
+        """Neither scripted event touches Drive."""
