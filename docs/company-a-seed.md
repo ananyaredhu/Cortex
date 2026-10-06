@@ -98,7 +98,7 @@ Note on `slack:C_DBMIG/thread-2`: it is the prompt-injection test. Its author in
 
 | Fixture ID | Folder | File title | Share with (viewer) | Owner |
 |---|---|---|---|---|
-| `gdrive:postmortem-pay-outage` | `incidents` | Postmortem: payment outage | Priya, Dana | Maya |
+| `gdrive:postmortem-pay-outage` | `incidents` | Postmortem: payment outage | Priya, Dana | Dana (the fixtures name Maya as author; see below) |
 | `gdrive:vendor-integration-notes` | `vendor` | Vendor integration notes | Sam, Dana | Priya |
 
 Native sharing in the fixtures, for reference:
@@ -106,7 +106,7 @@ Native sharing in the fixtures, for reference:
 - `gdrive:postmortem-pay-outage`: `{"folder": "incidents", "sharing": [{"group": "payments-eng", "role": "viewer"}]}`, tokens `group:gdrive:payments-eng`, `user:dana@companya.com`
 - `gdrive:vendor-integration-notes`: `{"folder": "vendor", "sharing": [{"user": "sam@contractor.io", "role": "viewer"}]}`, tokens `external:sam@contractor.io`, `group:gdrive:payments-eng`
 
-The fixtures share with a group, `payments-eng`. Personal Gmail accounts have no groups, so on real Drive share with the listed people one by one. How the connector turns that back into `group:gdrive:payments-eng` is an open decision (hand-off, section 15).
+The fixtures share with a group, `payments-eng`. Personal Gmail accounts have no groups, so on real Drive share with the listed people one by one. The connector turns that back into `group:gdrive:payments-eng` when a file is shared with every member of the group in `gdrive.local.json` (`connectors/gdrive/README.md`). It then leaves out those members' own tokens, so the postmortem's real tokens are `group:gdrive:payments-eng` alone; the same people can read it, and contract test 1 compares this backend by readers (connector-interface 0.3).
 
 File contents, as Google Docs:
 
@@ -149,10 +149,10 @@ Copy `connectors/identity-map.example.json` to `connectors/identity-map.local.js
 ## Where real platforms cannot match the story
 
 - **Sam on Slack: decided 5 Oct, Sam has no Slack account.** Guest accounts are paid-only, and on a free workspace Sam would be a full member who could read every public channel. So Sam is left out of the workspace and out of the Slack part of the identity map: no Slack access at all, which fails closed. The fixtures follow (Sam no longer holds `channel:C_AUTH`). Scenario 3 is unaffected: it runs on Confluence and Jira. Guest handling is still tested in the Slack connector's own tests, with a guest who is not a persona.
-- **`public:org` on Drive.** Personal Gmail has no organisation, so nothing native backs it.
-- **Drive groups.** See the note under Google Drive.
-- **Drive owners.** The fixtures make Maya the author of the postmortem, yet her tokens do not let her read it. On
-  real Drive the owner can always read their own file. Either have Priya or Dana create that file, or accept that
-  Maya can read it on real Drive.
-
-These are open team decisions, listed in section 15 of `docs/03-workstreams/ws-a-handoff.md`.
+- **`public:org` on Drive.** Personal Gmail has no organisation, so nothing native backs it. No Drive document in
+  the fixtures carries it, so nothing depends on it until one does.
+- **Drive groups: settled.** Inferred from per-person shares, see the note under Google Drive.
+- **Drive owners: settled.** The fixtures make Maya the author of the postmortem, yet her tokens do not let her read
+  it, and on real Drive the owner can always read their own file. So Dana owns it on real Drive: Maya cannot read
+  it, as the story needs. The connector reports Dana as its author where the fixtures say Maya; nothing checks the
+  author of a Drive file.
