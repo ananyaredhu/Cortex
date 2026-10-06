@@ -1,0 +1,14 @@
+{
+  "folders": {
+    "folder-incidents": "1EXAMPLEincidentsFolderId",
+    "folder-vendor": "1EXAMPLEvendorFolderId"
+  },
+  "files": {
+    "gdrive:postmortem-pay-outage": "1EXAMPLEpostmortemFileId",
+    "gdrive:vendor-integration-notes": "1EXAMPLEvendorNotesFileId"
+  },
+  "versions": {
+    "gdrive:postmortem-pay-outage": "2026-10-05T09:12:44.512Z",
+    "gdrive:vendor-integration-notes": "2026-10-05T09:15:02.031Z"
+  }
+}

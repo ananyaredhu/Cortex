@@ -23,6 +23,7 @@ The connector asks Drive for everything Drive can tell it and takes the rest fro
 7. **Check it:**
    ```
    python -m connectors.gdrive.check_setup
+   python -m connectors.gdrive.build_manifest     # fixture IDs -> this Drive's IDs; lists anything it cannot match
    python -m connectors.ingestion --once --sources confluence,jira,slack,gdrive
    ```
 
@@ -81,13 +82,23 @@ Group membership lives in the config, so the connector emits no `principal_chang
 - **After a restart** every file is re-sent as an `upsert`; run ingestion with `--recrawl` to clean up deletes missed
   while it was down.
 - **Not covered:** shared drives, shortcuts, files with several parents, Sheets and Slides content, `links`.
-- **No seed manifest yet.** The fake uses the fixture IDs. Real Drive assigns its own, and the contract tests and
-  golden cases will need a mapping, as Slack has.
 - `check_access` against the real API takes about 0.5 s (5 Oct, three signed-in accounts, two files).
+
+## IDs and the seed manifest
+The fixtures name files and folders by readable IDs (`gdrive:postmortem-pay-outage`, `gdrive:folder-incidents`); real
+Drive assigns its own, and the connector always uses the real ones. `seed-manifest.local.json` (gitignored, built by
+`build_manifest`) maps between them and records each file's version at build time. A fixture file is matched by its
+exact title under the root folders, and its folder by where that file is. Rebuild the manifest after editing a seeded
+file. `testing.ManifestDrive` wraps the connector so the shared contract tests and other tools can speak fixture IDs.
+Drive's tokens name people and groups, never files, so only document and folder IDs are translated.
 
 ## Tests
 `fake.py` is an in-memory Drive v3 and token endpoint: per-account visibility, inherited sharing, sharing lists only
 for owners and editors. `SeededDrive` in `testing.py` is registered in the shared contract tests as `gdrive-fake` and
-passes all of them, including restriction and container revocation. `tests/` covers the Drive-specific behaviour.
+passes all of them, including restriction and container revocation. `RenamedSeededDrive` is the same fake with its own
+IDs, spoken to through a manifest built by `build_manifest`; it is registered as `gdrive-manifest` and passes them too.
+`tests/` covers the Drive-specific behaviour.
 
-No test calls the real Google API. The sign-in flow and `check_setup` have been run by hand against real Drive (5 Oct).
+No test calls the real Google API. The sign-in flow and `check_setup` have been run by hand against real Drive (5 Oct),
+and `build_manifest` plus read-only checks through `ManifestDrive` (6 Oct): IDs, folders, versions, readers and all 10
+persona-by-file access checks match.

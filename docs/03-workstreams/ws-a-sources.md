@@ -36,7 +36,7 @@ Day 1 = Fri 2 Oct. Day 3 = contracts freeze. Day 8 = demoable build.
 
 ### Days 3 to 5 (Sun 4 to Tue 6 Oct)
 - [ ] Slack connector: public/private channels, membership, threads, DMs; Events API plus poll fallback; `check_access` via channel membership (merged and run on real Slack, PRs #9, #10, #12; left unticked because DMs and the Events API are not built, polling only)
-- [ ] Drive connector: folders, files, sharing roles, inheritance, shared drives, external sharing; `changes.watch`; `check_access` via permissions API (merged and run on real Drive, PRs #11 and #13; left unticked because shared drives, `changes.watch` and the seed manifest are not built, polling only)
+- [ ] Drive connector: folders, files, sharing roles, inheritance, shared drives, external sharing; `changes.watch`; `check_access` via permissions API (merged and run on real Drive, PRs #11 and #13; seed manifest added 6 Oct; left unticked because shared drives and `changes.watch` are not built, polling only)
 - [x] Confluence simulator: spaces, nested pages, space permissions, inherited page restrictions, webhooks, REST shapes similar to the real API
 - [x] Jira simulator: projects, role schemes, groups, **issue security levels**, issues with links, webhooks
 
