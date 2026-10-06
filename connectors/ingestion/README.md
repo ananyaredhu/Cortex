@@ -9,7 +9,17 @@ the reference for that hand-over.
 python -m connectors.ingestion --once              # drain every source once
 python -m connectors.ingestion --poll 5            # keep going, 5 seconds between passes
 python -m connectors.ingestion --once --recrawl    # forget cursors and crawl again (after a simulator restart)
+python -m connectors.ingestion --once --sources confluence,jira,slack,gdrive   # all four (Slack and Drive are real)
+python -m connectors.ingestion.check_index         # compare the index with the fixtures, through the seed manifests
 ```
+The simulators must be running for Confluence and Jira (`make sim-confluence`, `make sim-jira`).
+`check_index` checks, read-only, that every seeded document is indexed with the current ACL snapshot and a vector
+from `EMBEDDING_BACKEND`, that the right personas can read it, and that each persona's prefilter finds exactly what
+they may see. It prints fixture IDs, persona names and counts only.
+
+First run on all four sources (6 Oct, this laptop): 18 documents, 18 chunks, bge-m3, about 1.5 minutes, most of it
+loading the model. A second run changes nothing and embeds nothing; it takes about 30 seconds, the cost of polling
+Slack and Drive.
 Environment: `DATABASE_URL`, `EMBEDDING_BACKEND` (`bge-m3`, or `none` for no vectors), `CONFLUENCE_SIM_URL`,
 `JIRA_SIM_URL`. `.env` is not loaded automatically. Hosted embedding backends are refused: document text is
 only embedded locally.

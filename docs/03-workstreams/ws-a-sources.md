@@ -46,7 +46,7 @@ Day 1 = Fri 2 Oct. Day 3 = contracts freeze. Day 8 = demoable build.
 - [ ] Seed Company A data in all four sources, including the scenario fixtures (breach report in a security-only space, private channel, runbook, DB-migration project, auth-service thread)
 
 ### Day 8 (Fri 9 Oct): demoable build
-- [ ] Data flows from all four sources into the index with correct ACL tokens
+- [x] Data flows from all four sources into the index with correct ACL tokens (6 Oct: 18 documents, bge-m3; checked with `python -m connectors.ingestion.check_index`)
 - [x] Simulator admin actions work (revoke, restrict, edit)
 
 ### Days 9 to 10 (Sat 10 to Sun 11 Oct)

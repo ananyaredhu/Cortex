@@ -47,6 +47,7 @@ def main() -> None:
     args = parser.parse_args()
     load_dotenv()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
+    logging.getLogger("httpx").setLevel(logging.WARNING)   # one line per API call, with real platform IDs: too noisy
 
     names = [n.strip() for n in args.sources.split(",") if n.strip()]
     unknown = [n for n in names if n not in SOURCES]
