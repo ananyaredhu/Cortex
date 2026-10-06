@@ -5,8 +5,9 @@ Update at the end of each day. Newest first. Keep it short: done, next, blockers
 ## Tue 6 Oct (Day 5)
 - **Done:** PR #12 (Sam has no Slack account) and PR #13 (Drive file read through an account that can see its folder) merged. Identity mapping ticked: Slack and Drive both use it and fail closed on unmapped accounts. Check #4 result written (OAuth works; `changes.watch` still open). Checklist brought up to date.
 - **Done:** bge-m3 installed and run on this laptop's CPU with `embed_check`: about 2.4 chunks/s, 1024 dimensions, peak about 1.9 GB, MIT license. Result written under check #6 (B's check). Model cache kept on D: through `HF_HOME`. The 12k-page scale corpus will take hours to embed, so pre-embed it offline.
+- **Done, later:** `chunks` schema settled as connector-interface 0.3: new `source` column for per-source fan-out, rules and reference queries for B's retrieval, tested on Postgres (`test_index_reads.py`). Found on the way: a vector search with a narrow ACL returns nothing unless pgvector's iterative index scan is on, so that is now a rule. Written without B (not started yet); B reviews the PR.
 - **Next:** Drive seed manifest; run ingestion with `--sources ...,gdrive`; do scripted event `e2` by hand on real Slack; seed the scenario fixtures in all four sources.
-- **Blockers:** `chunks` schema still to be agreed with B. `evals/` needs the Slack and Drive seed manifests to map golden-case fixture IDs to real IDs (for C).
+- **Blockers:** `evals/` needs the Slack and Drive seed manifests to map golden-case fixture IDs to real IDs (for C).
 
 ## Mon 5 Oct (Day 4)
 - **Done:** Slack connector merged (PR #9) and verified on the real "Company A" workspace: all 5 channels and 6 threads found, tokens and text match the fixtures, access matches for Priya, Dana and Maya. Check #3: exempt from the 1-request-per-minute cut. `check_access` now asks Slack in parallel: median about 270 ms, down from 740 ms.
