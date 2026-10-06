@@ -8,6 +8,7 @@ from typing import Protocol
 
 from connectors.base import Document
 from connectors.ingestion.events import IngestionEvent
+from connectors.ingestion.freshness import LagSample, SourceRun, parse_ts
 
 
 @dataclass
@@ -46,6 +47,7 @@ class Indexed:
     acl_tokens: list[str] | None
     embedding_model: str | None        # None when the document has no chunks
     embedding_version: str | None
+    updated_at: str | None = None      # the source's time of the indexed version (Document.updated_at)
 
 
 class Store(Protocol):
@@ -78,6 +80,18 @@ class Store(Protocol):
     def events_after(self, seq: int = 0, limit: int = 100) -> list[IngestionEvent]:
         """Outbox events with a higher `seq`, oldest first. How a consumer reads the outbox."""
 
+    def record_lag(self, samples: list[LagSample]) -> None:
+        """Keep freshness samples (freshness.py)."""
+
+    def lag_since(self, since: str) -> list[LagSample]:
+        """Samples applied at or after `since`, oldest first."""
+
+    def record_run(self, run: SourceRun) -> None:
+        """The last pass over `run.source`. `last_ok_at` None keeps the previous one."""
+
+    def runs(self) -> list[SourceRun]:
+        """The last pass over every source that has run."""
+
 
 def same_acl(snapshot_hash: str | None, tokens: list[str] | None, doc: Document) -> bool:
     return snapshot_hash == doc.acl.snapshot_hash and tokens == list(doc.acl.tokens)
@@ -92,6 +106,8 @@ class InMemoryStore:
         self.chunks: dict[str, list[ChunkRow]] = {}
         self.snapshots: dict[str, list[Snapshot]] = {}
         self.events: list[IngestionEvent] = []
+        self.lag: list[LagSample] = []
+        self.source_runs: dict[str, SourceRun] = {}
 
     def get_cursor(self, source: str) -> str | None:
         return self.cursors.get(source)
@@ -113,7 +129,8 @@ class InMemoryStore:
         first = next(iter(self.chunks.get(doc_id, [])), None)
         return Indexed(row["version"], row["deleted"],
                        current.snapshot_hash if current else None, list(current.tokens) if current else None,
-                       first.embedding_model if first else None, first.embedding_version if first else None)
+                       first.embedding_model if first else None, first.embedding_version if first else None,
+                       row["updated_at"] or None)
 
     def replace_document(self, doc: Document, chunks: list[ChunkRow], at: str) -> None:
         self.documents[doc.doc_id] = {
@@ -144,6 +161,20 @@ class InMemoryStore:
 
     def events_after(self, seq: int = 0, limit: int = 100) -> list[IngestionEvent]:
         return self.events[max(seq, 0):][:limit]
+
+    def record_lag(self, samples: list[LagSample]) -> None:
+        self.lag += samples
+
+    def lag_since(self, since: str) -> list[LagSample]:
+        return [s for s in self.lag if parse_ts(s.applied_at) >= parse_ts(since)]
+
+    def record_run(self, run: SourceRun) -> None:
+        previous = self.source_runs.get(run.source)
+        ok = run.last_ok_at or (previous.last_ok_at if previous else None)
+        self.source_runs[run.source] = replace(run, last_ok_at=ok)
+
+    def runs(self) -> list[SourceRun]:
+        return [self.source_runs[s] for s in sorted(self.source_runs)]
 
     # -- inspection (tests, debugging) ----------------------------------------------------------
     def chunks_of(self, doc_id: str) -> list[ChunkRow]:

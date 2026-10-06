@@ -52,7 +52,7 @@ Day 1 = Fri 2 Oct. Day 3 = contracts freeze. Day 8 = demoable build.
 ### Days 9 to 10 (Sat 10 to Sun 11 Oct)
 - [x] Contract tests pass on real and simulated backends (inheritance, revocation, edit, negative case) (6 Oct: real Slack and real Drive registered, opt-in with `CONTRACT_REAL`; all pass, except restriction and container revocation, which are expected failures because the scopes are read-only, and Slack's revocation needs a hand step; simulators and fakes pass all)
 - [ ] Scale seed generator: 12k+ pages, 200+ channels; measure ingestion throughput
-- [ ] Measure and expose freshness lag (`freshness_lag_seconds`, p50/p95)
+- [x] Measure and expose freshness lag (`freshness_lag_seconds`, p50/p95) (6 Oct: samples in `ingestion_lag`, last run per source in `ingestion_sources`, report for `GET /v1/freshness` proposed; measured on all four sources, see the status file)
 
 ### Days 11 to 12 (Mon 12 to Tue 13 Oct)
 - [ ] Hidden-document add/remove/edit tooling for Leak-CI (with C)

@@ -6,6 +6,7 @@ from psycopg.types.json import Jsonb
 
 from connectors.base import Document
 from connectors.ingestion.events import IngestionEvent
+from connectors.ingestion.freshness import LagSample, SourceRun
 from connectors.ingestion.store import ChunkRow, Indexed, Snapshot, same_acl
 
 DEFAULT_URL = "postgresql://brain:brain@localhost:5432/brain"   # the local docker-compose database
@@ -50,7 +51,7 @@ class PostgresStore:
         return {r[0] for r in rows}
 
     def indexed(self, doc_id: str) -> Indexed | None:
-        row = self._conn.execute("SELECT version, deleted FROM documents WHERE doc_id = %s", (doc_id,)).fetchone()
+        row = self._conn.execute("SELECT version, deleted, updated_at FROM documents WHERE doc_id = %s", (doc_id,)).fetchone()
         if row is None:
             return None
         snap = self._conn.execute(
@@ -58,7 +59,7 @@ class PostgresStore:
         chunk = self._conn.execute(
             "SELECT embedding_model, embedding_version FROM chunks WHERE doc_id = %s LIMIT 1", (doc_id,)).fetchone()
         return Indexed(row[0], row[1], snap[0] if snap else None, list(snap[1]) if snap else None,
-                       chunk[0] if chunk else None, chunk[1] if chunk else None)
+                       chunk[0] if chunk else None, chunk[1] if chunk else None, _iso(row[2]))
 
     def replace_document(self, doc: Document, chunks: list[ChunkRow], at: str) -> None:
         with self._conn.transaction():
@@ -106,6 +107,34 @@ class PostgresStore:
             "SELECT kind, source, detected_at, observed_at, principal, token, doc_id, snapshot_hash, seq"
             " FROM ingestion_events WHERE seq > %s ORDER BY seq LIMIT %s", (seq, limit)).fetchall()
         return [IngestionEvent(r[0], r[1], _iso(r[2]), _iso(r[3]), r[4], r[5], r[6], r[7], r[8]) for r in rows]
+
+    def record_lag(self, samples: list[LagSample]) -> None:
+        if not samples:
+            return
+        with self._conn.cursor() as cur:
+            cur.executemany(
+                "INSERT INTO ingestion_lag (source, action, trigger, detected_at, applied_at, source_at)"
+                " VALUES (%s, %s, %s, %s, %s, %s)",
+                [(s.source, s.action, s.trigger, s.detected_at, s.applied_at, s.source_at) for s in samples])
+
+    def lag_since(self, since: str) -> list[LagSample]:
+        rows = self._conn.execute(
+            "SELECT source, action, trigger, detected_at, applied_at, source_at FROM ingestion_lag"
+            " WHERE applied_at >= %s ORDER BY applied_at, id", (since,)).fetchall()
+        return [LagSample(r[0], r[1], r[2], _iso(r[3]), _iso(r[4]), _iso(r[5])) for r in rows]
+
+    def record_run(self, run: SourceRun) -> None:
+        self._conn.execute(
+            "INSERT INTO ingestion_sources (source, last_run_at, last_ok_at, last_error, last_actions)"
+            " VALUES (%s, %s, %s, %s, %s) ON CONFLICT (source) DO UPDATE SET last_run_at = EXCLUDED.last_run_at,"
+            " last_ok_at = COALESCE(EXCLUDED.last_ok_at, ingestion_sources.last_ok_at),"
+            " last_error = EXCLUDED.last_error, last_actions = EXCLUDED.last_actions",
+            (run.source, run.last_run_at, run.last_ok_at, run.last_error, Jsonb(run.last_actions)))
+
+    def runs(self) -> list[SourceRun]:
+        rows = self._conn.execute(
+            "SELECT source, last_run_at, last_ok_at, last_error, last_actions FROM ingestion_sources ORDER BY source").fetchall()
+        return [SourceRun(r[0], _iso(r[1]), _iso(r[2]), r[3], dict(r[4])) for r in rows]
 
     # -- inspection (tests, debugging) ----------------------------------------------------------
     def chunks_of(self, doc_id: str) -> list[ChunkRow]:

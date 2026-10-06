@@ -60,8 +60,9 @@ def test_crawl_follows_has_more_across_pages(store):
 
 def test_lag_is_reported_per_source(store):
     report = _ingestor(store, SeededJira()).run_once()
-    lag = report.as_json()["freshness_lag_seconds"]["jira"]
+    lag = report.as_json()["pipeline_lag_seconds"]["jira"]
     assert lag["count"] == len(_docs("jira")) and 0 <= lag["p50"] <= lag["p95"] <= lag["max"]
+    assert report.as_json()["freshness_lag_seconds"] == {}, "a crawl is not freshness: old documents are not lag"
 
 
 # -- restart and idempotence --------------------------------------------------------------------
