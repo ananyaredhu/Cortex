@@ -20,7 +20,7 @@ def test_build_maps_every_fixture_file_and_folder_to_the_drives_own_ids():
     assert problems == []
     assert manifest.files == {POSTMORTEM: "1Realpostmortempayoutage", VENDOR: "1Realvendorintegrationnotes"}
     assert manifest.folders == {"folder-incidents": "1Realfolderincidents", "folder-vendor": "1Realfoldervendor"}
-    assert manifest.versions == {POSTMORTEM: "2026-10-10T08:00:00Z", VENDOR: "2026-10-10T08:00:00Z"}
+    assert manifest.versions == {POSTMORTEM: "1", VENDOR: "1"}
 
 
 def test_translation_goes_both_ways_and_unknown_ids_are_none():

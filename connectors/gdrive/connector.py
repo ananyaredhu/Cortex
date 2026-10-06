@@ -1,7 +1,8 @@
 """Connector for Google Drive on personal accounts (docs/02-contracts/connector-interface.md, acl-model.md).
 
-One document is one file. `doc_id` is `gdrive:<file id>`, `parent_id` is `gdrive:<folder id>`, `version` is the
-file's modified time (so a sharing change alone does not look like a content change).
+One document is one file. `doc_id` is `gdrive:<file id>`, `parent_id` is `gdrive:<folder id>`, `version` is
+Drive's version counter for the file. Not its modified time: for a Google Doc that moves once per editing session,
+so later edits in the session would never look like a change (seen on real Drive, 6 Oct).
 
 How it gets at Drive: through the read-only OAuth grants of the persona accounts that signed in (client.py). A
 file exists for the connector when it sits under a configured root folder (config.py) and at least one of those
@@ -21,11 +22,13 @@ Drive: that comes from the local config.
 
 Changes are found by polling, like the Slack connector: scan the root folders, compare with the previous scan.
 """
+import base64
 import hashlib
 import json
 import re
 import time
 import uuid
+import zlib
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -40,7 +43,7 @@ POLICY_VERSION = "gdrive-0.1"
 ACCESS_TIMEOUT = 3.0
 FOLDER = "application/vnd.google-apps.folder"
 GOOGLE_DOC = "application/vnd.google-apps.document"
-FILE_FIELDS = "id,name,mimeType,parents,trashed,modifiedTime,createdTime,webViewLink,owners(emailAddress)"
+FILE_FIELDS = "id,name,mimeType,parents,trashed,version,modifiedTime,createdTime,webViewLink,owners(emailAddress)"
 PERMISSION_FIELDS = "nextPageToken,permissions(id,type,role,emailAddress,deleted)"
 MAX_DEPTH = 25
 
@@ -55,6 +58,22 @@ def _parse(doc_id: str) -> str | None:
     """"gdrive:<file id>" -> file id. None if it is not a well-formed Drive doc id."""
     prefix, _, file_id = doc_id.partition(":")
     return file_id if prefix == "gdrive" and _FILE_ID.match(file_id) else None
+
+
+_SAVED = "~"   # in a cursor, separates "<epoch>:<position>" from the saved file IDs
+
+
+def _save(scan: dict[str, tuple]) -> str:
+    return base64.urlsafe_b64encode(zlib.compress(json.dumps(sorted(scan), separators=(",", ":")).encode())).decode()
+
+
+def _restore(text: str) -> dict[str, tuple] | None:
+    """A baseline with the saved IDs and no signatures: every file still there differs from it, so it is re-sent."""
+    try:
+        ids = json.loads(zlib.decompress(base64.urlsafe_b64decode(text.encode())))
+        return {str(doc_id): (None, None, ()) for doc_id in ids}
+    except (ValueError, TypeError, zlib.error):
+        return None
 
 
 class _NotVisible(Exception):
@@ -111,17 +130,27 @@ class DriveConnector:
             return None
 
     def list_changes(self, cursor: str | None) -> ChangeBatch:
-        """cursor=None is the full crawl: every file as an upsert. Otherwise what changed since that cursor."""
+        """cursor=None is the full crawl: every file as an upsert. Otherwise what changed since that cursor.
+
+        The cursor carries the IDs of the files it ends at, so a new process (ingestion restarted, or run with
+        --once) still reports files deleted or unshared in between, and re-sends every file as an upsert.
+        """
         scan = self._scan()
+        head, _, saved = (cursor or "").partition(_SAVED)
+        epoch, _, raw = head.partition(":")
+        position = int(raw) if epoch == self._epoch and raw.isdigit() and int(raw) <= len(self._log) else None
+        if position is None and self._baseline is None and saved:
+            restored = _restore(saved)
+            if restored is not None:
+                self._baseline, position = restored, len(self._log)
         if self._baseline is not None:
             self._log += self._diff(self._baseline, scan)
         self._baseline = scan
-        end = f"{self._epoch}:{len(self._log)}"
-        epoch, _, raw = (cursor or "").partition(":")
-        if cursor is None or epoch != self._epoch or not raw.isdigit() or int(raw) > len(self._log):
+        end = f"{self._epoch}:{len(self._log)}{_SAVED}{_save(scan)}"
+        if position is None:
             now = _now()
             return ChangeBatch([Change("upsert", doc_id, now) for doc_id in sorted(scan)], end, False)
-        return ChangeBatch(self._log[int(raw):], end, False)
+        return ChangeBatch(self._log[position:], end, False)
 
     def fetch(self, doc_id: str) -> Document:
         label, meta = self._document(doc_id)
@@ -142,7 +171,7 @@ class DriveConnector:
             author=self._identities.canonical_email(self.source, owner) if owner else None,
             created_at=meta.get("createdTime") or "",
             updated_at=meta.get("modifiedTime") or "",
-            version=meta.get("modifiedTime") or "",
+            version=str(meta.get("version") or ""),
             acl=acl.evidence,
         )
 
@@ -177,7 +206,7 @@ class DriveConnector:
             return deny
 
     def version(self, doc_id: str) -> str:
-        return self._document(doc_id)[1].get("modifiedTime") or ""
+        return str(self._document(doc_id)[1].get("version") or "")
 
     # -- reading Drive through whichever account can ----------------------------------------------
     def _try(self, what: str, file_id: str, call, *, complete=lambda result: True):
@@ -334,7 +363,7 @@ class DriveConnector:
                 acl = self._evaluate(meta, self._permissions(file_id))
             except _NotVisible:
                 continue   # nobody signed in can read its sharing: not indexed
-            scan[f"gdrive:{file_id}"] = (meta.get("modifiedTime"), acl.evidence.snapshot_hash, tuple(acl.evidence.tokens))
+            scan[f"gdrive:{file_id}"] = (str(meta.get("version") or ""), acl.evidence.snapshot_hash, tuple(acl.evidence.tokens))
         return scan
 
     @staticmethod
@@ -342,9 +371,11 @@ class DriveConnector:
         now = _now()
         changes: list[Change] = []
         for doc_id in sorted(new):
-            if doc_id not in old or old[doc_id][0] != new[doc_id][0]:
-                changes.append(Change("upsert", doc_id, now))
+            if doc_id not in old or old[doc_id][1] is None:
+                changes.append(Change("upsert", doc_id, now))       # new, or after a restart
             elif old[doc_id][1:] != new[doc_id][1:]:
                 changes.append(Change("acl_change", doc_id, now))   # shared, unshared, or a folder's sharing changed
+            elif old[doc_id][0] != new[doc_id][0]:
+                changes.append(Change("upsert", doc_id, now))
         changes += [Change("delete", doc_id, now) for doc_id in sorted(set(old) - set(new))]
         return changes

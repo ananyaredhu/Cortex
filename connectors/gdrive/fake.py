@@ -6,6 +6,7 @@ list is only shown to people who can share the file (owner or editor).
 
 It is a test double, not a simulator: no change feed, no shared drives, no uploads.
 """
+import json
 import re
 import time
 from collections import Counter
@@ -36,14 +37,15 @@ class FakeDrive:
         self.expire_tokens = 0        # answer this many API requests with HTTP 401 first
         self.down = False
         self.delay = 0.0
+        self.channels: dict[str, dict] = {}   # push-notification channels opened with changes.watch, by channel id
         self._ids = 0
 
     # -- building and changing the drive ------------------------------------------------------------
     def add(self, file_id: str, name: str, *, owner: str, parent: str | None = None, mime: str = GOOGLE_DOC, content: str = "",
             modified: str = "2026-10-10T08:00:00Z") -> str:
         self.files[file_id] = {"id": file_id, "name": name, "mimeType": mime, "parents": [parent] if parent else [], "owner": owner,
-                               "permissions": [], "content": content, "modifiedTime": modified, "createdTime": "2026-10-10T00:00:00Z",
-                               "trashed": False}
+                               "permissions": [], "content": content, "version": 1, "modifiedTime": modified,
+                               "createdTime": "2026-10-10T00:00:00Z", "trashed": False}
         return file_id
 
     def add_folder(self, folder_id: str, name: str, *, owner: str, parent: str | None = None) -> str:
@@ -56,8 +58,15 @@ class FakeDrive:
     def unshare(self, file_id: str, address: str) -> None:
         self.files[file_id]["permissions"] = [p for p in self.files[file_id]["permissions"] if p.get("emailAddress") != address]
 
-    def edit(self, file_id: str, content: str, modified: str) -> None:
-        self.files[file_id].update(content=content, modifiedTime=modified)
+    def edit(self, file_id: str, content: str, modified: str | None = None) -> None:
+        """Like Docs: `version` goes up on every edit; pass `modified=None` to leave the modified time where it was."""
+        file = self.files[file_id]
+        file.update(content=content, version=file["version"] + 1, modifiedTime=modified or file["modifiedTime"])
+
+    def notifications(self, state: str = "change") -> list[dict[str, str]]:
+        """The headers Google would send to each open channel's address when something changes."""
+        return [{"X-Goog-Channel-ID": c["id"], "X-Goog-Channel-Token": c.get("token", ""), "X-Goog-Resource-State": state,
+                 "X-Goog-Resource-ID": c["resourceId"], "X-Goog-Message-Number": "1"} for c in self.channels.values()]
 
     def session(self, account: str, **kwargs) -> DriveSession:
         """A session signed in as `account`."""
@@ -90,8 +99,9 @@ class FakeDrive:
         """As Drive v3 answers: `parents` lists only the folders `actor` can see, and is left out when there are none."""
         parents = [p for p in file["parents"] if p in self.files and self._role(actor, self.files[p])]
         return {"id": file["id"], "name": file["name"], "mimeType": file["mimeType"], **({"parents": parents} if parents else {}),
-                "trashed": file["trashed"], "modifiedTime": file["modifiedTime"], "createdTime": file["createdTime"],
-                "webViewLink": f"https://drive.test/file/d/{file['id']}/view", "owners": [{"emailAddress": file["owner"]}]}
+                "trashed": file["trashed"], "version": str(file["version"]), "modifiedTime": file["modifiedTime"],
+                "createdTime": file["createdTime"], "webViewLink": f"https://drive.test/file/d/{file['id']}/view",
+                "owners": [{"emailAddress": file["owner"]}]}
 
     # -- the API --------------------------------------------------------------------------------------
     def _handle(self, request: httpx.Request) -> httpx.Response:
@@ -117,6 +127,23 @@ class FakeDrive:
             return _error(401, "authError")
         actor = request.headers.get("Authorization", "").removeprefix("Bearer at:")
         params = request.url.params
+        if path == "changes/startPageToken":
+            return httpx.Response(200, json={"startPageToken": "1"})
+        if path == "changes/watch" and request.method == "POST":
+            body = json.loads(request.content)
+            if body.get("type") != "web_hook" or not str(body.get("address", "")).startswith("https://") or not params.get("pageToken"):
+                return _error(400, "badRequest")
+            channel = {"kind": "api#channel", "id": body["id"], "resourceId": f"changes-{actor}", "token": body.get("token", ""),
+                       "resourceUri": f"{API}changes", "expiration": str(body.get("expiration") or 3_600_000)}
+            self.channels[body["id"]] = {**channel, "address": body["address"], "account": actor}
+            return httpx.Response(200, json={k: v for k, v in channel.items() if k != "token"})
+        if path == "channels/stop" and request.method == "POST":
+            body = json.loads(request.content)
+            channel = self.channels.get(body.get("id"))
+            if channel is None or channel["resourceId"] != body.get("resourceId") or channel["account"] != actor:
+                return _error(404, "notFound")
+            del self.channels[body["id"]]
+            return httpx.Response(204)
         if path == "files":
             match = _PARENT_QUERY.search(params.get("q", ""))
             parent = match.group(1) if match else None
