@@ -2,7 +2,7 @@
 
     python -m connectors.ingestion --once
     python -m connectors.ingestion --poll 5
-    python -m connectors.ingestion --once --recrawl      (after restarting a simulator)
+    python -m connectors.ingestion --once --recrawl      (forget cursors; a simulator restart no longer needs it)
 
     python -m connectors.ingestion --once --sources confluence,jira,slack,gdrive
     python -m connectors.ingestion --poll 600 --sources confluence,jira,slack,gdrive --drive-webhook 8110 --slack-events
@@ -103,6 +103,7 @@ def main() -> None:
     connectors = {n: SOURCES[n]() for n in names}
     embedder = from_env()
     ingestor = Ingestor(connectors.values(), store, embedder)
+    failed = 0
     wake = Wakeups()
     server = listener = None
     if args.drive_webhook is not None:
@@ -123,17 +124,24 @@ def main() -> None:
         if server is not None or listener is not None:
             # The model loads on first use, which took about 90 s on 6 Oct. Pay it now, not on the first event.
             embedder.embed(["warm up"])
-        print(json.dumps(ingestor.run_once().as_json()), flush=True)
+        first = ingestor.run_once()
+        print(json.dumps(first.as_json()), flush=True)
+        if args.once and first.errors:
+            failed = 1                          # --once: tell the caller a source failed
         while not args.once:
             due = time.monotonic() + args.poll
             while wake.event.wait(max(0.0, due - time.monotonic())):
                 pending = wake.take()
                 time.sleep(max((SETTLE_SECONDS[n] for n in pending), default=0.0))
                 for name in sorted(pending | wake.take()):    # and whatever arrived while settling
+                    if ingestor.backing_off(name) > 0:
+                        continue                # it failed recently: the scheduled pass retries it after the back-off
                     if name == "slack":
                         connectors["slack"].quick_next()
-                    actions = ingestor.run_source(connectors[name], trigger="event")
-                    print(json.dumps({"trigger": TRIGGERS[name], "actions": {name: dict(actions)},
+                    actions = ingestor.try_source(connectors[name], trigger="event")
+                    outcome = {"actions": {name: dict(actions)}} if actions is not None \
+                        else {"errors": {name: ingestor.health[name].last_error}}
+                    print(json.dumps({"trigger": TRIGGERS[name], **outcome,
                                       METRIC: {name: ingestor.freshness.summary().get(name)},
                                       PIPELINE_METRIC: {name: ingestor.lag.summary().get(name)}}), flush=True)
             print(json.dumps(ingestor.run_once().as_json()), flush=True)
@@ -145,6 +153,7 @@ def main() -> None:
         if listener is not None:
             listener.stop()
         store.close()
+    raise SystemExit(failed)
 
 
 if __name__ == "__main__":

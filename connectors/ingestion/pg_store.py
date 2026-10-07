@@ -22,14 +22,25 @@ def _iso(value) -> str | None:
 
 
 class PostgresStore:
-    def __init__(self, conn: psycopg.Connection) -> None:
-        """`conn` must be in autocommit mode: each write method opens its own transaction."""
+    def __init__(self, conn: psycopg.Connection, *, url: str | None = None, connect_timeout: int = 5) -> None:
+        """`conn` must be in autocommit mode: each write method opens its own transaction. With `url`, a connection
+        broken by a database restart can be replaced (`reconnect_if_broken`)."""
         self._conn = conn
+        self._url = url
+        self._connect_timeout = connect_timeout
         self._conn.execute(_SCHEMA.read_text(encoding="utf-8"))
 
     @classmethod
     def connect(cls, url: str = DEFAULT_URL, *, connect_timeout: int = 5) -> "PostgresStore":
-        return cls(psycopg.connect(url, autocommit=True, connect_timeout=connect_timeout))
+        return cls(psycopg.connect(url, autocommit=True, connect_timeout=connect_timeout), url=url,
+                   connect_timeout=connect_timeout)
+
+    def reconnect_if_broken(self) -> None:
+        """Open a new connection when the current one is closed or broken (a database restart breaks it at the next
+        query). Raises if the database is still down; the caller backs off and tries again."""
+        if self._url is None or not (self._conn.closed or self._conn.broken):
+            return
+        self._conn = psycopg.connect(self._url, autocommit=True, connect_timeout=self._connect_timeout)
 
     def close(self) -> None:
         self._conn.close()

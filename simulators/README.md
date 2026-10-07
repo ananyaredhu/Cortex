@@ -60,7 +60,7 @@ Fields under `_simulator` are not part of Confluence. `expand` is ignored: pages
 ### Freshness
 | Endpoint | Purpose |
 |---|---|
-| `GET /sim/changes?cursor=&limit=` | Change feed behind `list_changes`. No cursor = full crawl (every page as an `upsert`), then incremental `upsert`, `delete`, `acl_change`, `principal_change` |
+| `GET /sim/changes?cursor=&limit=` | Change feed behind `list_changes`. No cursor = full crawl (every page as an `upsert`), then incremental `upsert`, `delete`, `acl_change`, `principal_change`. A cursor names its run of the log; after a restart or reset, an older one gets `410 Gone` and the connector raises `CursorExpired`, so ingestion crawls again on its own |
 | `POST /sim/webhooks` `{"url": ...}` | Register a webhook. Each change is POSTed with `webhookEvent` = `page_created`, `page_updated`, `page_removed`, `content_permissions_updated`, `space_permissions_updated` or `group_membership_updated` |
 | `DELETE /sim/webhooks` | Remove all webhooks |
 

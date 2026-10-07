@@ -161,6 +161,7 @@ Real platforms assign their own IDs (Slack channel IDs, Drive file IDs), so they
 
 ## Behavior requirements
 - `list_changes(None)` enumerates the whole source as `upsert`s (initial load). Ingestion calls it once, then keeps the returned cursor.
+- A source that no longer recognizes a cursor (its change log began again, e.g. a simulator restart) raises `CursorExpired` from `list_changes`. The consumer then crawls again with `list_changes(None)`. Never answer an expired cursor with an empty or partial feed: changes would be lost silently.
 - Permission changes come in two kinds (see "Two kinds of permission change" in acl-model.md):
   - **`acl_change`**: the document's own ACL changed (page restriction added, file unshared, channel made private). The document's tokens change, so ingestion re-fetches it and rewrites its chunks' `acl_tokens`.
   - **`principal_change`**: a person's membership changed (removed from a channel, group or role). No document's tokens change, so there is **one** change entry, not one per document. The consumer drops cached identities and cached decisions for that principal.
@@ -179,6 +180,7 @@ Real platforms assign their own IDs (Slack channel IDs, Drive file IDs), so they
 6. Initial load: `list_changes(None)`, followed until `has_more` is false, returns an `upsert` for every seeded document of that source.
 
 ## Changelog
+- 0.3, 7 Oct addition: `CursorExpired` from `list_changes`; the consumer crawls again. Raised by the simulators' connectors; Slack and Drive resync on their own and never raise it.
 - 0.3, 6 Oct addition: contract test 1 may compare a real backend's ACL by readers when its native model uses other tokens for the same people (real Drive's inferred groups). No change to the interface.
 - 0.3: the `chunks` schema agreed (`db/init.sql`): new `source` column, `embedding` may be null; new section "Reading the index" with the rules and reference queries for B's retrieval.
 - 0.2: `list_changes(None)` defined as a full crawl; `DocumentNotFound`; `PlatformIdentity.groups` are ACL tokens and `email` is the canonical email; `Document.author` may be None; new `principal_change` change type with `principal` and `token`; document granularity and ID table, seed manifest for real backends; chunks removed on delete; `AccessDecision` stays in the policy plane; contract tests 2 and 5 updated, test 6 added.

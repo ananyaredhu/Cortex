@@ -56,7 +56,7 @@ Day 1 = Fri 2 Oct. Day 3 = contracts freeze. Day 8 = demoable build.
 
 ### Days 11 to 12 (Mon 12 to Tue 13 Oct)
 - [x] Hidden-document add/remove/edit tooling for Leak-CI (with C) (7 Oct, `python -m simulators.leakci`: plant, edit, remove, list, clear and verify, on Confluence and Jira; C wires it into the Leak-CI tests)
-- [ ] Webhook and poll hardening, rate-limit back-off, retries
+- [x] Webhook and poll hardening, rate-limit back-off, retries (7 Oct: a failing source no longer stops the others or the process; per-source back-off with `Retry-After`; database reconnect; expired simulator cursors recrawl on their own, contract 0.3 addition)
 - [ ] Support B on revocation-to-enforcement timing measurement
 
 ### Days 13 to 15 (Wed 14 to Fri 16 Oct)

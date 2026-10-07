@@ -8,7 +8,7 @@ the reference for that hand-over.
 ```
 python -m connectors.ingestion --once              # drain every source once
 python -m connectors.ingestion --poll 5            # keep going, 5 seconds between passes
-python -m connectors.ingestion --once --recrawl    # forget cursors and crawl again (after a simulator restart)
+python -m connectors.ingestion --once --recrawl    # forget cursors and crawl again (rarely needed: see "Failures")
 python -m connectors.ingestion --once --sources confluence,jira,slack,gdrive   # all four (Slack and Drive are real)
 python -m connectors.ingestion.check_index         # compare the index with the fixtures, through the seed manifests
 ```
@@ -119,8 +119,30 @@ message, which could hold IDs. The printed run report has both lags too, for thi
 | `principal_change` | Appends to the outbox. The index is not touched |
 
 The cursor is saved after each batch and every step is idempotent, so a crash replays at most one batch. A full
-crawl that completes in one run also removes indexed documents the crawl did not list. Any failure stops that
-source with its cursor unmoved; there is no retry or back-off yet.
+crawl that completes in one run also removes indexed documents the crawl did not list.
+
+## Failures
+A failure in one source's pass (network, rate limit, database, outbox) stops that pass with its cursor where it
+was, and nothing else:
+- **The other sources carry on.** The run report lists the failed source under `errors` (the exception class only:
+  messages can hold IDs and URLs), and `ingestion_sources.last_error` records it for the freshness report.
+- **The failed source backs off:** 30 s, doubling to at most 15 minutes, with ±20% jitter, or longer when a rate
+  limit says so (an exception with `retry_after`, such as `SlackRateLimited`). Until then, scheduled passes report
+  it under `backing_off_seconds` and Slack events or Drive notifications do not wake it. The next attempt replays the
+  same changes; a success resets the back-off.
+- **A lost database connection** (Postgres restarted) is replaced before the next attempt.
+- **An expired cursor** (`CursorExpired`: the simulator restarted or was reset, so its change log began again) makes
+  ingestion clear that cursor and crawl the source again at once, removing what the crawl no longer lists. So
+  `--recrawl` is no longer needed after a simulator restart.
+- **`--once`** exits with status 1 when a source failed.
+
+Below the pass, the Slack and Drive clients retry HTTP 429 (and Drive's 5xx) themselves, honouring `Retry-After`,
+three times at most before the pass fails. The query path (`check_access`, `resolve_identity`) never retries: it
+fails closed.
+
+Limit, known: a document that fails on every attempt (say, one the embedder rejects) blocks its source's later
+changes, retried at the back-off pace, until it is fixed or deleted. `last_error` shows it; nothing is skipped
+silently, because skipping an `acl_change` would leave stale tokens in the index.
 
 ## Code map
 `pipeline.py` the loop · `chunking.py` passages · `embedding.py` embedders · `store.py` the store interface and an

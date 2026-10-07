@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 
 import httpx
 
-from connectors.base import AccessDecision, AclEvidence, ChangeBatch, Document, DocumentNotFound, PlatformIdentity, Source
+from connectors.base import AccessDecision, AclEvidence, ChangeBatch, CursorExpired, Document, DocumentNotFound, PlatformIdentity, Source
 from simulators.common import to_change
 from simulators.confluence.model import valid_id
 from simulators.confluence.tokens import group_token
@@ -67,6 +67,8 @@ class ConfluenceConnector:
         if cursor is not None:
             params["cursor"] = cursor
         response = self._client.get("/sim/changes", params=params)
+        if response.status_code == 410:
+            raise CursorExpired(cursor)
         response.raise_for_status()
         data = response.json()
         return ChangeBatch([to_change(c) for c in data["changes"]], data["next_cursor"], data["has_more"])
