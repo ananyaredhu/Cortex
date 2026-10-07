@@ -55,7 +55,7 @@ Day 1 = Fri 2 Oct. Day 3 = contracts freeze. Day 8 = demoable build.
 - [x] Measure and expose freshness lag (`freshness_lag_seconds`, p50/p95) (6 Oct, PR #22: samples in `ingestion_lag`, last run per source in `ingestion_sources`, report for `GET /v1/freshness` proposed; measured on all four sources, see the status file)
 
 ### Days 11 to 12 (Mon 12 to Tue 13 Oct)
-- [ ] Hidden-document add/remove/edit tooling for Leak-CI (with C)
+- [x] Hidden-document add/remove/edit tooling for Leak-CI (with C) (7 Oct, `python -m simulators.leakci`: plant, edit, remove, list, clear and verify, on Confluence and Jira; C wires it into the Leak-CI tests)
 - [ ] Webhook and poll hardening, rate-limit back-off, retries
 - [ ] Support B on revocation-to-enforcement timing measurement
 
