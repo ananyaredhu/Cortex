@@ -13,6 +13,11 @@ class DocumentNotFound(LookupError):
     """Raised by `fetch` and `version`. Never raised by `check_access`, which returns a deny instead."""
 
 
+class CursorExpired(LookupError):
+    """Raised by `list_changes` when the source no longer knows the cursor (e.g. a simulator restarted and its change
+    log began again). The consumer starts over with a full crawl, `list_changes(None)`."""
+
+
 @dataclass
 class PlatformIdentity:
     source: Source
@@ -86,7 +91,8 @@ class Connector(Protocol):
         """Canonical email -> this platform's identity. None when unmapped (fail closed)."""
 
     def list_changes(self, cursor: str | None) -> ChangeBatch:
-        """cursor=None starts a full crawl (every document as an upsert, paged). Otherwise incremental changes."""
+        """cursor=None starts a full crawl (every document as an upsert, paged). Otherwise incremental changes.
+        Raises CursorExpired when the cursor is no longer valid."""
 
     def fetch(self, doc_id: str) -> Document:
         """Raises DocumentNotFound if the document does not exist or was deleted."""

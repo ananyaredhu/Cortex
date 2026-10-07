@@ -5,7 +5,7 @@ It talks to the simulator only over HTTP, the way a connector for a real Jira si
 """
 import httpx
 
-from connectors.base import AccessDecision, AclEvidence, ChangeBatch, Document, DocumentNotFound, PlatformIdentity, Source
+from connectors.base import AccessDecision, AclEvidence, ChangeBatch, CursorExpired, Document, DocumentNotFound, PlatformIdentity, Source
 from simulators.common import to_change, utc_now
 from simulators.jira.model import valid_issue_key
 
@@ -65,6 +65,8 @@ class JiraConnector:
         if cursor is not None:
             params["cursor"] = cursor
         response = self._client.get("/sim/changes", params=params)
+        if response.status_code == 410:
+            raise CursorExpired(cursor)
         response.raise_for_status()
         data = response.json()
         return ChangeBatch([to_change(c) for c in data["changes"]], data["next_cursor"], data["has_more"])

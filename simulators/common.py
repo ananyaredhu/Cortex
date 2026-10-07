@@ -1,4 +1,5 @@
 """Pieces the simulators share: errors, clock, the change feed and webhook delivery."""
+import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -15,6 +16,10 @@ class NotFound(LookupError):
 
 class Invalid(ValueError):
     """A request the simulator cannot apply (bad id, duplicate, bad cursor...)."""
+
+
+class Gone(LookupError):
+    """A change-feed cursor from another run of the log: the simulator restarted or was reset. HTTP 410."""
 
 
 def utc_now() -> str:
@@ -52,6 +57,7 @@ class ChangeLog:
     def __init__(self, clock: Callable[[], str] = utc_now) -> None:
         self._clock = clock
         self.entries: list[ChangeEntry] = []
+        self.run = uuid.uuid4().hex[:8]     # cursors name the run of the log they belong to
 
     def emit(self, type_: str, item_id: str, doc_id: str, event: str) -> None:
         """A document was created, edited or deleted, or its own ACL changed."""
@@ -63,12 +69,15 @@ class ChangeLog:
 
     def clear(self) -> None:
         self.entries.clear()
+        self.run = uuid.uuid4().hex[:8]     # a reset is a new log: older cursors no longer mean anything
 
     def read(self, cursor: str | None, limit: int, live: dict[str, str]) -> tuple[list[ChangeEntry], str, bool]:
         """Returns (entries, next_cursor, has_more). `live` maps every existing item id to its doc id.
 
         cursor=None starts a full crawl: every live item as an upsert, paged by item id. The crawl remembers
         where the log stood when it began, so nothing that changes during the crawl is lost.
+        Cursors are "<run>.<position>" or "crawl:<run>.<position>:<after>". One from another run of the log (the
+        simulator restarted or was reset) raises Gone: the consumer must crawl again.
         """
         if limit < 1:
             raise Invalid("limit must be at least 1")
@@ -77,15 +86,24 @@ class ChangeLog:
                 return self._crawl(len(self.entries), "", limit, live)
             if cursor.startswith("crawl:"):
                 _, log_pos, after = cursor.split(":", 2)
-                return self._crawl(self._position(int(log_pos)), after, limit, live)
-            start = self._position(int(cursor))
+                return self._crawl(self._position(log_pos), after, limit, live)
+            start = self._position(cursor)
         except ValueError as exc:
             raise Invalid(f"Bad cursor: {cursor!r}") from exc
         batch = self.entries[start:start + limit]
         end = start + len(batch)
-        return batch, str(end), end < len(self.entries)
+        return batch, self._cursor(end), end < len(self.entries)
 
-    def _position(self, pos: int) -> int:
+    def _cursor(self, pos: int) -> str:
+        return f"{self.run}.{pos}"
+
+    def _position(self, mark: str) -> int:
+        """`mark` is "<run>.<position>". Another run's, or a bare number (the format before runs), is Gone;
+        anything else malformed is a ValueError (400)."""
+        run, dot, raw = mark.partition(".")
+        if (dot and run != self.run) or (not dot and mark.isdigit()):
+            raise Gone("This cursor belongs to an earlier run of the change log; start a full crawl")
+        pos = int(raw)
         if not 0 <= pos <= len(self.entries):
             raise ValueError(pos)
         return pos
@@ -96,8 +114,8 @@ class ChangeLog:
         now = self._clock()
         entries = [ChangeEntry(-1, "upsert", i, live[i], now, "crawl") for i in batch]
         if len(ids) > limit:
-            return entries, f"crawl:{log_pos}:{batch[-1]}", True
-        return entries, str(log_pos), log_pos < len(self.entries)
+            return entries, f"crawl:{self._cursor(log_pos)}:{batch[-1]}", True
+        return entries, self._cursor(log_pos), log_pos < len(self.entries)
 
 
 def webhook_payloads(entries: list[ChangeEntry], item_field: str, id_field: str) -> list[dict]:

@@ -22,7 +22,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, FastAPI, Header, HTTPEx
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from simulators.common import Invalid, NotFound, deliver, webhook_payloads
+from simulators.common import Gone, Invalid, NotFound, deliver, webhook_payloads
 from simulators.confluence.model import ConfluenceSim, Page, Principals
 from simulators.confluence.seed import seed_company_a
 
@@ -111,6 +111,10 @@ def create_app(sim: ConfluenceSim | None = None, *, admin_token: str | None = No
     @app.exception_handler(NotFound)
     def _not_found(_, exc: NotFound) -> JSONResponse:
         return JSONResponse({"statusCode": 404, "message": str(exc)}, status_code=404)
+
+    @app.exception_handler(Gone)
+    def _gone(_, exc: Gone) -> JSONResponse:
+        return JSONResponse({"statusCode": 410, "message": str(exc)}, status_code=410)
 
     @app.exception_handler(Invalid)
     def _invalid(_, exc: Invalid) -> JSONResponse:

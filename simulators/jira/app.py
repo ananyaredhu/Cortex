@@ -22,7 +22,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, FastAPI, Header, HTTPEx
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from simulators.common import Invalid, NotFound, deliver, norm_email, webhook_payloads
+from simulators.common import Gone, Invalid, NotFound, deliver, norm_email, webhook_payloads
 from simulators.jira.model import Actors, Issue, JiraSim
 from simulators.jira.seed import seed_company_a
 
@@ -120,6 +120,10 @@ def create_app(sim: JiraSim | None = None, *, admin_token: str | None = None,
     @app.exception_handler(NotFound)
     def _not_found(_, exc: NotFound) -> JSONResponse:
         return JSONResponse({"errorMessages": [str(exc)], "errors": {}}, status_code=404)
+
+    @app.exception_handler(Gone)
+    def _gone(_, exc: Gone) -> JSONResponse:
+        return JSONResponse({"errorMessages": [str(exc)], "errors": {}}, status_code=410)
 
     @app.exception_handler(Invalid)
     def _invalid(_, exc: Invalid) -> JSONResponse:

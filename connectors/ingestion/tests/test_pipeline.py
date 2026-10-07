@@ -273,11 +273,8 @@ def test_a_failing_sink_leaves_the_cursor_so_the_event_is_retried(store):
     _ingestor(store, slack).run_once()
     cursor = store.get_cursor("slack")
     slack.advance("e2")
-    try:
-        _ingestor(store, slack, sink=_Down()).run_once()
-        raise AssertionError("the failure must surface")
-    except ConnectionError:
-        pass
+    report = _ingestor(store, slack, sink=_Down()).run_once()
+    assert report.errors == {"slack": "ConnectionError"}, "the failure must surface"
     assert store.get_cursor("slack") == cursor
     sink = RecordingSink()
     _ingestor(store, slack, sink=sink).run_once()

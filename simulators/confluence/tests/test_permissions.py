@@ -6,7 +6,7 @@ change does to the change feed.
 """
 import pytest
 
-from simulators.common import Invalid, NotFound
+from simulators.common import Gone, Invalid, NotFound
 from simulators.confluence.model import ConfluenceSim
 from simulators.confluence.tokens import ORG_GROUP
 
@@ -199,7 +199,9 @@ def test_invalid_requests_are_rejected(sim):
     with pytest.raises(Invalid):
         sim.changes("not-a-cursor")
     with pytest.raises(Invalid):
-        sim.changes("9999")
+        sim.changes(f"{sim.changelog.run}.9999")       # this run's log, but past its end
+    with pytest.raises(Gone):
+        sim.changes("9999")                            # a bare number: a cursor from before runs existed
     with pytest.raises(NotFound):
         sim.create_page("orphan", "NOPE", "unknown space")
     with pytest.raises(NotFound):
