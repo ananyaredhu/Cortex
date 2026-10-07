@@ -248,12 +248,35 @@ def alerts(authorization: str | None = Header(None)):
 
 @app.post("/v1/audit/query")
 def audit_query(body: dict, authorization: str | None = Header(None)):
+    """Filters: `user` (email), `space` (e.g. "confluence:PAY", matched on allowed document ids only: denied ones
+    are salted hashes by design), `decision` ("allowed" or "denied": events with at least one such decision).
+    `question` (natural language) is accepted and ignored by the stub. The query is itself logged."""
     me = _persona(authorization)
     if "compliance" not in me["roles"]:
         raise HTTPException(403, "compliance role required")
-    user = (body.get("filter") or {}).get("user")
-    events = [e for e in AUDIT if user is None or e["actor"]["user_id"] == user]
-    return {"events": events, "count": len(events)}
+    f = body.get("filter") or {}
+    user, space, decision = f.get("user"), f.get("space"), f.get("decision")
+    events = [e for e in AUDIT
+              if (user is None or e["actor"]["user_id"] == user)
+              and (space is None or any(d.get("doc_id", "").startswith(space + "/") for d in e["decisions"]))
+              and (decision in (None, "all") or any(d["allowed"] is (decision == "allowed") for d in e["decisions"]))]
+    shown = [_for_officer(e, STATE.persona_tokens[me["id"]]) for e in events]
+    _append_audit({"request_id": f"aq_{len(AUDIT) + 1:04d}", "event_type": "audit_query",
+                   "actor": {"user_id": me["email"], "roles": me["roles"], "client": "ui"},
+                   "query": {"text": body.get("question") or json.dumps(f, sort_keys=True), "skill": None},
+                   "decisions": [], "flags": []})
+    return {"events": shown, "count": len(shown)}
+
+
+def _for_officer(event: dict, officer_tokens: set[str]) -> dict:
+    """An answer's text goes to the officer only if they may see every document it cites; the hash always does."""
+    answer = event.get("answer")
+    if not answer:
+        return event
+    cited = [STATE.docs.get(c) for c in answer["citations"]]
+    if all(d is not None and can_see(officer_tokens, d) for d in cited):
+        return event
+    return {**event, "answer": {**{k: v for k, v in answer.items() if k != "text"}, "text": None, "text_withheld": True}}
 
 
 @app.get("/v1/audit/verify")
@@ -329,6 +352,11 @@ def policy_evaluate(body: EvaluateBody, authorization: str | None = Header(None)
     if who is None or d is None:
         raise HTTPException(404, "unknown user or document")
     shared = sorted(STATE.persona_tokens[who["id"]] & set(d["acl"]["tokens"]))
+    admin = _persona(authorization)
+    _append_audit({"request_id": f"ev_{len(AUDIT) + 1:04d}", "event_type": "admin_view",
+                   "actor": {"user_id": admin["email"], "roles": admin["roles"], "client": "ui"},
+                   "query": {"text": f"policy evaluate {body.user} {body.doc_id}", "skill": None},
+                   "decisions": [], "flags": []})
     return {"allowed": bool(shared), "rule": "token-overlap", "policy_version": POLICY_VERSION,
             "proof_path": [f"user:{who['email']}", shared[0]] if shared else []}
 

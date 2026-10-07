@@ -114,3 +114,35 @@ def test_stale_source_is_reported_per_source():
     r = _ask("priya", "What's the latest runbook for payment-service incident failover?")
     assert r["freshness"]["per_source"]["confluence"]["status"] == "stale"
     assert r["freshness"]["per_source"]["jira"]["status"] == "ok"
+
+
+def _audit(persona: str, **flt) -> list[dict]:
+    return client.post("/v1/audit/query", json={"filter": flt}, headers=H(persona)).json()["events"]
+
+
+def test_audit_filters_by_user_space_and_decision():
+    _ask("priya", "What's the latest runbook for payment-service incident failover?")
+    _ask("sam", BREACH)
+    pay = _audit("jordan", user="priya@companya.com", space="confluence:PAY")
+    assert pay and all(e["actor"]["user_id"] == "priya@companya.com" for e in pay)
+    denied = _audit("jordan", decision="denied")
+    assert denied and all(any(not d["allowed"] for d in e["decisions"]) for e in denied)
+
+
+def test_audit_query_is_itself_logged():
+    _audit("jordan")
+    events = _audit("jordan")
+    assert events[-1]["event_type"] == "audit_query" and events[-1]["actor"]["user_id"] == "jordan@companya.com"
+
+
+def test_officer_gets_answer_text_only_for_sources_they_may_see():
+    _ask("dana", BREACH)   # cites the security-only breach report, which Jordan may not see
+    ask_events = [e for e in _audit("jordan", user="dana@companya.com") if e["event_type"] == "ask"]
+    assert ask_events[0]["answer"]["text"] is None and ask_events[0]["answer"]["text_withheld"] is True
+    assert ask_events[0]["answer"]["sha256"].startswith("sha256:")
+    assert "CANARY" not in json.dumps(ask_events)
+
+
+def test_policy_evaluate_is_logged():
+    client.post("/v1/policy/evaluate", json={"user": "sam@contractor.io", "doc_id": "jira:SEC-17"}, headers=H("dana"))
+    assert _audit("jordan")[-1]["event_type"] == "admin_view"

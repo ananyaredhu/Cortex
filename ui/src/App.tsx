@@ -1,10 +1,13 @@
 import { Navigate, Route, Routes } from "react-router-dom";
+import { AdminPage } from "./admin/AdminPage";
 import { AskPage } from "./ask/AskPage";
+import { AuditPage } from "./audit/AuditPage";
 import { usePersona } from "./auth/PersonaContext";
 import { canAdmin, canAudit } from "./auth/personas";
 import { ComparePage } from "./compare/ComparePage";
 import { Sidebar } from "./components/Sidebar";
-import { DEMO_CONTROLS, DemoControls } from "./demo/DemoControls";
+import { DemoControls } from "./demo/DemoControls";
+import { DEMO_CONTROLS } from "./demo/sim";
 import { Placeholder } from "./routes/Placeholder";
 
 export function App() {
@@ -21,7 +24,7 @@ export function App() {
             path="/audit"
             element={
               canAudit(persona) ? (
-                <Placeholder title="Audit console" phase="Phase 3" mockup="Audit Console.dc.html" />
+                <AuditPage />
               ) : (
                 <Navigate to="/" replace />
               )
@@ -31,7 +34,7 @@ export function App() {
             path="/admin"
             element={
               canAdmin(persona) ? (
-                <Placeholder title="Admin" phase="Phase 3" mockup="Admin.dc.html" />
+                <AdminPage />
               ) : (
                 <Navigate to="/" replace />
               )

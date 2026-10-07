@@ -4,28 +4,13 @@ import { useState } from "react";
 import { SOURCES, type Source } from "../api/types";
 import { SOURCE_LABEL } from "../components/SourceGlyph";
 import "./demo.css";
+import { sim } from "./sim";
 
-/**
- * Demo-only controls for the scripted changes in the scenarios. They call the stub API's /sim endpoints;
- * against the real system the same buttons should call Workstream A's simulator admin endpoints
- * (simulators/README.md). Only built in when DEMO_CONTROLS is true (`npm run dev:demo`), never in production.
- */
-export const DEMO_CONTROLS = import.meta.env.MODE === "demo" || import.meta.env.VITE_DEMO_CONTROLS === "1";
-
+/** Demo-only controls for the scripted changes in the scenarios (see ./sim.ts). */
 const EVENTS = [
   { id: "e1", scenario: "Scenario 2", label: "Runbook owner adds a failover step" },
   { id: "e2", scenario: "Scenario 4", label: "Remove Priya from #auth-private" },
 ];
-
-async function sim(path: string, body?: unknown): Promise<unknown> {
-  const res = await fetch(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`${path}: ${res.status}`);
-  return res.json();
-}
 
 export function DemoControls() {
   const qc = useQueryClient();
