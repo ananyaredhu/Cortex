@@ -180,8 +180,26 @@ document's tokens from its own spec. `connectors/ingestion/scale_run.py` ingests
 `brain_scale` database and checks the index against that spec.
 
 First full run (7 Oct, fake embedder): about 12 documents/s for both sources (Confluence 17 min, Slack 2.3 min),
-bounded by per-document writes to Postgres; every check passed. Numbers and details in `docs/status/ws-a.md`. Run the scale Confluence simulator on another port
+bounded by per-document writes to Postgres; every check passed. With bge-m3 the embedding dominates: 0.61 chunks/s
+measured, about 8 hours for the corpus on this laptop's CPU, so run it overnight. Numbers in `docs/status/ws-a.md`. Run the scale Confluence simulator on another port
 (e.g. 8111, with `CONFLUENCE_SIM_URL`) to keep the demo one on 8101 untouched.
+
+## Hidden documents for Leak-CI
+[`leakci.py`](leakci.py) plants, edits and removes documents an asker may not see, each with a unique canary string,
+through the admin endpoints above. It is for C's metamorphic Leak-CI tests: ask, plant a hidden document on the same
+topic, ingest, ask again, expect the same answer and never the canary.
+```
+python -m simulators.leakci plant confluence --topic "Q3 breach security incident report"     # own space
+python -m simulators.leakci plant confluence --mode restricted --topic "..."                  # restricted page in ENG
+python -m simulators.leakci plant jira --mode level --topic "..." --visible-to priya            # a control
+python -m simulators.leakci verify <doc_id> --asker sam --index                                 # hidden, and indexed?
+python -m simulators.leakci edit <doc_id> | remove <doc_id> | list | clear
+```
+Each planted document has its own holders group (empty unless `--visible-to`), so a control document never opens
+another planted one. `verify` keeps a test from passing vacuously: the document must be hidden from the asker
+(live `check_access`) and, with `--index`, be indexed with its canary and tokens the asker does not hold. From
+Python: `LeakCI.from_env()`, or `LeakCI(confluence_client, jira_client)` in tests. Planted documents carry the label
+`leakci`, so the tool keeps no state of its own. Everything prints JSON: doc IDs, canaries and persona names.
 
 ## Shared code
 [`common.py`](common.py) holds what both simulators use: the change feed with its full crawl, webhook delivery,
