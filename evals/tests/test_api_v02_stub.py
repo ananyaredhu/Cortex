@@ -146,3 +146,16 @@ def test_officer_gets_answer_text_only_for_sources_they_may_see():
 def test_policy_evaluate_is_logged():
     client.post("/v1/policy/evaluate", json={"user": "sam@contractor.io", "doc_id": "jira:SEC-17"}, headers=H("dana"))
     assert _audit("jordan")[-1]["event_type"] == "admin_view"
+
+
+def test_alerts_carry_the_question_and_skip_documents_no_longer_visible():
+    q = "What's the latest runbook for payment-service incident failover?"
+    _ask("priya", q)
+    client.post("/sim/advance", json={"event_id": "e1"})
+    a = client.get("/v1/alerts", headers=H("priya")).json()["alerts"]
+    assert a[0]["question"] == q and a[0]["changed_title"] == "Payment-service incident runbook"
+    # Revocation (e2) is not a content change: no alert, and nothing about the private thread.
+    _ask("priya", "What are the open concerns in the auth service threat model?")
+    client.post("/sim/advance", json={"event_id": "e2"})
+    dump = json.dumps(client.get("/v1/alerts", headers=H("priya")).json())
+    assert "C_AUTHPRIV" not in dump

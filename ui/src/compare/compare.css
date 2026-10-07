@@ -1,4 +1,4 @@
-.compare { display: flex; flex-direction: column; height: 100vh; }
+.compare { display: flex; flex-direction: column; height: 100%; }
 .compare__head { padding: var(--space-6) var(--space-6) var(--space-3); }
 .compare__head .h2 { font: var(--type-h2); letter-spacing: var(--ls-heading); margin: 0 0 var(--space-1); }
 .compare__grid { flex: 1; min-height: 0; overflow: auto; display: grid; grid-template-columns: repeat(3, minmax(300px, 1fr)); gap: var(--space-4); padding: 0 var(--space-6) var(--space-4); }

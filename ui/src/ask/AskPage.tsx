@@ -24,6 +24,8 @@ interface Turn {
 const TRUST_KEY = "cortex.trustOpen";
 
 function initialTrustOpen(): boolean {
+  // On phones the panel is a bottom sheet over the answer: start closed and open it from an answer's pill.
+  if (window.matchMedia?.("(max-width: 720px)").matches) return false;
   try {
     return localStorage.getItem(TRUST_KEY) !== "0";
   } catch {
@@ -44,14 +46,22 @@ export function AskPage() {
   const nextId = useRef(1);
 
   // A new persona or "Ask Cortex" starts a new conversation: never show one persona's answers to another.
+  // The refs make each reset and each "ask again" happen once per navigation, even when effects run twice.
+  const resetFor = useRef("");
+  const askedFor = useRef("");
   useEffect(() => {
+    const key = `${persona.id}|${location.key}`;
+    if (resetFor.current === key) return;
+    resetFor.current = key;
     setTurns([]);
     setConversationId(undefined);
     setSelected(null);
   }, [persona.id, location.key]);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    // Only once there is something to scroll to: scrolling on first render moves the browser's Tab starting
+    // point past the skip link.
+    if (turns.length) endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [turns]);
 
   const busy = turns.some((t) => !t.answer && !t.error);
@@ -83,6 +93,14 @@ export function AskPage() {
       update(id, (t) => ({ ...t, error: (e as Error).message }));
     }
   };
+
+  // Arriving from My Work with a question ("Ask again", a suggestion) asks it straight away.
+  useEffect(() => {
+    const q = (location.state as { ask?: string } | null)?.ask;
+    if (!q || askedFor.current === location.key) return;
+    askedFor.current = location.key;
+    ask(q);
+  }, [location.key]);
 
   const shown = turns.find((t) => t.id === selected)?.answer ?? null;
   const openTrust = (open: boolean) => {
@@ -126,6 +144,10 @@ export function AskPage() {
                     asker={persona.id}
                     answer={t.answer}
                     onChoose={(q) => ask(q)}
+                    onTrust={() => {
+                      setSelected(t.id);
+                      setTrustOpen(true);
+                    }}
                     onWhyMore={() => {
                       setSelected(t.id);
                       openTrust(true);

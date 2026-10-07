@@ -26,7 +26,7 @@ from fixtures.loader import State, can_see
 app = FastAPI(title="Internal Brain stub API", version="0.1")
 STATE = State()
 AUDIT: list[dict] = []
-ANSWERED: dict[str, list[dict]] = {}   # persona -> [{request_id, doc_ids}]
+ANSWERED: dict[str, list[dict]] = {}   # persona -> [{request_id, question, doc_ids}]
 CONVERSATIONS: dict[str, dict[str, dict]] = {}   # persona -> conversation_id -> {title, last_asked_at}
 SOURCE_STATUS: dict[str, str] = {}   # source -> "stale" | "unavailable" (absent: "ok"), set by /sim/source-status
 SALT = "stub-salt"
@@ -160,7 +160,8 @@ def _answer(me: dict, body: AskBody) -> dict:
 
     refused = not allowed
     answer = REFUSAL if refused else "Here is what I found:\n" + "\n".join(lines)
-    ANSWERED.setdefault(me["id"], []).append({"request_id": request_id, "doc_ids": [d["doc_id"] for d in allowed]})
+    ANSWERED.setdefault(me["id"], []).append({"request_id": request_id, "question": body.question,
+                                              "doc_ids": [d["doc_id"] for d in allowed]})
 
     decisions = [{"doc_id": d["doc_id"], "allowed": True, "proof_path": c["why_visible"],
                   "acl_snapshot_hash": d["acl"]["snapshot_hash"], "policy_version": "stub-0.1",
@@ -234,15 +235,20 @@ def explain_access(doc_id: str, authorization: str | None = Header(None)):
 @app.get("/v1/alerts")
 def alerts(authorization: str | None = Header(None)):
     me = _persona(authorization)
+    toks = STATE.persona_tokens[me["id"]]
     out = []
     for ev_id in STATE.applied:
         ev = next(e for e in STATE.data["events"] if e["id"] == ev_id)
-        if ev["type"] != "upsert":
+        doc = STATE.docs.get(ev.get("doc_id", ""))
+        # Content changes only, and only to documents the person may still see: an alert about a document
+        # they have lost would tell them it changed.
+        if ev["type"] != "upsert" or doc is None or not can_see(toks, doc):
             continue
         for ans in ANSWERED.get(me["id"], []):
             if ev["doc_id"] in ans["doc_ids"]:
-                out.append({"request_id": ans["request_id"], "changed_doc": ev["doc_id"],
-                            "changed_at": ev["at"], "summary": ev.get("note", "A source changed after your answer")})
+                out.append({"request_id": ans["request_id"], "question": ans["question"], "changed_doc": ev["doc_id"],
+                            "changed_title": doc["title"], "changed_at": ev["at"],
+                            "summary": f"{doc['title']} changed after your answer"})
     return {"alerts": out}
 
 

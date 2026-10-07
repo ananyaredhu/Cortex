@@ -1,5 +1,5 @@
 /* Audit console: dense, tabular (design-reference/screens/Audit Console.dc.html). */
-.audit { display: grid; grid-template-columns: minmax(0, 1fr); height: 100vh; }
+.audit { display: grid; grid-template-columns: minmax(0, 1fr); height: 100%; }
 .audit--drawer { grid-template-columns: minmax(0, 1fr) 420px; }
 .audit__main { overflow: auto; padding: var(--space-6); display: flex; flex-direction: column; gap: var(--space-4); }
 .audit__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
@@ -13,7 +13,7 @@
 .chain--verifying .chain__icon, .chain--unknown .chain__icon { color: var(--text-muted); }
 .chain__text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; font-size: var(--fs-13); }
 .chain__actions { display: flex; flex-direction: column; align-items: flex-end; }
-.ghost--danger { color: var(--danger); }
+.ghost--danger { color: var(--danger-text); }
 .demo-tag { padding: 0 5px; border-radius: 4px; background: var(--bg-sunken); color: var(--text-muted); font: 600 10px/16px var(--font-mono); text-transform: uppercase; }
 
 .audit__query { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-4); border: var(--border-1); border-radius: var(--radius-lg); background: var(--surface-card); }
@@ -42,7 +42,7 @@
 .doccell { display: flex !important; align-items: center; gap: 4px; }
 .doccell .mono { word-break: break-all; }
 
-.drawer { position: relative; height: 100vh; overflow: auto; border-left: var(--border-1); background: var(--surface-card); }
+.drawer { position: relative; height: 100%; overflow: auto; border-left: var(--border-1); background: var(--surface-card); }
 .drawer__head { position: sticky; top: 0; z-index: 1; display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-2); padding: var(--space-4) var(--space-5); background: inherit; border-bottom: var(--border-1); }
 .drawer__body { padding: 0 var(--space-5) var(--space-6); }
 .drawer__body section { padding: var(--space-4) 0; border-bottom: var(--border-1); }
@@ -69,3 +69,5 @@
   .drawer { position: fixed; top: 0; right: 0; width: min(420px, 94vw); z-index: 10; box-shadow: var(--shadow-3); }
   .replay__cols { grid-template-columns: 1fr; }
 }
+.audit__results { overflow-x: auto; }
+@media (max-width: 720px) { .audit__main { padding: var(--space-4); } }

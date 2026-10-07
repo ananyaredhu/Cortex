@@ -79,3 +79,20 @@ test("split-screen: Priya, Sam and Dana ask the same question and get different,
   await expect(column("Sam")).not.toContainText("CANARY");
   await expect(column("Priya")).not.toContainText("CANARY");
 });
+
+test("stale-answer alert: My Work flags the changed runbook and asks again", async ({ page }) => {
+  await openAs(page, "priya");
+  const question = "What's the latest runbook for payment-service incident failover?";
+  await ask(page, question);
+  await page.request.post("/sim/advance", { data: { event_id: "e1" } });
+
+  await page.goto("/");
+  const needs = page.getByRole("region", { name: "Needs you" });
+  await expect(needs).toContainText("Payment-service incident runbook");
+  await expect(page.getByRole("link", { name: /My work/ })).toContainText("1");
+  await needs.getByRole("button", { name: /Ask again/ }).click();
+
+  await expect(page).toHaveURL(/\/ask$/);
+  const card = page.getByRole("article", { name: "Answer" }).last();
+  await expect(card).toContainText("failover step");
+});

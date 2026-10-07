@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, Check, Copy, ExternalLink, ShieldQuestion, Sparkles, WifiOff } from "lucide-react";
+import { AlertTriangle, Check, Copy, ExternalLink, ShieldCheck, ShieldQuestion, Sparkles, WifiOff } from "lucide-react";
 import { useId, useState } from "react";
 import { api } from "../api/client";
 import type { AskResponse, Citation } from "../api/types";
@@ -16,11 +16,13 @@ export function AnswerCard({
   asker,
   answer,
   onWhyMore,
+  onTrust,
   onChoose,
 }: {
   asker: PersonaId;
   answer: AskResponse;
   onWhyMore?: () => void; // absent where there is no Trust panel (split-screen)
+  onTrust?: () => void; // phones: the "Trust" pill opens this answer's Trust panel as a bottom sheet
   onChoose: (question: string) => void;
 }) {
   const [active, setActive] = useState<number | null>(null);
@@ -53,6 +55,11 @@ export function AnswerCard({
         <Sparkles size={14} color="var(--orange)" aria-hidden />
         <strong>Cortex</strong>
         {answer.skill && <span className="muted">· {answer.skill}</span>}
+        {onTrust && (
+          <button type="button" className="chip answer__trust-pill" onClick={onTrust}>
+            <ShieldCheck size={13} aria-hidden /> Trust
+          </button>
+        )}
       </div>
 
       <p className="answer__text">

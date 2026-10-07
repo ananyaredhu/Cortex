@@ -1,4 +1,4 @@
-.demo__fab { position: fixed; left: 12px; bottom: 84px; z-index: 20; display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border: var(--border-ink); border-radius: var(--radius-pill); background: var(--surface-card); font-weight: var(--fw-bold); box-shadow: var(--shadow-2); }
+.demo__fab { position: fixed; left: 12px; bottom: 132px; z-index: 20; display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border: var(--border-ink); border-radius: var(--radius-pill); background: var(--surface-card); font-weight: var(--fw-bold); box-shadow: var(--shadow-2); }
 .demo { position: fixed; left: calc(var(--sidebar-w) + 12px); bottom: 16px; z-index: 20; width: 300px; max-height: calc(100vh - 32px); overflow: auto; padding: 0 var(--space-4) var(--space-4); border: var(--border-ink); border-radius: var(--radius-lg); background: var(--surface-raised); box-shadow: var(--shadow-3); }
 .demo__head { position: sticky; top: 0; display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3) 0; background: inherit; }
 .demo__head .small { flex: 1; }

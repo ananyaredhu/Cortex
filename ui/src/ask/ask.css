@@ -1,5 +1,5 @@
 /* Ask: thread and composer in the middle, Trust panel on the right (design-reference/screens/Ask.dc.html). */
-.ask { display: grid; grid-template-columns: minmax(0, 1fr); height: 100vh; }
+.ask { display: grid; grid-template-columns: minmax(0, 1fr); height: 100%; }
 .ask--trust { grid-template-columns: minmax(0, 1fr) 340px; }
 .ask__main { display: flex; flex-direction: column; min-height: 0; }
 .ask__head { display: flex; align-items: center; gap: var(--space-3); min-height: 56px; padding: 0 var(--space-6); border-bottom: var(--border-1); }
@@ -26,7 +26,7 @@
 
 /* Stepper */
 .stepper { list-style: none; margin: 0; padding: var(--space-4) var(--space-5); display: flex; flex-direction: column; gap: var(--space-2); background: var(--surface-card); border: var(--border-1); border-radius: var(--radius-lg); font-size: var(--fs-13); }
-.stepper li { display: grid; grid-template-columns: 16px 1fr auto; align-items: center; gap: var(--space-2); color: var(--text-faint); }
+.stepper li { display: grid; grid-template-columns: 16px 1fr auto; align-items: center; gap: var(--space-2); color: var(--text-muted); }
 .stepper li[data-state="running"] { color: var(--text-strong); }
 .stepper li[data-state="done"] { color: var(--text-body); }
 .stepper li[data-state="done"] svg { color: var(--success); }
@@ -71,7 +71,7 @@
 .composer__send:disabled { opacity: .4; cursor: default; }
 
 /* Trust panel */
-.trust { border-left: var(--border-1); background: var(--surface-card); height: 100vh; overflow: auto; }
+.trust { border-left: var(--border-1); background: var(--surface-card); height: 100%; overflow: auto; }
 .trust__head { position: sticky; top: 0; display: flex; align-items: center; gap: var(--space-2); min-height: 56px; padding: 0 var(--space-3) 0 var(--space-5); background: inherit; border-bottom: var(--border-1); }
 .trust__title { font-weight: var(--fw-bold); }
 .trust__for { flex: 1; font-size: var(--fs-12); }
@@ -105,4 +105,22 @@
 @media (max-width: 1000px) {
   .ask--trust { grid-template-columns: minmax(0, 1fr); }
   .trust { position: fixed; top: 0; right: 0; width: min(340px, 92vw); z-index: 10; box-shadow: var(--shadow-3); }
+}
+
+/* Phones: the Trust panel is a bottom sheet opened from each answer's pill; sources scroll sideways. */
+.answer__trust-pill { display: none; margin-left: auto; height: 26px; }
+@media (max-width: 720px) {
+  .ask__head { padding: 0 var(--space-4); min-height: 48px; }
+  .ask__head > .ghost { display: none; }
+  .ask__thread { padding: var(--space-5) var(--space-4); }
+  .ask__composer { padding: var(--space-2) var(--space-3) var(--space-3); }
+  .composer__scopes { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .composer__hint { display: none; }
+  .answer { padding: var(--space-4); }
+  .answer__trust-pill { display: inline-flex; }
+  .sources { flex-direction: row; overflow-x: auto; padding-bottom: 4px; scroll-snap-type: x mandatory; }
+  .source { flex: 0 0 82%; scroll-snap-align: start; }
+  .trust { position: fixed; top: auto; bottom: 0; left: 0; right: 0; width: 100%; height: auto; max-height: 78dvh; border-left: 0; border-radius: var(--radius-lg) var(--radius-lg) 0 0; box-shadow: var(--shadow-3); z-index: 30; }
+  .trust__head { border-radius: inherit; }
+  .empty__scope { grid-template-columns: 1fr; }
 }

@@ -43,10 +43,10 @@ Status: **Done** = handled in the Phase 0 branch (`ws-c/ui-phase0`). **Proposed*
 
 | # | Drift | Resolution | Status |
 |---|---|---|---|
-| 24 | Needs-you list, ticket priority and due dates, sprint, team, project timeline, sprint board, "Security" card. None of it is in `/v1/mywork` or the fixtures. | Build only what `/mywork` returns: issues (with optional `status`), projects, channels, recent pages, suggested questions, alerts. Drop the rest. | Build (Phase 4) |
+| 24 | Needs-you list, ticket priority and due dates, sprint, team, project timeline, sprint board, "Security" card. None of it is in `/v1/mywork` or the fixtures. | Build only what `/mywork` returns: issues (with optional `status`), projects, channels, recent pages, suggested questions, alerts. Drop the rest. | Done (Phase 4, `/`) |
 | 25 | "Synced 2 min ago" on the home page; `/v1/freshness` is admin-only. | Take it from the latest answer's `freshness.per_source`, or add a `last_sync` summary to `/mywork` later. | Later |
 | 26 | Hardcoded `companya.atlassian.net` and Slack links. | Use each item's `url` from the API (now optional in `/mywork`). | Proposed; stub done |
-| 27 | Stale-answer alerts exist in the contract and stub but have no screen. | Put them at the top of My Work ("Needs you"), plus a count in the sidebar. They are a listed demo moment. | Build (Phase 4) |
+| 27 | Stale-answer alerts exist in the contract and stub but have no screen. | Put them at the top of My Work ("Needs you"), plus a count in the sidebar. They are a listed demo moment. | Done (Phase 4): "Needs you" on My Work with "Ask again", and a count on the My work link. Alerts now carry the question and only cover documents still visible (api.md 0.2) |
 | 28 | **Split-screen personas** (Priya, Sam and Dana ask the same question) is a planned demo moment with no mockup. | New `/compare` route: three columns, each its own request with its own persona token (never mixed client-side), each rendered with the Ask answer card. | Done (Phase 2, `/compare`) |
 | 29 | Demo controls: only "Tamper one row" exists in the mockup. Scenarios 2 and 4 need "advance e1/e2" and reset. | A drawer behind `VITE_DEMO_CONTROLS`, calling `/sim/*` (stub) or A's simulator admin endpoints (real). Never in production builds. | Done (Phase 2, stub endpoints) |
 
@@ -79,7 +79,7 @@ Status: **Done** = handled in the Phase 0 branch (`ws-c/ui-phase0`). **Proposed*
 
 | # | Drift | Resolution | Status |
 |---|---|---|---|
-| 45 | The brief reserves one accent (blue) for interaction and green/amber/red for trust state. | Cortex orange is the accent; green/amber/red stay reserved for trust state, always paired with an icon or label (Cortex already restricts them to badges and dots). | Build |
-| 46 | Contrast: white on Cortex orange fails AA. | Follow Cortex: ink text on orange (`--text-on-accent`), orange text only as `--orange-700`. | Done (tokens) |
-| 47 | The brief asks for tabular figures in tables. | Add `font-variant-numeric: tabular-nums` to tables and counters when they are built. | Build |
-| 48 | Cover image: "Pathfin · Internal Brain", Alice's outage answer. | Rebuild in Cortex with a real fixture answer (Priya, PAYINC outage). Blurb under 10 words. | Build (Phase 4) |
+| 45 | The brief reserves one accent (blue) for interaction and green/amber/red for trust state. | Cortex orange is the accent; green/amber/red stay reserved for trust state, always paired with an icon or label (Cortex already restricts them to badges and dots). | Done: status text uses darker `--success-text`, `--warning-text` and `--danger-text` (AA overrides in app.css), always with an icon or label |
+| 46 | Contrast: white on Cortex orange fails AA. | Follow Cortex: ink text on orange (`--text-on-accent`), orange text only as `--orange-700`. | Done (tokens), plus AA overrides in app.css for muted text and, in dark mode, the "-soft" fills the tokens did not redefine. axe passes on every screen in both themes |
+| 47 | The brief asks for tabular figures in tables. | Add `font-variant-numeric: tabular-nums` to tables and counters when they are built. | Done (tables, Trust panel, chart) |
+| 48 | Cover image: "Pathfin · Internal Brain", Alice's outage answer. | Rebuild in Cortex with a real fixture answer (Priya, PAYINC outage). Blurb under 10 words. | Later (submission work, not UI code) |

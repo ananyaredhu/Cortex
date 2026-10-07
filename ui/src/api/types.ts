@@ -71,6 +71,8 @@ export interface StaleAlert {
   changed_doc: string;
   changed_at: string;
   summary: string;
+  question?: string; // 0.2
+  changed_title?: string; // 0.2
 }
 
 export interface MyWork {
