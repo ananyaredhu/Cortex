@@ -1,0 +1,73 @@
+:root {
+  /* Base — warm paper + near-black ink */
+  --paper: #F4F3F0;
+  --paper-2: #E9E7E2;
+  --white: #FFFFFF;
+  --ink: #141414;
+  --ink-2: #2A2926;
+  --gray-700: #4A4843;
+  --gray-500: #6B6862;
+  --gray-400: #A19D95;
+  --gray-200: #E6E3DD;
+  --gray-100: #EFEDE9;
+
+  /* Brand — Cortex orange (the "thread") */
+  --orange: #F47B2A;
+  --orange-600: #D9631A;
+  --orange-700: #B04E10;
+  --orange-100: #FDEBDD;
+  --orange-50: #FEF5EE;
+
+  /* Semantic — same lightness/chroma family */
+  --green: oklch(0.58 0.12 150);
+  --green-100: oklch(0.95 0.03 150);
+  --red: oklch(0.57 0.18 28);
+  --red-100: oklch(0.95 0.03 28);
+  --blue: oklch(0.56 0.12 250);
+  --blue-100: oklch(0.95 0.025 250);
+  --amber: oklch(0.72 0.14 80);
+  --amber-100: oklch(0.96 0.04 85);
+
+  /* Semantic aliases — light */
+  --bg-app: var(--paper);
+  --bg-sunken: var(--paper-2);
+  --surface-card: var(--white);
+  --surface-raised: var(--white);
+  --surface-inverse: var(--ink);
+  --text-strong: var(--ink);
+  --text-body: var(--gray-700);
+  --text-muted: var(--gray-500);
+  --text-faint: var(--gray-400);
+  --text-on-inverse: var(--paper);
+  --text-on-accent: var(--ink);
+  --border-subtle: var(--gray-200);
+  --border-strong: var(--ink);
+  --accent: var(--orange);
+  --accent-hover: var(--orange-600);
+  --accent-soft: var(--orange-100);
+  --accent-text: var(--orange-700);
+  --focus-ring: var(--orange);
+  --success: var(--green); --success-soft: var(--green-100);
+  --danger: var(--red);    --danger-soft: var(--red-100);
+  --info: var(--blue);     --info-soft: var(--blue-100);
+  --warning: var(--amber); --warning-soft: var(--amber-100);
+  --avatar-tile: var(--white);
+}
+
+[data-theme="dark"] {
+  --bg-app: #141414;
+  --bg-sunken: #0C0C0C;
+  --surface-card: #1E1D1B;
+  --surface-raised: #262522;
+  --surface-inverse: var(--paper);
+  --text-strong: #F4F3F0;
+  --text-body: #CFCBC4;
+  --text-muted: #A19D95;
+  --text-faint: #6B6862;
+  --text-on-inverse: var(--ink);
+  --border-subtle: #2F2E2B;
+  --border-strong: #F4F3F0;
+  --accent-soft: #3A2516;
+  --accent-text: #F8A066;
+  --avatar-tile: var(--white);
+}

@@ -1,4 +1,4 @@
-.PHONY: setup test lint fixtures stub-api sim-confluence sim-jira db-up db-down
+.PHONY: setup test lint fixtures stub-api ui sim-confluence sim-jira db-up db-down
 
 setup:            ## create a venv, install dev dependencies, enable the secret-scan hook
 	python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt && .venv/bin/pre-commit install
@@ -14,6 +14,9 @@ fixtures:         ## regenerate fixtures/company_a.json from fixtures/generate.p
 
 stub-api:         ## run the stub Brain API on :8000 (auth: Authorization: Bearer dev:priya)
 	.venv/bin/uvicorn brain.stub_api.app:app --reload --port 8000
+
+ui:               ## run the Cortex UI on :5173, proxying /v1 and /sim to the stub API (run stub-api first)
+	cd ui && npm install && npm run dev
 
 sim-confluence:   ## run the Confluence simulator on :8101, seeded with Company A
 	.venv/bin/uvicorn simulators.confluence.app:app --reload --port 8101

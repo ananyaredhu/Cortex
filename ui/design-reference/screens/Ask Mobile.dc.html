@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#e6e6e1;font-family:'IBM Plex Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased;--bg:#f3f3f0;--panel:#f9f9f7;--surface:#fff;--ink:#16181d;--ink2:#4c525c;--ink3:#6a707a;--line:#e0e0da;--line2:#ebebe6;--accent:#3350b5;--accentSoft:#e9edfa;--glyph:#56606f;--ok:#17744a;--okSoft:#e4f2ea}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}*{box-sizing:border-box}
+</style>
+</helmet>
+<div style="display:flex;justify-content:center;padding:32px;font-feature-settings:'tnum' 1">
+<div style="position:relative;width:390px;height:844px;border-radius:44px;overflow:hidden;background:var(--bg);color:var(--ink);box-shadow:0 0 0 10px #16181d,0 30px 60px rgba(0,0,0,.25)">
+  <div style="height:47px;display:flex;align-items:flex-end;justify-content:space-between;padding:0 30px 6px;font-size:14px;font-weight:600"><span>14:33</span><span style="display:flex;gap:5px;align-items:center"><span style="width:17px;height:10px;border-radius:2px;border:1.5px solid var(--ink)"></span></span></div>
+  <div style="display:flex;align-items:center;gap:10px;height:52px;padding:0 16px;border-bottom:1px solid var(--line)">
+    <div style="width:36px;height:36px;display:grid;place-items:center"><span style="display:flex;flex-direction:column;gap:4px"><span style="width:16px;height:1.5px;background:var(--ink)"></span><span style="width:16px;height:1.5px;background:var(--ink)"></span><span style="width:11px;height:1.5px;background:var(--ink)"></span></span></div>
+    <div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Payment outage root cause</div><div style="font-size:11.5px;color:var(--ink3)">Internal Brain · Pathfin</div></div>
+    <div style="width:30px;height:30px;border-radius:50%;background:var(--line);display:grid;place-items:center;font-size:11px;font-weight:600;color:var(--ink2)">AT</div>
+  </div>
+  <div style="padding:16px 16px 120px;display:flex;flex-direction:column;gap:14px">
+    <div style="font-size:12px;color:var(--ink3)"><span style="font-weight:600;color:var(--ink2)">Alice Tan</span> · 14:32</div>
+    <div style="font-size:15px;line-height:1.5;margin-top:-8px">What was the root cause of the payment outage last quarter, and what follow-up tickets were created?</div>
+    <article style="background:var(--surface);border:1px solid var(--line);border-radius:12px">
+      <div style="display:flex;align-items:center;gap:7px;padding:12px 14px 2px;font-size:11.5px;color:var(--ink3)"><span style="width:12px;height:12px;border-radius:3px;background:var(--ink)"></span><span style="font-weight:600;color:var(--ink)">Internal Brain</span>· 14:32</div>
+      <p style="margin:0;padding:6px 14px 12px;font-size:15px;line-height:1.68;text-wrap:pretty">The 19 May outage was caused by connection-pool exhaustion on the payment gateway after a config change reduced the pool size from 200 to 50<span style="display:inline-flex;min-width:16px;height:16px;padding:0 4px;margin:0 1px;vertical-align:2px;justify-content:center;align-items:center;border-radius:4px;font:500 10px 'IBM Plex Mono',monospace;color:var(--accent);background:var(--accentSoft)">1</span><span style="display:inline-flex;min-width:16px;height:16px;padding:0 4px;margin:0 1px;vertical-align:2px;justify-content:center;align-items:center;border-radius:4px;font:500 10px 'IBM Plex Mono',monospace;color:var(--accent);background:var(--accentSoft)">2</span>. Recovery took 47 minutes<span style="display:inline-flex;min-width:16px;height:16px;padding:0 4px;margin:0 1px;vertical-align:2px;justify-content:center;align-items:center;border-radius:4px;font:500 10px 'IBM Plex Mono',monospace;color:var(--accent);background:var(--accentSoft)">1</span>. Three follow-up tickets were created: PAY-2110 (Done)<span style="display:inline-flex;min-width:16px;height:16px;padding:0 4px;margin:0 1px;vertical-align:2px;justify-content:center;align-items:center;border-radius:4px;font:500 10px 'IBM Plex Mono',monospace;color:var(--accent);background:var(--accentSoft)">3</span>, PAY-2111 (Done)<span style="display:inline-flex;min-width:16px;height:16px;padding:0 4px;margin:0 1px;vertical-align:2px;justify-content:center;align-items:center;border-radius:4px;font:500 10px 'IBM Plex Mono',monospace;color:var(--accent);background:var(--accentSoft)">4</span> and PAY-2112 (still Open)<span style="display:inline-flex;min-width:16px;height:16px;padding:0 4px;margin:0 1px;vertical-align:2px;justify-content:center;align-items:center;border-radius:4px;font:500 10px 'IBM Plex Mono',monospace;color:var(--accent);background:var(--accentSoft)">5</span>.</p>
+      <div style="display:flex;gap:8px;overflow-x:auto;padding:0 14px 12px;scrollbar-width:none">
+        <sc-for list="{{ chips }}" as="c" hint-placeholder-count="5">
+          <div style="flex:none;display:flex;align-items:center;gap:8px;min-height:44px;padding:6px 10px;border:1px solid var(--line2);border-radius:9px;max-width:220px">
+            <span style="font:500 10.5px 'IBM Plex Mono',monospace;color:var(--ink2)">{{ c.n }}</span><span style="{{ c.g }}"></span>
+            <span style="display:flex;flex-direction:column;min-width:0"><span style="font-size:12.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.title }}</span><span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--ink3)"><span style="width:6px;height:6px;border-radius:50%;background:var(--ok)"></span>{{ c.fresh }}</span></span>
+          </div>
+        </sc-for>
+      </div>
+      <div style="display:flex;align-items:center;gap:4px;padding:6px 8px;border-top:1px solid var(--line2)">
+        <button style="height:44px;padding:0 10px;border:0;background:transparent;font:500 13px 'IBM Plex Sans',sans-serif;color:var(--ink2)">Copy</button>
+        <button style="height:44px;padding:0 10px;border:0;background:transparent;font:500 13px 'IBM Plex Sans',sans-serif;color:var(--ink2)">Share</button>
+        <button onClick="{{ openSheet }}" style="margin-left:auto;display:flex;align-items:center;gap:7px;height:36px;padding:0 14px;border:1px solid var(--accent);background:var(--accentSoft);border-radius:999px;font:600 13px 'IBM Plex Sans',sans-serif;color:var(--accent)"><span style="width:7px;height:7px;border-radius:50%;background:var(--ok)"></span>Trust · 96%</button>
+      </div>
+    </article>
+  </div>
+  <div style="position:absolute;left:12px;right:12px;bottom:28px;display:flex;align-items:center;gap:8px;padding:8px 8px 8px 14px;background:var(--surface);border:1px solid var(--line);border-radius:14px"><span style="flex:1;font-size:14.5px;color:var(--ink3)">Ask across your tools…</span><span style="height:36px;padding:0 14px;border-radius:9px;background:var(--accent);color:#fff;display:grid;place-items:center;font-weight:600;font-size:13px">Ask</span></div>
+
+  <sc-if value="{{ open }}">
+    <div onClick="{{ closeSheet }}" style="position:absolute;inset:0;background:rgba(16,18,22,.32)"></div>
+    <div role="dialog" aria-label="Trust" style="position:absolute;left:0;right:0;bottom:0;max-height:78%;overflow:auto;background:var(--panel);border-radius:20px 20px 0 0;padding:8px 18px 30px;box-shadow:0 -10px 30px rgba(0,0,0,.15)">
+      <div style="width:38px;height:5px;border-radius:3px;background:var(--line);margin:0 auto 12px"></div>
+      <div style="display:flex;align-items:baseline;gap:8px"><span style="font-weight:600;font-size:17px">Trust</span><span style="font-size:12px;color:var(--ink3)">for answer at 14:32</span><button onClick="{{ closeSheet }}" style="margin-left:auto;width:44px;height:32px;border:0;background:transparent;font-size:18px;color:var(--ink2)">×</button></div>
+      <div style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);margin:14px 0 8px">Sources considered</div>
+      <div style="display:grid;grid-template-columns:1fr 40px 12px 44px 12px 38px;row-gap:8px;font-size:13.5px;align-items:center">
+        <span style="font-size:11px;color:var(--ink3)"></span><span style="font-size:11px;color:var(--ink3);text-align:right">Found</span><span></span><span style="font-size:11px;color:var(--ink3);text-align:right">Allowed</span><span></span><span style="font-size:11px;color:var(--ink3);text-align:right">Shown</span>
+        <sc-for list="{{ rows }}" as="r" hint-placeholder-count="4">
+          <span style="display:flex;align-items:center;gap:8px"><span style="{{ r.g }}"></span>{{ r.p }}</span><span style="text-align:right;color:var(--ink2)">{{ r.f }}</span><span style="text-align:center;color:var(--ink3);font-size:11px">→</span><span style="text-align:right;color:var(--ink2)">{{ r.a }}</span><span style="text-align:center;color:var(--ink3);font-size:11px">→</span><span style="text-align:right;font-weight:600">{{ r.s }}</span>
+        </sc-for>
+      </div>
+      <div style="margin-top:8px;font-size:12px;color:var(--ink3)">Items you don't have access to are not shown and are not named.</div>
+      <div style="height:1px;background:var(--line);margin:14px 0"></div>
+      <div style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);margin-bottom:8px">Freshness</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <sc-for list="{{ rows }}" as="r">
+          <div style="display:flex;align-items:center;gap:7px;padding:8px 10px;border:1px solid var(--line2);border-radius:8px;background:var(--surface);font-size:12.5px"><span style="width:7px;height:7px;border-radius:50%;background:var(--ok)"></span><span style="flex:1">{{ r.p }}</span><span style="color:var(--ink2)">{{ r.ago }}</span></div>
+        </sc-for>
+      </div>
+      <div style="height:1px;background:var(--line);margin:14px 0"></div>
+      <div style="display:flex;align-items:baseline;gap:10px"><span style="font-size:30px;font-weight:500">96%</span><span style="font-size:12.5px;color:var(--ink2)">Share of statements verified against a source you can access.</span></div>
+      <div style="margin-top:6px;font-size:12.5px;color:var(--ink2)">1 unsupported statement was removed.</div>
+      <div style="height:1px;background:var(--line);margin:14px 0"></div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;font:500 12px 'IBM Plex Mono',monospace"><span style="padding:3px 8px;border:1px solid var(--line);border-radius:5px;background:var(--surface)">policy 3c9f · 2 Oct</span><span style="padding:3px 8px;border:1px solid var(--line);border-radius:5px;background:var(--surface)">req_8f3a ⧉</span><span style="font:400 12px 'IBM Plex Sans',sans-serif;color:var(--ink2)">Recorded in the audit log.</span></div>
+    </div>
+  </sc-if>
+  <div style="position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:134px;height:5px;border-radius:3px;background:var(--ink)"></div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:460,&quot;height&quot;:910},&quot;sheetOpen&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;}}">
+const G={Confluence:'sq',Jira:'di',Slack:'ci',Drive:'tr'};
+function glyph(p){const g=G[p],c='var(--glyph)';if(g==='sq')return{width:10,height:10,borderRadius:2,background:c,flex:'none'};if(g==='di')return{width:8,height:8,margin:1,transform:'rotate(45deg)',background:c,flex:'none'};if(g==='ci')return{width:10,height:10,borderRadius:'50%',background:c,flex:'none'};return{width:0,height:0,borderLeft:'5.5px solid transparent',borderRight:'5.5px solid transparent',borderBottom:'10px solid '+c,flex:'none'};}
+class Component extends DCLogic {
+  state={open:null};
+  renderVals(){
+    const open=this.state.open ?? this.props.sheetOpen ?? true;
+    const chips=[['Confluence','Payment gateway outage — postmortem','3 min ago'],['Slack','#payments-oncall · 19 May','1 min ago'],['Jira','PAY-2110 · Done','2 min ago'],['Jira','PAY-2111 · Done','2 min ago'],['Jira','PAY-2112 · Open','2 min ago']].map((c,i)=>({n:i+1,g:glyph(c[0]),title:c[1],fresh:c[2]}));
+    const rows=[['Confluence',12,9,1,'3 min'],['Jira',21,21,3,'2 min'],['Slack',34,26,1,'1 min'],['Drive',6,4,0,'9 min']].map(r=>({p:r[0],g:glyph(r[0]),f:r[1],a:r[2],s:r[3],ago:r[4]}));
+    return {open,chips,rows,openSheet:()=>this.setState({open:true}),closeSheet:()=>this.setState({open:false})};
+  }
+}
+</script>
+</body>
+</html>

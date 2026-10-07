@@ -1,0 +1,36 @@
+<!-- @dsCard group="Cortex app" viewport="1280x800" name="Cortex web app" subtitle="Ask, sources, people & access" -->
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Cortex</title><link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"></script>
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<script src="../../components/_preview.js"></script>
+<style>html,body,#root{height:100%}</style></head><body><div id="root"></div>
+<script type="text/babel" src="data.jsx"></script>
+<script type="text/babel" src="Sidebar.jsx"></script>
+<script type="text/babel" src="AskView.jsx"></script>
+<script type="text/babel" src="SourcesView.jsx"></script>
+<script type="text/babel" src="PeopleView.jsx"></script>
+<script type="text/babel">
+function App() {
+  const { Toast } = window.Cortex;
+  const [view, setView] = React.useState(localStorage.getItem('cortex-kit-view') || 'ask');
+  const [viewAs, setViewAs] = React.useState('priya');
+  const [thread, setThread] = React.useState(null);
+  const [msg, setMsg] = React.useState(null);
+  React.useEffect(() => { localStorage.setItem('cortex-kit-view', view); }, [view]);
+  React.useEffect(() => { if (!msg) return; const t = setTimeout(() => setMsg(null), 3200); return () => clearTimeout(t); }, [msg]);
+  return (
+    <div style={{ display: 'flex', height: '100%' }}>
+      <Sidebar view={view} setView={setView} viewAs={viewAs} setViewAs={id => { setViewAs(id); setMsg('Viewing Cortex as ' + PEOPLE.find(p => p.id === id).name); }} onNewThread={() => { setThread(null); setView('ask'); }} />
+      <main style={{ flex: 1, minWidth: 0, height: '100%', overflow: 'auto' }}>
+        {view === 'ask' && <AskView thread={thread} setThread={setThread} viewAs={viewAs} />}
+        {view === 'sources' && <SourcesView toast={setMsg} />}
+        {view === 'people' && <PeopleView toast={setMsg} />}
+      </main>
+      {msg && <div style={{ position: 'fixed', left: 'calc(50% + var(--sidebar-w) / 2)', bottom: 24, transform: 'translateX(-50%)', zIndex: 60 }}><Toast message={msg} onClose={() => setMsg(null)} /></div>}
+    </div>
+  );
+}
+CortexLoad().then(() => ReactDOM.createRoot(document.getElementById('root')).render(<App />));
+</script></body></html>

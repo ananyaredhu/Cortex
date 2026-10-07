@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#e9e9e4;font-family:'IBM Plex Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased;font-feature-settings:'tnum' 1}
+a{color:#3350b5;text-decoration:none}a:hover{text-decoration:underline}*{box-sizing:border-box}
+[data-theme=light]{--bg:#f3f3f0;--panel:#f9f9f7;--surface:#fff;--ink:#16181d;--ink2:#4c525c;--ink3:#6a707a;--line:#e0e0da;--line2:#ebebe6;--accent:#3350b5;--accentInk:#fff;--accentSoft:#e9edfa;--glyph:#56606f;--ok:#17744a;--okSoft:#e4f2ea;--warn:#895800;--warnSoft:#faefd8;--bad:#b3261e;--badSoft:#fbe8e6;--quote:#f5f5f1}
+[data-theme=dark]{--bg:#101216;--panel:#15171b;--surface:#1b1e23;--ink:#eceef1;--ink2:#b4b9c2;--ink3:#8e949e;--line:#2b2f36;--line2:#23272d;--accent:#93a8ff;--accentInk:#0e1430;--accentSoft:#1e2540;--glyph:#9aa3b2;--ok:#5ec791;--okSoft:#13281d;--warn:#e6b24d;--warnSoft:#2d2412;--bad:#ff8b80;--badSoft:#3a1715;--quote:#16191d}
+</style>
+</helmet>
+
+<section id="t3" data-theme="light" style="padding:40px 44px 36px;border-bottom:1px solid rgba(0,0,0,.08);background:#e9e9e4">
+  <div style="display:flex;align-items:baseline;gap:10px;margin:0 0 20px"><a href="#t3" style="font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px">3</a><span style="font:600 13px/1.2 'IBM Plex Sans',sans-serif;color:#1a1a1a">Design rationale — five scenarios, ten seconds each</span></div>
+  <div id="3a" style="width:1180px;background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:8px;padding:40px 48px;color:#16181d">
+    <div style="display:flex;align-items:baseline;gap:14px"><h2 style="margin:0;font-size:26px;font-weight:600;letter-spacing:-.01em">The AI is a reader with an escort.</h2><span style="font-size:13px;color:#6a707a">Internal Brain · design rationale · v1</span></div>
+    <p style="margin:10px 0 28px;max-width:760px;font-size:15px;line-height:1.6;color:#4c525c;text-wrap:pretty">Every trust signal lives in one fixed place — the right-hand Trust panel on Ask, the top-right chain widget in Audit — so a judge learns the layout once and every scenario reads in the same glance. Security colours (green / amber / red) are reserved for trust state and always ship with a label or glyph; the one interactive accent is blue.</p>
+    <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px">
+      <sc-for list="{{ scenarios }}" as="s" hint-placeholder-count="5">
+        <div style="display:flex;flex-direction:column;gap:10px;padding:16px;border:1px solid #e0e0da;border-radius:10px;background:#f9f9f7">
+          <span style="font:500 11px 'IBM Plex Mono',monospace;color:#6a707a">{{ s.n }}</span>
+          <span style="font-size:15px;font-weight:600;line-height:1.3">{{ s.t }}</span>
+          <span style="font-size:13px;line-height:1.55;color:#4c525c">{{ s.d }}</span>
+          <span style="margin-top:auto;font-size:12px;color:#6a707a;padding-top:10px;border-top:1px solid #e0e0da">Look at: <span style="color:#16181d;font-weight:500">{{ s.where }}</span></span>
+        </div>
+      </sc-for>
+    </div>
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:32px;margin-top:36px">
+      <div>
+        <div style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#6a707a;margin-bottom:10px">Negative case — two screenshots, one image</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <sc-for list="{{ twins }}" as="tw">
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <div style="padding:14px 16px;border:1px solid #e0e0da;border-radius:10px;background:#fff">
+                <div style="font-size:11.5px;color:#6a707a;margin-bottom:6px"><span style="font-weight:600;color:#4c525c">Raj Verma</span> · 14:36</div>
+                <div style="font-size:13px;line-height:1.5;margin-bottom:10px">{{ tw.q }}</div>
+                <div style="font-size:13px;line-height:1.55;padding-top:10px;border-top:1px solid #ebebe6">I couldn't find anything you have access to on that topic. If you think it should exist, ask the owner or your manager.</div>
+                <div style="margin-top:10px;height:44px;border:1px dashed #e0e0da;border-radius:7px;display:grid;place-items:center;font-size:11.5px;color:#6a707a">No sources to show for this answer.</div>
+                <div style="margin-top:10px;display:flex;gap:6px;font:400 10.5px 'IBM Plex Mono',monospace;color:#6a707a"><span>found —</span><span>allowed —</span><span>shown 0</span><span style="margin-left:auto">policy 3c9f</span></div>
+              </div>
+              <span style="font-size:12px;color:#6a707a">{{ tw.cap }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#6a707a;margin-bottom:10px">Where a requirement beat a nicer layout</div>
+        <ol style="margin:0;padding-left:18px;display:flex;flex-direction:column;gap:9px;font-size:13px;line-height:1.55;color:#4c525c">
+          <sc-for list="{{ conflicts }}" as="c"><li><span style="color:#16181d;font-weight:600">{{ c.t }}</span> {{ c.d }}</li></sc-for>
+        </ol>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="t2" style="padding:40px 44px 36px;border-bottom:1px solid rgba(0,0,0,.08)">
+  <div style="display:flex;align-items:baseline;gap:10px;margin:0 0 20px"><a href="#t2" style="font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px">2</a><span style="font:600 13px/1.2 'IBM Plex Sans',sans-serif;color:#1a1a1a">Component sheet — light <a href="#2a" style="font:600 10.5px ui-monospace,monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#1a1a1a;border-radius:5px">2a</a> and dark <a href="#2b" style="font:600 10.5px ui-monospace,monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#1a1a1a;border-radius:5px">2b</a></span></div>
+  <div style="display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start">
+  <sc-for list="{{ themes }}" as="th" hint-placeholder-count="2">
+    <div id="{{ th.id }}" data-theme="{{ th.theme }}" style="width:760px;display:flex;flex-direction:column;gap:9px">
+      <div style="display:flex;align-items:baseline;gap:8px;font:400 11px/1.3 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.55)"><a href="#{{ th.id }}" style="font:600 10.5px ui-monospace,monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#1a1a1a;border-radius:5px">{{ th.id }}</a>{{ th.label }}</div>
+      <div style="background:var(--bg);color:var(--ink);border:1px solid rgba(0,0,0,.08);border-radius:8px;padding:28px;display:flex;flex-direction:column;gap:26px;font-size:13px">
+
+        <div>
+          <div style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);margin-bottom:10px">Platform glyphs</div>
+          <div style="display:flex;gap:18px">
+            <sc-for list="{{ glyphs }}" as="g"><span style="display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--line);border-radius:7px;background:var(--surface)"><span style="{{ g.g }}"></span>{{ g.p }}</span></sc-for>
+          </div>
+        </div>
+
+        <div>
+          <div style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);margin-bottom:10px">Citation chip · default / hover / stale / revoked-since</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <sc-for list="{{ chips }}" as="c">
+              <div style="{{ c.box }}">
+                <span style="font:500 11px 'IBM Plex Mono',monospace;color:var(--ink2);width:14px">{{ c.n }}</span><span style="{{ c.g }}"></span>
+                <span style="display:flex;flex-direction:column;min-width:0;flex:1"><span style="font-size:11px;color:var(--ink3)">{{ c.where }}</span><span style="{{ c.titleStyle }}">{{ c.title }}</span></span>
+                <span style="display:flex;align-items:center;gap:5px;font-size:11.5px;color:{{ c.fc }};white-space:nowrap"><span style="{{ c.dot }}"></span>{{ c.fresh }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+          <div>
+            <div style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);margin-bottom:10px">Freshness dot + tooltip</div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <sc-for list="{{ fresh }}" as="f"><span style="{{ f.pill }}"><span style="{{ f.dot }}"></span>{{ f.label }} · {{ f.t }}</span></sc-for>
+              <div style="margin-top:4px;padding:8px 10px;border:1px solid var(--line);border-radius:7px;background:var(--surface);font-size:12px;line-height:1.45;color:var(--ink2);max-width:260px;box-shadow:0 6px 18px rgba(0,0,0,.12)"><span style="font-weight:600;color:var(--ink)">Slack · synced 2 h ago</span><br>Beyond the 60-min SLA. Answers may miss recent messages.</div>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);margin-bottom:10px">Grounding score</div>
+            <div style="padding:14px 16px;border:1px solid var(--line);border-radius:10px;background:var(--surface)">
+              <div style="display:flex;align-items:baseline;gap:10px"><span style="font-size:34px;font-weight:500;line-height:1">96%</span><span style="font-size:12px;color:var(--ink2)">Share of statements verified against a source you can access.</span></div>
+              <div style="margin-top:10px;height:6px;border-radius:3px;background:var(--line2)"><div style="width:96%;height:100%;border-radius:3px;background:var(--ok)"></div></div>
+              <div style="margin-top:8px;font-size:12px;color:var(--ink2)">− 1 unsupported statement was removed.</div>
+            </div>
+            <div style="margin-top:12px;display:flex;align-items:center;gap:8px;padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:var(--surface);font-size:12px;color:var(--ink2);width:max-content"><span style="width:7px;height:7px;border-radius:50%;border:1.5px solid var(--ink2)"></span><span style="font-weight:600;color:var(--ink)">Guest access</span>· Nimbus Consulting · 1 channel, 1 folder</div>
+          </div>
+        </div>
+
+        <div>
+          <div style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);margin-bottom:10px">Pipeline progress · step 3 of 5</div>
+          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px">
+            <sc-for list="{{ pipe }}" as="p"><div style="display:flex;flex-direction:column;gap:6px"><div style="{{ p.bar }}"></div><span style="{{ p.ls }}">{{ p.l }}</span></div></sc-for>
+          </div>
+        </div>
+
+        <div>
+          <div style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);margin-bottom:10px">Chain integrity · verified / verifying / broken</div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+            <sc-for list="{{ chains }}" as="c">
+              <div style="{{ c.box }}"><div style="display:flex;align-items:center;gap:8px"><span style="{{ c.icon }}">{{ c.g }}</span><span style="{{ c.ts }}">{{ c.t }}</span></div><div style="font-size:11.5px;color:var(--ink2);margin-top:6px;line-height:1.45">{{ c.s }}</div></div>
+            </sc-for>
+          </div>
+        </div>
+
+        <div>
+          <div style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);margin-bottom:10px">Decision table rows · allowed / denied / re-verified</div>
+          <div style="border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--surface)">
+            <sc-for list="{{ drows }}" as="d">
+              <div style="display:grid;grid-template-columns:110px 1fr 90px 90px 30px;align-items:center;gap:8px;height:42px;padding:0 12px;border-top:{{ d.bt }}">
+                <span style="font:400 11.5px 'IBM Plex Mono',monospace">{{ d.id }}</span><span style="{{ d.ts }}">{{ d.t }}</span><span style="{{ d.ds }}">{{ d.d }}</span><span style="font:400 11px 'IBM Plex Mono',monospace;color:var(--ink2)">3c9f · {{ d.acl }}</span><span style="{{ d.vs }}">{{ d.v }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <div>
+          <div style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);margin-bottom:10px">Answer card · default / no-information / stale / error</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <sc-for list="{{ cards }}" as="c">
+              <div style="border:1px solid var(--line);border-radius:10px;background:var(--surface);overflow:hidden">
+                <sc-if value="{{ c.hasBanner }}"><div style="{{ c.bs }}">! {{ c.banner }}</div></sc-if>
+                <div style="padding:10px 12px;font-size:12.5px;line-height:1.55">{{ c.text }}</div>
+                <div style="display:flex;gap:4px;padding:0 12px 10px"><sc-for list="{{ c.srcs }}" as="s"><span style="height:18px;padding:0 6px;border-radius:4px;background:var(--accentSoft);color:var(--accent);font:500 10px/18px 'IBM Plex Mono',monospace">{{ s }}</span></sc-for></div>
+                <div style="display:flex;justify-content:space-between;padding:6px 12px;border-top:1px solid var(--line2);font-size:11px;color:var(--ink3)"><span>Copy · Share · Report</span><span style="color:var(--accent)">Why can't I see more?</span></div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <div>
+          <div style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);margin-bottom:10px">Trust panel → bottom sheet</div>
+          <div style="display:flex;gap:14px;align-items:flex-end">
+            <div style="width:230px;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:12px;font-size:11.5px;display:flex;flex-direction:column;gap:8px"><span style="font-weight:600;font-size:12.5px">Trust</span><span style="color:var(--ink2)">Sources 73 → 60 → 5</span><span style="color:var(--ink2)">Freshness ● ● ● ●</span><span style="color:var(--ink2)">Grounding 96%</span><span style="font-family:'IBM Plex Mono',monospace;color:var(--ink2)">3c9f · req_8f3a</span></div>
+            <span style="color:var(--ink3);font-size:18px;padding-bottom:40px">→</span>
+            <div style="width:200px;height:170px;border:1px solid var(--line);border-radius:18px;background:var(--bg);position:relative;overflow:hidden"><div style="position:absolute;left:0;right:0;bottom:0;height:110px;background:var(--panel);border-radius:14px 14px 0 0;border-top:1px solid var(--line);padding:8px 12px;font-size:11px;color:var(--ink2);display:flex;flex-direction:column;gap:5px"><span style="width:28px;height:4px;border-radius:2px;background:var(--line);margin:0 auto 4px"></span><span style="font-weight:600;color:var(--ink)">Trust</span><span>Sources · Freshness</span><span>Grounding · Policy · Audit</span></div><span style="position:absolute;top:18px;right:12px;padding:3px 9px;border-radius:999px;border:1px solid var(--accent);background:var(--accentSoft);color:var(--accent);font-size:10.5px;font-weight:600">Trust · 96%</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </sc-for>
+  </div>
+</section>
+
+<section id="t1" style="padding:40px 44px 36px;border-bottom:1px solid rgba(0,0,0,.08)">
+  <div style="display:flex;align-items:baseline;gap:10px;margin:0 0 20px"><a href="#t1" style="font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px">1</a><span style="font:600 13px/1.2 'IBM Plex Sans',sans-serif;color:#1a1a1a">Cover image · 1920×1080 frame, three blurbs</span></div>
+  <div style="display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start">
+    <sc-for list="{{ covers }}" as="cv" hint-placeholder-count="3">
+      <div id="{{ cv.id }}" style="display:flex;flex-direction:column;gap:9px">
+        <div style="display:flex;align-items:baseline;gap:8px;font:400 11px/1.3 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.55)"><a href="#{{ cv.id }}" style="font:600 10.5px ui-monospace,monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#1a1a1a;border-radius:5px">{{ cv.id }}</a>{{ cv.words }}</div>
+        <div style="width:672px;height:378px;overflow:hidden;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.1)">
+          <div data-theme="light" style="width:1920px;height:1080px;transform:scale(.35);transform-origin:0 0;position:relative;overflow:hidden;background:#16181d;color:#eceef1">
+            <div style="position:absolute;left:120px;top:120px;display:flex;align-items:center;gap:22px"><div style="width:64px;height:64px;border-radius:16px;background:#eceef1;display:grid;place-items:center"><div style="width:24px;height:24px;border-radius:50%;border:5px solid #16181d"></div></div><span style="font-size:34px;font-weight:500;color:#b4b9c2">Pathfin</span></div>
+            <div style="position:absolute;left:120px;top:330px;width:760px">
+              <div style="font-size:124px;font-weight:600;letter-spacing:-.03em;line-height:1">Internal Brain</div>
+              <div style="margin-top:40px;font-size:54px;line-height:1.2;color:#c9cdd4;text-wrap:balance">{{ cv.blurb }}</div>
+            </div>
+            <div style="position:absolute;left:120px;bottom:110px;display:flex;gap:28px;font-size:24px;color:#8e949e"><span>Tencent Cloud Hackathon Singapore 2026</span><span>·</span><span>FinTech</span></div>
+            <div style="position:absolute;left:1010px;top:150px;width:1100px;display:flex;gap:0;border-radius:24px;overflow:hidden;background:#f3f3f0;color:#16181d;box-shadow:0 40px 90px rgba(0,0,0,.5)">
+              <div style="width:640px;padding:44px 44px 40px;background:#fff">
+                <div style="font-size:22px;color:#6a707a;margin-bottom:14px"><span style="font-weight:600;color:#4c525c">Alice Tan</span> · 14:32</div>
+                <div style="font-size:27px;line-height:1.45;margin-bottom:26px">What was the root cause of the payment outage last quarter?</div>
+                <div style="font-size:27px;line-height:1.6;padding-top:24px;border-top:2px solid #ebebe6">The 19 May outage was caused by connection-pool exhaustion after a config change cut the pool from 200 to 50<span style="display:inline-block;margin-left:6px;padding:0 9px;border-radius:7px;background:#e9edfa;color:#3350b5;font:500 19px/30px 'IBM Plex Mono',monospace;vertical-align:4px">1</span><span style="display:inline-block;margin-left:4px;padding:0 9px;border-radius:7px;background:#e9edfa;color:#3350b5;font:500 19px/30px 'IBM Plex Mono',monospace;vertical-align:4px">2</span>.</div>
+                <div style="margin-top:28px;display:flex;flex-direction:column;gap:12px">
+                  <div style="display:flex;align-items:center;gap:16px;padding:16px 20px;border:2px solid #ebebe6;border-radius:14px;font-size:21px"><span style="width:16px;height:16px;border-radius:3px;background:#56606f"></span><span style="flex:1;font-weight:500">Payment gateway outage — postmortem</span><span style="width:11px;height:11px;border-radius:50%;background:#17744a"></span><span style="color:#4c525c">3 min ago</span></div>
+                  <div style="display:flex;align-items:center;gap:16px;padding:16px 20px;border:2px solid #ebebe6;border-radius:14px;font-size:21px"><span style="width:16px;height:16px;border-radius:50%;background:#56606f"></span><span style="flex:1;font-weight:500">#payments-oncall · 19 May</span><span style="width:11px;height:11px;border-radius:50%;background:#17744a"></span><span style="color:#4c525c">1 min ago</span></div>
+                </div>
+              </div>
+              <div style="width:460px;padding:44px 40px;background:#f9f9f7;border-left:2px solid #e0e0da;display:flex;flex-direction:column;gap:30px">
+                <div style="font-size:26px;font-weight:600">Trust</div>
+                <div><div style="font-size:16px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#6a707a">Sources considered</div><div style="font-size:40px;font-weight:500;margin-top:8px">73 → 60 → 5</div><div style="font-size:18px;color:#6a707a;margin-top:4px">found · allowed · shown</div></div>
+                <div><div style="font-size:16px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#6a707a">Grounding</div><div style="font-size:56px;font-weight:500;margin-top:4px">96%</div></div>
+                <div style="display:flex;align-items:center;gap:12px;font-size:21px;color:#17744a;font-weight:500"><span style="width:26px;height:26px;border-radius:50%;background:#17744a;color:#fff;display:grid;place-items:center;font-size:15px">✓</span>Recorded · req_8f3a</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </sc-for>
+    <div id="1d" style="display:flex;flex-direction:column;gap:9px">
+      <div style="display:flex;align-items:baseline;gap:8px;font:400 11px/1.3 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.55)"><a href="#1d" style="font:600 10.5px ui-monospace,monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#1a1a1a;border-radius:5px">1d</a>At 380×216 thumbnail size — name, blurb and trust panel still legible</div>
+      <div style="width:380px;height:216px;overflow:hidden;border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,.1);background:#16181d;position:relative">
+        <div style="position:absolute;left:24px;top:62px;font-size:25px;font-weight:600;letter-spacing:-.02em;color:#eceef1">Internal Brain</div>
+        <div style="position:absolute;left:24px;top:98px;width:170px;font-size:11px;line-height:1.25;color:#c9cdd4">Ask anything. See only what you're allowed to.</div>
+        <div style="position:absolute;left:200px;top:30px;width:220px;height:160px;border-radius:6px;background:#f9f9f7;padding:12px;display:flex;flex-direction:column;gap:7px;color:#16181d"><span style="font-size:9px;font-weight:600">Trust</span><span style="font-size:13px;font-weight:500">73 → 60 → 5</span><span style="font-size:18px;font-weight:500">96%</span><span style="font-size:8px;color:#17744a;font-weight:600">✓ Recorded · req_8f3a</span></div>
+      </div>
+    </div>
+  </div>
+  <p style="margin:22px 0 0;font:12px/1.5 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.5)">Try next: "use <a href="#1b" style="font:600 10.5px ui-monospace,monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#1a1a1a;border-radius:5px">1b</a>'s blurb on a light background" · "show the red broken chain on the cover instead"</p>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const G={Confluence:'sq',Jira:'di',Slack:'ci',Drive:'tr'};
+function glyph(p,c){const g=G[p];c=c||'var(--glyph)';if(g==='sq')return{width:10,height:10,borderRadius:2,background:c,flex:'none'};if(g==='di')return{width:8,height:8,margin:1,transform:'rotate(45deg)',background:c,flex:'none'};if(g==='ci')return{width:10,height:10,borderRadius:'50%',background:c,flex:'none'};return{width:0,height:0,borderLeft:'5.5px solid transparent',borderRight:'5.5px solid transparent',borderBottom:'10px solid '+c,flex:'none'};}
+const C={ok:['var(--ok)','var(--okSoft)'],warn:['var(--warn)','var(--warnSoft)'],bad:['var(--bad)','var(--badSoft)'],na:['var(--ink2)','var(--line2)']};
+class Component extends DCLogic {
+  renderVals(){
+    const covers=[['1a',"Ask anything. See only what you're allowed to.",'8 words · plain promise'],['1b','One cited answer. Every source checked, every read logged.','9 words · process-first'],['1c','Company knowledge, answered — with the receipts.','6 words · shortest, most memorable']].map(c=>({id:c[0],blurb:c[1],words:c[2]}));
+    const themes=[{id:'2a',theme:'light',label:'Light'},{id:'2b',theme:'dark',label:'Dark'}];
+    const glyphs=Object.keys(G).map(p=>({p,g:glyph(p)}));
+    const chipDefs=[['default','Confluence','ENG','Payment gateway outage — postmortem','synced 3 min ago','ok'],['hover','Jira','PAY-2110 · Done','Add pool-size alerting','synced 2 min ago','ok'],['stale','Slack','#payments-oncall','Thread from 19 May, 14:02','synced 2 h ago','bad'],['revoked','Drive','Finance — shared','Restricted since this answer','revoked 15:04','na']];
+    const chips=chipDefs.map((c,i)=>({n:i+1,g:glyph(c[1]),where:c[1]+' · '+c[2],title:c[3],fresh:c[4],fc:c[0]==='revoked'?'var(--ink3)':'var(--ink2)',dot:{width:7,height:7,borderRadius:'50%',background:c[5]==='na'?'transparent':C[c[5]][0],border:c[5]==='na'?'1.5px solid var(--ink3)':'0'},
+      titleStyle:{fontSize:13,fontWeight:500,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',textDecoration:c[0]==='revoked'?'line-through':'none',color:c[0]==='revoked'?'var(--ink3)':'var(--ink)'},
+      box:{display:'flex',alignItems:'center',gap:9,padding:'8px 11px',borderRadius:8,border:(c[0]==='revoked'?'1px dashed ':'1px solid ')+(c[0]==='hover'?'var(--accent)':c[0]==='stale'?'var(--bad)':'var(--line2)'),background:c[0]==='hover'?'var(--accentSoft)':'var(--surface)'}}));
+    const fresh=[['ok','Fresh','< 15 min'],['warn','Lagging','< 60 min'],['bad','Stale','> 60 min']].map(f=>({label:f[1],t:f[2],dot:{width:7,height:7,borderRadius:'50%',background:C[f[0]][0]},pill:{display:'inline-flex',alignItems:'center',gap:6,width:'max-content',padding:'3px 10px',borderRadius:999,fontSize:12,fontWeight:500,color:C[f[0]][0],background:C[f[0]][1]}}));
+    const pipe=['Finding sources','Checking your access','Verifying with source systems','Writing answer','Checking citations'].map((l,i)=>({l,bar:{height:4,borderRadius:2,background:i<2?'var(--ink)':i===2?'var(--accent)':'var(--line)'},ls:{fontSize:11.5,lineHeight:1.3,fontWeight:i===2?600:400,color:i<=2?'var(--ink)':'var(--ink3)'}}));
+    const chains=[['ok','✓','Log integrity verified','10,482 entries · checkpoint signed 14:00 SGT'],['na','…','Recomputing hashes…','6,120 / 10,482 entries'],['bad','!','Chain broken at 13:52','Entry 10,441 does not match its hash.']].map(c=>({g:c[1],t:c[2],s:c[3],ts:{fontSize:12.5,fontWeight:600,color:c[0]==='bad'?'var(--bad)':'var(--ink)'},icon:{width:22,height:22,borderRadius:'50%',display:'grid',placeItems:'center',fontSize:11,fontWeight:700,color:'var(--surface)',background:C[c[0]][0],flex:'none'},box:{padding:'10px 12px',borderRadius:9,border:'1.5px solid '+(c[0]==='na'?'var(--line)':C[c[0]][0]),background:c[0]==='bad'?'var(--badSoft)':'var(--surface)'}}));
+    const drows=[['CONF-88213','PGW incident notes — Sep 2026','allowed','v14',true],['CONF-90231',null,'denied','v2',true],['SLK-C0441','#pgw-oncall thread 23 Sep','allowed','v8',false]].map((d,i)=>({id:d[0],t:d[1]||'restricted item',acl:d[3],bt:i?'1px solid var(--line2)':'0',
+      ts:{color:d[1]?'var(--ink)':'var(--ink3)',fontStyle:d[1]?'normal':'italic',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'},d:d[2]==='allowed'?'✓ allowed':'✕ denied',
+      ds:{fontSize:11.5,fontWeight:600,padding:'2px 6px',borderRadius:4,width:'max-content',color:d[2]==='allowed'?'var(--ok)':'var(--bad)',background:d[2]==='allowed'?'var(--okSoft)':'var(--badSoft)'},
+      v:d[4]?'✓':'—',vs:{fontWeight:600,color:d[4]?'var(--ok)':'var(--ink3)'}}));
+    const cards=[[null,null,'The 19 May outage was caused by connection-pool exhaustion after a config change cut the pool from 200 to 50.',['1','2']],[null,null,"I couldn't find anything you have access to on that topic. If you think it should exist, ask the owner or your manager.",[]],['warn','Slack data is 2 h old — the answer may be missing recent messages.','The 19 May outage was caused by connection-pool exhaustion…',['1','2']],['bad','Jira is unreachable — answer uses Confluence, Slack and Drive only.','The 19 May outage was caused by connection-pool exhaustion…',['1','2']]].map(c=>({hasBanner:!!c[0],banner:c[1],text:c[2],srcs:c[3],bs:c[0]?{padding:'6px 12px',fontSize:11.5,fontWeight:500,color:C[c[0]][0],background:C[c[0]][1],borderBottom:'1px solid var(--line)'}:{}}));
+    const scenarios=[
+      ['01','Unified query','One question returns one answer with five numbered chips spanning Confluence, Slack and Jira; hovering a number lights its chip and shows the source excerpt, set apart in mono.','Answer card sources'],
+      ['02','Freshness','Every chip carries “synced N min ago”; the Trust panel lists each platform against the SLA. When Slack is 2 h old, an amber banner sits on the answer itself.','Chip right edge · Trust §2'],
+      ['03','Negative case','Raj asking for the breach report and for something that doesn’t exist produce pixel-identical cards: one fixed sentence, an empty sources slot of fixed height, counts shown as dashes.','Answer card · Trust §1'],
+      ['04','Live revocation','Replay puts “what jdoe saw at 13:52” next to “what jdoe would see now”; the since-restricted page and its sentence are struck out and labelled with the time of the ACL change.','Audit › Replay'],
+      ['05','Audit inquiry','A plain-English query fills the timeline; the chain widget stays green top-right. “Tamper one row” turns it red and names entry 10,441 and 13:52.','Audit › chain widget']].map(s=>({n:s[0],t:s[1],d:s[2],where:s[3]}));
+    const twins=[{q:'Can you show me the Q2 data breach incident report?',cap:'A restricted report exists'},{q:'Can you show me the Q2 data breach incident report?',cap:'No such report exists'}];
+    const conflicts=[
+      ['Counts go blank on empty answers.','The brief asks for found → allowed → shown on every answer, and for no-info answers that look the same either way. Showing “5 → 0” would prove something exists, so empty answers show dashes. The panel is a little less informative; the uniform response wins.'],
+      ['Guests only get counts from their own grants.','For Raj, “found” is counted inside his grants, so found always equals allowed and nothing tells him more exists.'],
+      ['Every sentence gets a citation, sample copy included.','The brief’s own sample “Recovery took 47 minutes” had no citation. It now cites [1].'],
+      ['Clarifying questions carry citations.','“There were two outages” is a claim, so it cites both reviews, even though an uncited prompt would look cleaner.'],
+      ['Geometric glyphs, not logos.','Square, diamond, circle and triangle in one ink colour, always next to a text label, so platforms are recognisable without the real marks.'],
+      ['Audit shows hashes, not answers.','The drawer shows the answer hash, and only titles the officer can open. Replay renders text only after checking the viewer’s own access.']].map(c=>({t:c[0],d:c[1]}));
+    return {covers,themes,glyphs,chips,fresh,pipe,chains,drows,cards,scenarios,twins,conflicts};
+  }
+}
+</script>
+</body>
+</html>

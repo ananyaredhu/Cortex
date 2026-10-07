@@ -42,3 +42,4 @@ models/
 
 # raw, unchecked screenshots (check for secrets, then move to docs/proof/)
 screenshots-raw/
+*.tsbuildinfo
