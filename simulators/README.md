@@ -180,7 +180,8 @@ document's tokens from its own spec. `connectors/ingestion/scale_run.py` ingests
 `brain_scale` database and checks the index against that spec.
 
 First full run (7 Oct, fake embedder): about 12 documents/s for both sources (Confluence 17 min, Slack 2.3 min),
-bounded by per-document writes to Postgres; every check passed. Numbers and details in `docs/status/ws-a.md`. Run the scale Confluence simulator on another port
+bounded by per-document writes to Postgres; every check passed. With bge-m3 the embedding dominates: 0.61 chunks/s
+measured, about 8 hours for the corpus on this laptop's CPU, so run it overnight. Numbers in `docs/status/ws-a.md`. Run the scale Confluence simulator on another port
 (e.g. 8111, with `CONFLUENCE_SIM_URL`) to keep the demo one on 8101 untouched.
 
 ## Shared code
