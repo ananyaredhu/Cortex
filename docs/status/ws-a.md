@@ -2,6 +2,12 @@
 
 Update at the end of each day. Newest first. Keep it short: done, next, blockers.
 
+## Wed 7 Oct (Day 6)
+- **Done:** scale seed (`simulators/scale.py`), deterministic: Company A plus 400 people, 40 teams, 80 spaces with 12,000 nested pages (8% restricted subtrees) and 220 Slack channels with 1,730 threads. `SIM_SEED=scale` on the Confluence simulator and on a new Slack simulator (the Slack test double served over HTTP; the real connector runs against it unchanged). `python -m connectors.ingestion.scale_run` ingests it into a separate `brain_scale` database and checks the index against the generator's spec.
+- **Measured** (fake embedder, this laptop, Postgres in Docker Desktop): Confluence 12,004 pages, 15,616 chunks in 17 min (11.8 documents/s); Slack 1,736 threads in 2.3 min (12.4/s). The limit is the per-document writes (about 9 round trips of 2 ms plus a commit); batching documents per transaction is the fix if it matters. With bge-m3 the embedding dominates instead: 17.6k chunks at about 2.4 chunks/s, about 2 hours.
+- **Index at scale:** all generated documents indexed with the spec's tokens; each persona's prefilter finds exactly what the spec lets them read (Priya 5,603, Dana 5,326, Maya 5,092, Jordan 4,144, Sam 0); live `check_access` agrees with the spec on 40 sampled documents per source per persona; the vector query with the iterative scan and the keyword query return 10 rows inside the prefilter for every persona with that many. Vector p50 55 to 96 ms (p95 up to 368 ms), keyword p50 2 to 45 ms.
+- **Next:** the same run with bge-m3 for real-model timings; hidden-document tooling for Leak-CI.
+
 ## Tue 6 Oct (Day 5)
 - **Done:** PR #12 (Sam has no Slack account) and PR #13 (Drive file read through an account that can see its folder) merged. Identity mapping ticked: Slack and Drive both use it and fail closed on unmapped accounts. Check #4 result written (OAuth works; `changes.watch` still open). Checklist brought up to date.
 - **Done:** bge-m3 installed and run on this laptop's CPU with `embed_check`: about 2.4 chunks/s, 1024 dimensions, peak about 1.9 GB, MIT license. Result written under check #6 (B's check). Model cache kept on D: through `HF_HOME`. The 12k-page scale corpus will take hours to embed, so pre-embed it offline.
