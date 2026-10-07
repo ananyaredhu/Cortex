@@ -1,0 +1,21 @@
+<!-- @dsCard group="Components" viewport="700x220" name="Cards" -->
+<!DOCTYPE html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"></script>
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<script src="../_preview.js"></script>
+<style>body{padding:20px}.l{font:var(--type-mono);color:var(--text-muted);margin-bottom:8px}</style></head><body><div id="root"></div>
+<script type="text/babel">
+CortexLoad().then((C) => {
+const {Card} = C;
+const Row = ({label, children}) => <div style={{marginBottom:16}}><div className="l">{label}</div><div style={{display:'flex',flexWrap:'wrap',gap:10,alignItems:'center'}}>{children}</div></div>;
+const A = (n) => '../../assets/personas/' + n + '.svg';
+ReactDOM.createRoot(document.getElementById('root')).render(<>
+<div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:12,width:'100%'}}>
+<Card interactive><div style={{font:'var(--type-h3)'}}>Card</div><div style={{fontSize:13,color:'var(--text-muted)',marginTop:6}}>Hairline border, hover darkens</div></Card>
+<Card tone="sunken"><div style={{font:'var(--type-h3)'}}>Sunken</div><div style={{fontSize:13,color:'var(--text-muted)',marginTop:6}}>Wells, empty states</div></Card>
+<Card tone="accent"><div style={{font:'var(--type-h3)'}}>Accent</div><div style={{fontSize:13,color:'var(--accent-text)',marginTop:6}}>Cortex insight</div></Card>
+<Card tone="inverse"><div style={{font:'var(--type-h3)'}}>Inverse</div><div style={{fontSize:13,color:'var(--gray-400)',marginTop:6}}>Hero, promo</div></Card></div></>);
+});
+</script></body></html>

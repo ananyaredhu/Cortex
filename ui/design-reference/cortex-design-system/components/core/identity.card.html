@@ -1,0 +1,20 @@
+<!-- @dsCard group="Components" viewport="700x330" name="Identity & entities" -->
+<!DOCTYPE html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"></script>
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<script src="../_preview.js"></script>
+<style>body{padding:20px}.l{font:var(--type-mono);color:var(--text-muted);margin-bottom:8px}</style></head><body><div id="root"></div>
+<script type="text/babel">
+CortexLoad().then((C) => {
+const {SourcePill, Badge, Avatar, AvatarGroup, Logo} = C;
+const Row = ({label, children}) => <div style={{marginBottom:16}}><div className="l">{label}</div><div style={{display:'flex',flexWrap:'wrap',gap:10,alignItems:'center'}}>{children}</div></div>;
+const A = (n) => '../../assets/personas/' + n + '.svg';
+ReactDOM.createRoot(document.getElementById('root')).render(<>
+<Row label="logo"><Logo size={22} markSrc="../../assets/logo/cortex-mark.svg" /><div style={{background:'var(--ink)',padding:10,borderRadius:12}}><Logo size={18} onDark markSrc="../../assets/logo/cortex-mark.svg" /></div><Logo variant="mark" size={20} markSrc="../../assets/logo/cortex-mark.svg" /></Row>
+<Row label="source pills"><SourcePill label="Roadmap" /><SourcePill label="Q3 launch plan" index={1} size="sm" onClick={()=>{}} /><SourcePill label="ENG-2041" index={2} size="sm" /><SourcePill label="Drive" icon="hard-drive" variant="soft" /><SourcePill label="#launch" icon="hash" size="lg" /></Row>
+<Row label="badges"><Badge tone="success" dot>Synced</Badge><Badge tone="accent">Cortex</Badge><Badge tone="warning" dot>Restricted</Badge><Badge tone="danger" dot>Sync failed</Badge><Badge tone="info">Beta</Badge><Badge>Contractor</Badge><Badge tone="inverse">Admin</Badge></Row>
+<Row label="avatars"><Avatar src={A('priya')} name="Priya" size={56} ring /><Avatar src={A('sam')} name="Sam" size={40} /><Avatar src={A('dana')} name="Dana" size={32} /><Avatar src={A('jordan')} name="Jordan" size={28} shape="rounded" /><Avatar name="New Hire" size={32} /><AvatarGroup people={['priya','sam','dana','jordan','maya'].map(n=>({src:A(n),name:n}))} /></Row></>);
+});
+</script></body></html>

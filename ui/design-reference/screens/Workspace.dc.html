@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,600&display=swap" rel="stylesheet">
+<style>
+body{margin:0;--paper:#F4F3F0;--paper2:#E9E7E2;--white:#FFFFFF;--ink:#141414;--ink2:#2A2926;--g7:#4A4843;--g5:#6B6862;--g4:#A19D95;--line:#E6E3DD;--line2:#EFEDE9;--orange:#F47B2A;--orange6:#D9631A;--orange7:#B04E10;--orange1:#FDEBDD;--orange05:#FEF5EE;--green:oklch(0.58 0.12 150);--green1:oklch(0.95 0.03 150);--red:oklch(0.57 0.18 28);--red1:oklch(0.95 0.03 28);--blue:oklch(0.56 0.12 250);--blue1:oklch(0.95 0.025 250);--amber:oklch(0.72 0.14 80);--amber1:oklch(0.96 0.04 85);--sans:"Helvetica Neue",Helvetica,Arial,sans-serif;--serif:"Newsreader",Georgia,serif;--mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;--sh1:0 1px 2px rgba(20,20,20,.06);--sh2:0 8px 24px -8px rgba(20,20,20,.14),0 1px 2px rgba(20,20,20,.06);--ring:0 0 0 3px color-mix(in srgb,#F47B2A 35%,transparent);background:var(--paper);font-family:var(--sans);color:var(--ink);-webkit-font-smoothing:antialiased}
+a{color:var(--orange7);text-decoration:none}a:hover{color:var(--ink);text-decoration:underline}
+*{box-sizing:border-box}
+button{font-family:var(--sans)}
+:focus-visible{outline:none;box-shadow:var(--ring);border-radius:10px}
+textarea::placeholder{color:var(--g5)}
+</style>
+</helmet>
+<div style="display:grid;grid-template-columns:248px minmax(0,1fr);height:100vh;min-height:680px;min-width:900px;background:var(--paper);color:var(--ink);font-size:14px">
+
+<aside style="display:flex;flex-direction:column;gap:18px;min-height:0;padding:18px 12px 12px;background:var(--paper2)">
+  <div style="display:flex;align-items:center;gap:8px;padding:0 6px">
+    <img src="assets/logo/cortex-mark.svg" alt="" style="width:22px;height:22px;display:block">
+    <span style="font:600 23px/1 var(--serif);letter-spacing:-.01em;flex:1">cortex</span>
+    <span style="font-size:12px;color:var(--g5);white-space:nowrap">Company A</span>
+  </div>
+  <button onClick="{{ newChat }}" style="display:flex;align-items:center;gap:10px;height:34px;padding:0 10px;border:0;border-radius:8px;background:transparent;color:var(--g7);font:400 14px/1 var(--sans);cursor:pointer;text-align:left" style-hover="background:rgba(20,20,20,.06);color:var(--ink)"><span style="width:16px;height:16px;flex:none;background:currentColor;-webkit-mask:url(https://unpkg.com/lucide-static@0.460.0/icons/sparkles.svg) center/contain no-repeat;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/sparkles.svg) center/contain no-repeat"></span><span style="flex:1">Ask Cortex</span><span style="font:500 11px/1 var(--mono);color:var(--g4)">⌘K</span></button>
+  <nav style="display:flex;flex-direction:column;gap:2px">
+    <sc-for list="{{ nav }}" as="n" hint-placeholder-count="3">
+      <button onClick="{{ n.go }}" aria-current="{{ n.cur }}" style="{{ n.style }}"><span style="{{ n.icon }}"></span><span>{{ n.label }}</span></button>
+    </sc-for>
+  </nav>
+  <sc-if value="{{ isSec }}">
+    <div style="display:flex;flex-direction:column;gap:2px">
+      <div style="padding:0 10px 6px;font-size:12px;line-height:1;letter-spacing:.08em;text-transform:uppercase;color:var(--g5)">Security tools</div>
+      <a href="Audit Console.dc.html" style="display:flex;align-items:center;gap:10px;height:34px;padding:0 10px;border-radius:8px;font-size:14px;color:var(--g7);text-decoration:none" style-hover="background:rgba(20,20,20,.06);color:var(--ink);text-decoration:none"><span style="width:16px;height:16px;flex:none;background:currentColor;-webkit-mask:url(https://unpkg.com/lucide-static@0.460.0/icons/scroll-text.svg) center/contain no-repeat;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/scroll-text.svg) center/contain no-repeat"></span>Audit console</a>
+      <a href="Admin.dc.html" style="display:flex;align-items:center;gap:10px;height:34px;padding:0 10px;border-radius:8px;font-size:14px;color:var(--g7);text-decoration:none" style-hover="background:rgba(20,20,20,.06);color:var(--ink);text-decoration:none"><span style="width:16px;height:16px;flex:none;background:currentColor;-webkit-mask:url(https://unpkg.com/lucide-static@0.460.0/icons/shield-check.svg) center/contain no-repeat;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/shield-check.svg) center/contain no-repeat"></span>Admin</a>
+    </div>
+  </sc-if>
+  <sc-if value="{{ isChat }}">
+    <div style="flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:2px">
+      <div style="padding:0 10px 6px;font-size:12px;line-height:1;letter-spacing:.08em;text-transform:uppercase;color:var(--g5)">Recent</div>
+      <sc-for list="{{ recent }}" as="r" hint-placeholder-count="5">
+        <div style="padding:8px 10px;border-radius:8px;font-size:13px;line-height:1.2;color:var(--g7);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" style-hover="background:rgba(20,20,20,.06);color:var(--ink)">{{ r }}</div>
+      </sc-for>
+    </div>
+  </sc-if>
+  <sc-if value="{{ notChat }}"><div style="flex:1"></div></sc-if>
+  <div style="position:relative">
+    <sc-if value="{{ menuOpen }}">
+      <div style="position:absolute;left:0;right:0;bottom:calc(100% + 6px);z-index:5;display:flex;flex-direction:column;gap:2px;padding:8px;background:var(--white);border:1px solid var(--line);border-radius:14px;box-shadow:var(--sh2)">
+        <div style="padding:6px 8px 8px;font-size:12px;line-height:1;letter-spacing:.08em;text-transform:uppercase;color:var(--g5)">View Cortex as</div>
+        <sc-for list="{{ people }}" as="p" hint-placeholder-count="2">
+          <button onClick="{{ p.go }}" style="display:flex;align-items:center;gap:10px;padding:6px 8px;border:0;border-radius:8px;background:transparent;text-align:left;cursor:pointer" style-hover="background:rgba(20,20,20,.06)">
+            <span style="width:28px;height:28px;border-radius:50%;background:var(--white);border:1px solid var(--line);overflow:hidden;flex:none"><img src="{{ p.src }}" alt="" style="width:100%;height:100%;display:block"></span>
+            <span style="display:flex;flex-direction:column;gap:2px;flex:1;min-width:0"><span style="font:700 13px/1.2 var(--sans);color:var(--ink)">{{ p.name }}</span><span style="font-size:12px;line-height:1.2;color:var(--g5)">{{ p.role }}</span></span>
+            <span style="{{ p.check }}"></span>
+          </button>
+        </sc-for>
+      </div>
+    </sc-if>
+    <button onClick="{{ toggleMenu }}" aria-label="Switch demo account" style="width:100%;display:flex;align-items:center;gap:10px;padding:8px;border:1px solid var(--line);border-radius:14px;background:var(--white);cursor:pointer;text-align:left" style-hover="border-color:var(--g4)">
+      <span style="width:34px;height:34px;border-radius:50%;background:var(--white);border:1px solid var(--line);overflow:hidden;flex:none"><img src="{{ me.src }}" alt="" style="width:100%;height:100%;display:block"></span>
+      <span style="display:flex;flex-direction:column;gap:3px;min-width:0;flex:1"><span style="font:700 13px/1.2 var(--sans);color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ me.name }}</span><span style="font-size:12px;line-height:1.2;color:var(--g5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ me.role }}</span></span>
+      <span style="width:14px;height:14px;flex:none;background:var(--g5);-webkit-mask:url(https://unpkg.com/lucide-static@0.460.0/icons/chevrons-up-down.svg) center/contain no-repeat;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/chevrons-up-down.svg) center/contain no-repeat"></span>
+    </button>
+  </div>
+</aside>
+
+<sc-if value="{{ isChat }}">
+<main data-screen-label="Chat" style="display:flex;flex-direction:column;min-width:0;min-height:0">
+  <sc-if value="{{ chatEmpty }}">
+    <div style="flex:1;min-height:0;overflow:auto">
+      <div style="max-width:760px;margin:0 auto;padding:14vh 32px 32px;display:flex;flex-direction:column;gap:28px">
+        <h1 style="margin:0;display:flex;flex-direction:column;gap:4px;font:400 44px/1.04 var(--sans);letter-spacing:-.035em;text-wrap:balance"><span>{{ hello }}</span><span style="font-weight:700">What do you need to know?</span></h1>
+        <div style="display:flex;flex-direction:column;gap:10px;padding:14px 14px 10px 18px;background:var(--white);border:1px solid var(--line);border-radius:20px;box-shadow:var(--sh1)" style-focus-within="border-color:var(--ink);box-shadow:var(--ring)">
+          <textarea value="{{ draft }}" onChange="{{ onDraft }}" onKeyDown="{{ onKey }}" rows="2" aria-label="Message" placeholder="Ask anything about Company A…" style="border:0;outline:0;resize:none;background:transparent;font:400 16px/1.45 var(--sans);color:var(--ink)"></textarea>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:999px;background:var(--paper);font-size:12px;color:var(--g7)"><span style="width:13px;height:13px;flex:none;background:currentColor;-webkit-mask:url(https://unpkg.com/lucide-static@0.460.0/icons/layers.svg) center/contain no-repeat;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/layers.svg) center/contain no-repeat"></span>All sources</span>
+            <div style="flex:1"></div>
+            <button onClick="{{ send }}" aria-label="Send" style="{{ sendStyle }}"><span style="width:16px;height:16px;background:var(--ink);-webkit-mask:url(https://unpkg.com/lucide-static@0.460.0/icons/arrow-up.svg) center/contain no-repeat;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/arrow-up.svg) center/contain no-repeat"></span></button>
+          </div>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          <sc-for list="{{ suggest }}" as="s" hint-placeholder-count="3">
+            <button onClick="{{ s.go }}" style="display:inline-flex;align-items:center;gap:8px;max-width:100%;height:32px;padding:0 14px;border:1px solid var(--line);border-radius:999px;background:var(--white);font:400 13px/1 var(--sans);color:var(--g7);cursor:pointer;white-space:nowrap" style-hover="border-color:var(--ink);color:var(--ink)"><span style="width:14px;height:14px;flex:none;background:var(--orange);-webkit-mask:url(https://unpkg.com/lucide-static@0.460.0/icons/corner-down-right.svg) center/contain no-repeat;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/corner-down-right.svg) center/contain no-repeat"></span><span style="overflow:hidden;text-overflow:ellipsis">{{ s.t }}</span></button>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+  <sc-if value="{{ chatConv }}">
+    <div style="flex:1;min-height:0;overflow:auto">
+      <div style="max-width:760px;margin:0 auto;padding:40px 32px 24px;display:flex;flex-direction:column;gap:24px">
+        <div style="display:flex;gap:12px;align-items:flex-start;justify-content:flex-end">
+          <div style="max-width:75%;padding:10px 14px;background:var(--white);border:1px solid var(--line);border-radius:16px 16px 4px 16px;font:400 15px/1.45 var(--sans);text-wrap:pretty">{{ question }}</div>
+          <span style="width:28px;height:28px;border-radius:50%;background:var(--white);border:1px solid var(--line);overflow:hidden;flex:none"><img src="{{ me.src }}" alt="" style="width:100%;height:100%;display:block"></span>
+        </div>
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <span style="width:28px;height:28px;border-radius:50%;background:var(--white);box-shadow:inset 0 0 0 2px var(--orange);display:grid;place-items:center;flex:none"><img src="assets/logo/cortex-mark.svg" alt="" style="width:18px;height:18px;display:block"></span>
+          <sc-if value="{{ thinking }}">
+            <div style="font:400 14px/28px var(--sans);color:var(--g5)">Reading Jira, Confluence, Slack and Drive…</div>
+          </sc-if>
+          <sc-if value="{{ answered }}">
+            <div style="display:flex;flex-direction:column;gap:16px;min-width:0;flex:1">
+              <p style="margin:0;padding-top:4px;font:400 15.5px/1.65 var(--sans);text-wrap:pretty">
+                <sc-for list="{{ segs }}" as="s">
+                  <sc-if value="{{ s.isText }}"><span>{{ s.t }}</span></sc-if>
+                  <sc-if value="{{ s.isCite }}"><a href="{{ s.u }}" target="_blank" title="{{ s.title }}" style="display:inline-block;min-width:15px;height:15px;padding:0 3px;margin:0 2px;vertical-align:2px;border-radius:4px;background:var(--orange);color:var(--ink);font:700 10px/15px var(--mono);text-align:center;text-decoration:none" style-hover="background:var(--orange6);color:var(--ink);text-decoration:none">{{ s.n }}</a></sc-if>
+                </sc-for>
+              </p>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <span style="font-size:12px;line-height:1;letter-spacing:.08em;text-transform:uppercase;color:var(--g5)">Sources</span>
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px">
+                  <sc-for list="{{ sources }}" as="src" hint-placeholder-count="4">
+                    <a href="{{ src.u }}" target="_blank" style="display:flex;flex-direction:column;gap:8px;padding:12px;background:var(--white);border:1px solid var(--line);border-radius:14px;color:var(--ink);text-decoration:none;min-width:0" style-hover="border-color:var(--ink);color:var(--ink);text-decoration:none">
+                      <span style="display:flex;align-items:center;gap:6px;min-width:0"><span style="min-width:14px;height:14px;border-radius:4px;background:var(--orange);font:700 10px/14px var(--mono);text-align:center;flex:none">{{ src.n }}</span><span style="font:600 12px/1.3 var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ src.t }}</span></span>
+                      <span style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--g5);white-space:nowrap;overflow:hidden"><span style="{{ src.g }}"></span>{{ src.p }} · {{ src.d }}</span>
+                    </a>
+                  </sc-for>
+                </div>
+              </div>
+              <div style="display:flex;gap:2px;margin-left:-8px">
+                <button onClick="{{ copy }}" style="display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 10px;border:0;border-radius:10px;background:transparent;font:400 13px var(--sans);color:var(--g5);cursor:pointer" style-hover="background:rgba(20,20,20,.06);color:var(--ink)"><span style="width:14px;height:14px;background:currentColor;-webkit-mask:url(https://unpkg.com/lucide-static@0.460.0/icons/copy.svg) center/contain no-repeat;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/copy.svg) center/contain no-repeat"></span>{{ copyLabel }}</button>
+                <button onClick="{{ regen }}" style="display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 10px;border:0;border-radius:10px;background:transparent;font:400 13px var(--sans);color:var(--g5);cursor:pointer" style-hover="background:rgba(20,20,20,.06);color:var(--ink)"><span style="width:14px;height:14px;background:currentColor;-webkit-mask:url(https://unpkg.com/lucide-static@0.460.0/icons/rotate-ccw.svg) center/contain no-repeat;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/rotate-ccw.svg) center/contain no-repeat"></span>Regenerate</button>
+                <button style="display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 10px;border:0;border-radius:10px;background:transparent;font:400 13px var(--sans);color:var(--g5);cursor:pointer" style-hover="background:rgba(20,20,20,.06);color:var(--ink)"><span style="width:14px;height:14px;background:currentColor;-webkit-mask:url(https://unpkg.com/lucide-static@0.460.0/icons/flag.svg) center/contain no-repeat;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/flag.svg) center/contain no-repeat"></span>Report a problem</button>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+    </div>
+    <div style="padding:0 32px 12px">
+      <div style="max-width:696px;margin:0 auto;display:flex;align-items:flex-end;gap:8px;padding:10px 10px 10px 18px;background:var(--white);border:1px solid var(--line);border-radius:20px;box-shadow:var(--sh1)" style-focus-within="border-color:var(--ink);box-shadow:var(--ring)">
+        <textarea value="{{ draft }}" onChange="{{ onDraft }}" onKeyDown="{{ onKey }}" rows="1" aria-label="Message" placeholder="Ask a follow-up…" style="flex:1;border:0;outline:0;resize:none;background:transparent;padding:6px 0;font:400 16px/1.45 var(--sans);color:var(--ink)"></textarea>
+        <button onClick="{{ send }}" aria-label="Send" style="{{ sendStyle }}"><span style="width:16px;height:16px;background:var(--ink);-webkit-mask:url(https://unpkg.com/lucide-static@0.460.0/icons/arrow-up.svg) center/contain no-repeat;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/arrow-up.svg) center/contain no-repeat"></span></button>
+      </div>
+    </div>
+  </sc-if>
+  <div style="display:flex;align-items:center;justify-content:center;gap:6px;padding:0 32px 14px;font-size:12px;color:var(--g5)"><span style="width:12px;height:12px;background:currentColor;-webkit-mask:url(https://unpkg.com/lucide-static@0.460.0/icons/lock.svg) center/contain no-repeat;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/lock.svg) center/contain no-repeat"></span>Cortex never shows what you couldn’t open yourself. Every question is logged.</div>
+</main>
+</sc-if>
+
+<sc-if value="{{ isMe }}">
+<main data-screen-label="My focus" style="min-width:0;min-height:0;overflow:auto">
+  <div style="max-width:1200px;margin:0 auto;padding:40px 40px 56px;display:flex;flex-direction:column;gap:28px">
+    <div style="display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap">
+      <div style="display:flex;flex-direction:column;gap:12px;min-width:0">
+        <span style="font-size:12px;line-height:1;letter-spacing:.08em;text-transform:uppercase;color:var(--g5)">Monday 5 October</span>
+        <h1 style="margin:0;display:flex;flex-direction:column;gap:2px;font:400 40px/1.04 var(--sans);letter-spacing:-.035em"><span>{{ meHello }}</span><span style="font-weight:700">{{ me.summary }}</span></h1>
+      </div>
+      <span style="margin-left:auto;display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 12px;border:1px solid var(--line);border-radius:999px;background:var(--white);font-size:12px;color:var(--g7);white-space:nowrap"><span style="width:7px;height:7px;border-radius:50%;background:var(--green)"></span>Synced 2 min ago · Jira, Confluence, Slack, Drive</span>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,520px),1fr));gap:20px;align-items:start">
+      <div style="display:flex;flex-direction:column;gap:20px;min-width:0">
+        <section style="background:var(--white);border:1px solid var(--line);border-radius:20px;overflow:hidden">
+          <div style="display:flex;align-items:baseline;gap:8px;padding:18px 20px 12px"><span style="font:700 16px/1.2 var(--sans)">Needs you</span><span style="font:500 12px var(--mono);color:var(--g5)">{{ needsCount }}</span></div>
+          <sc-for list="{{ needs }}" as="r" hint-placeholder-count="4">
+            <a href="{{ r.u }}" target="_blank" style="display:grid;grid-template-columns:32px minmax(0,1fr) auto 14px;gap:14px;align-items:center;padding:12px 20px;border-top:1px solid var(--line2);color:var(--ink);text-decoration:none" style-hover="background:rgba(20,20,20,.03);color:var(--ink);text-decoration:none">
+              <span style="width:32px;height:32px;border-radius:10px;background:var(--paper);display:grid;place-items:center;color:var(--ink)"><span style="{{ r.g }}"></span></span>
+              <span style="display:flex;flex-direction:column;gap:3px;min-width:0"><span style="font-size:12px;color:var(--g5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.p }} · {{ r.meta }}</span><span style="font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.t }}</span></span>
+              <span style="font-size:12px;color:var(--g5);white-space:nowrap">{{ r.when }}</span>
+              <span style="width:14px;height:14px;background:var(--g4);-webkit-mask:url(https://unpkg.com/lucide-static@0.460.0/icons/arrow-up-right.svg) center/contain no-repeat;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/arrow-up-right.svg) center/contain no-repeat"></span>
+            </a>
+          </sc-for>
+        </section>
+
+        <section style="background:var(--white);border:1px solid var(--line);border-radius:20px;overflow:hidden">
+          <div style="display:flex;align-items:center;gap:12px;padding:14px 16px 12px 20px;flex-wrap:wrap">
+            <span style="font:700 16px/1.2 var(--sans);margin-right:4px">My tickets</span>
+            <div role="tablist" style="display:flex;flex-wrap:wrap;gap:2px;padding:3px;border-radius:10px;background:var(--paper);min-width:0">
+              <sc-for list="{{ tabs }}" as="tb" hint-placeholder-count="3">
+                <button role="tab" onClick="{{ tb.go }}" aria-selected="{{ tb.on }}" style="{{ tb.style }}">{{ tb.label }}<span style="font:500 11px var(--mono);color:var(--g5)">{{ tb.n }}</span></button>
+              </sc-for>
+            </div>
+            <a href="https://companya.atlassian.net/jira/your-work" target="_blank" style="margin-left:auto;display:inline-flex;align-items:center;gap:4px;font-size:13px;font-weight:500;white-space:nowrap">Open in Jira<span style="width:13px;height:13px;background:currentColor;-webkit-mask:url(https://unpkg.com/lucide-static@0.460.0/icons/arrow-up-right.svg) center/contain no-repeat;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/arrow-up-right.svg) center/contain no-repeat"></span></a>
+          </div>
+          <sc-for list="{{ tickets }}" as="tk" hint-placeholder-count="3">
+            <a href="{{ tk.u }}" target="_blank" style="display:grid;grid-template-columns:72px minmax(0,1fr) 60px 50px 104px;gap:12px;align-items:center;padding:12px 20px;border-top:1px solid var(--line2);color:var(--ink);text-decoration:none" style-hover="background:rgba(20,20,20,.03);color:var(--ink);text-decoration:none">
+              <span style="font:600 12px var(--mono);color:var(--ink)">{{ tk.k }}</span>
+              <span style="font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ tk.t }}</span>
+              <span style="{{ tk.priStyle }}">{{ tk.pri }}</span>
+              <span style="font:500 12px var(--mono);color:var(--g5);white-space:nowrap">{{ tk.due }}</span>
+              <span style="display:flex;justify-content:flex-end"><span style="{{ tk.pill }}"><span style="{{ tk.dot }}"></span>{{ tk.s }}</span></span>
+            </a>
+          </sc-for>
+        </section>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:20px;min-width:0">
+        <sc-if value="{{ isSec }}">
+          <section style="background:var(--ink);color:var(--paper);border-radius:20px;overflow:hidden">
+            <div style="display:flex;align-items:center;gap:8px;padding:18px 20px 12px"><span style="width:16px;height:16px;background:var(--orange);-webkit-mask:url(https://unpkg.com/lucide-static@0.460.0/icons/shield.svg) center/contain no-repeat;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/shield.svg) center/contain no-repeat"></span><span style="font:700 16px/1.2 var(--sans)">Security</span></div>
+            <sc-for list="{{ secRows }}" as="sr" hint-placeholder-count="3">
+              <a href="{{ sr.href }}" style="display:flex;align-items:center;gap:14px;padding:12px 20px;border-top:1px solid #2F2E2B;color:var(--paper);text-decoration:none" style-hover="background:#1E1D1B;color:var(--paper);text-decoration:none">
+                <span style="font:700 24px/1 var(--sans);letter-spacing:-.02em;min-width:22px">{{ sr.n }}</span>
+                <span style="display:flex;flex-direction:column;gap:3px;min-width:0;flex:1"><span style="font-size:14px">{{ sr.label }}</span><span style="font-size:12px;color:var(--g4)">{{ sr.cta }}</span></span>
+                <span style="width:16px;height:16px;background:var(--orange);-webkit-mask:url(https://unpkg.com/lucide-static@0.460.0/icons/arrow-right.svg) center/contain no-repeat;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/arrow-right.svg) center/contain no-repeat"></span>
+              </a>
+            </sc-for>
+          </section>
+        </sc-if>
+        <section style="background:var(--white);border:1px solid var(--line);border-radius:20px;overflow:hidden">
+          <div style="padding:18px 20px 12px;font:700 16px/1.2 var(--sans)">Docs I’m working on</div>
+          <sc-for list="{{ docs }}" as="d" hint-placeholder-count="3">
+            <a href="{{ d.u }}" target="_blank" style="display:grid;grid-template-columns:32px minmax(0,1fr) 14px;gap:12px;align-items:center;padding:11px 20px;border-top:1px solid var(--line2);color:var(--ink);text-decoration:none" style-hover="background:rgba(20,20,20,.03);color:var(--ink);text-decoration:none">
+              <span style="width:32px;height:32px;border-radius:10px;background:var(--paper);display:grid;place-items:center"><span style="{{ d.g }}"></span></span>
+              <span style="display:flex;flex-direction:column;gap:3px;min-width:0"><span style="font:600 13px/1.3 var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ d.t }}</span><span style="font-size:12px;color:var(--g5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ d.p }} · {{ d.meta }}</span></span>
+              <span style="width:14px;height:14px;background:var(--g4);-webkit-mask:url(https://unpkg.com/lucide-static@0.460.0/icons/arrow-up-right.svg) center/contain no-repeat;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/arrow-up-right.svg) center/contain no-repeat"></span>
+            </a>
+          </sc-for>
+        </section>
+        <section style="display:flex;flex-direction:column;gap:12px;padding:18px 20px 20px;background:var(--paper2);border-radius:20px">
+          <span style="display:flex;align-items:center;gap:8px;font:700 16px/1.2 var(--sans)"><span style="width:16px;height:16px;background:var(--orange);-webkit-mask:url(https://unpkg.com/lucide-static@0.460.0/icons/sparkles.svg) center/contain no-repeat;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/sparkles.svg) center/contain no-repeat"></span>Ask Cortex about your work</span>
+          <sc-for list="{{ asks }}" as="q" hint-placeholder-count="3">
+            <button onClick="{{ q.go }}" style="display:flex;align-items:center;gap:10px;text-align:left;padding:10px 12px;border:1px solid var(--line);background:var(--white);border-radius:10px;font:400 13px/1.4 var(--sans);color:var(--ink);cursor:pointer" style-hover="border-color:var(--ink)"><span style="width:14px;height:14px;flex:none;background:var(--orange);-webkit-mask:url(https://unpkg.com/lucide-static@0.460.0/icons/corner-down-right.svg) center/contain no-repeat;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/corner-down-right.svg) center/contain no-repeat"></span><span style="flex:1">{{ q.t }}</span></button>
+          </sc-for>
+        </section>
+      </div>
+    </div>
+  </div>
+</main>
+</sc-if>
+
+<sc-if value="{{ isTeam }}">
+<main data-screen-label="Team focus" style="min-width:0;min-height:0;overflow:auto">
+  <div style="max-width:1200px;margin:0 auto;padding:40px 40px 56px;display:flex;flex-direction:column;gap:28px">
+    <div style="display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap">
+      <div style="display:flex;flex-direction:column;gap:12px;min-width:0">
+        <span style="font-size:12px;line-height:1;letter-spacing:.08em;text-transform:uppercase;color:var(--g5)">Team focus</span>
+        <h1 style="margin:0;display:flex;flex-direction:column;gap:2px;font:700 40px/1.04 var(--sans);letter-spacing:-.035em"><span>{{ team.name }}</span></h1>
+        <span style="font-size:14px;line-height:1.45;color:var(--g7)">{{ team.sub }}</span>
+      </div>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:14px">
+        <div style="display:flex;padding-left:8px">
+          <sc-for list="{{ team.members }}" as="m" hint-placeholder-count="6">
+            <span title="{{ m.name }}" style="width:36px;height:36px;margin-left:-8px;border-radius:50%;background:var(--white);box-shadow:0 0 0 2px var(--paper);border:1px solid var(--line);overflow:hidden;display:grid;place-items:center;flex:none"><sc-if value="{{ m.hasSrc }}"><img src="{{ m.src }}" alt="" style="width:100%;height:100%;display:block"></sc-if><sc-if value="{{ m.noSrc }}"><span style="font:700 11px var(--sans);color:var(--g7)">{{ m.i }}</span></sc-if></span>
+          </sc-for>
+        </div>
+        <a href="{{ team.space }}" target="_blank" style="display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 14px;border:1px solid var(--line);background:var(--white);border-radius:10px;font-size:14px;font-weight:500;color:var(--ink);white-space:nowrap;text-decoration:none" style-hover="border-color:var(--ink);color:var(--ink);text-decoration:none"><span style="width:15px;height:15px;background:currentColor;-webkit-mask:url(https://unpkg.com/lucide-static@0.460.0/icons/book-open.svg) center/contain no-repeat;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/book-open.svg) center/contain no-repeat"></span>Team space</a>
+      </div>
+    </div>
+
+    <section style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:18px 32px;align-items:center;padding:22px 24px;background:var(--white);border:1px solid var(--line);border-radius:20px">
+      <div style="display:flex;flex-direction:column;gap:8px;min-width:0">
+        <span style="font:500 12px var(--mono);color:var(--g5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ sprint.name }} · {{ sprint.range }} · day {{ sprint.day }} of 10</span>
+        <span style="font:700 20px/1.25 var(--sans);letter-spacing:-.02em;text-wrap:pretty">{{ sprint.goal }}</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:baseline;gap:8px;font-size:13px;color:var(--g7)"><span style="font:700 20px var(--sans);letter-spacing:-.02em;color:var(--ink)">{{ sprint.done }}/{{ sprint.total }}</span>issues done<a href="{{ sprint.u }}" target="_blank" style="margin-left:auto;font-weight:500">Board</a></div>
+        <div style="position:relative;height:8px;border-radius:999px;background:var(--paper2)"><span style="{{ sprint.bar }}"></span><span style="{{ sprint.time }}"></span></div>
+      </div>
+    </section>
+
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <span style="font:700 16px/1.2 var(--sans)">Current focus</span>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px">
+        <sc-for list="{{ projects }}" as="pj" hint-placeholder-count="3">
+          <div style="display:flex;flex-direction:column;gap:14px;padding:20px;background:var(--white);border:1px solid var(--line);border-radius:20px">
+            <div style="display:flex;align-items:center;gap:10px"><span style="font:700 16px/1.2 var(--sans);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ pj.name }}</span><span style="{{ pj.pill }}"><span style="{{ pj.dot }}"></span>{{ pj.statusLabel }}</span></div>
+            <span style="font-size:14px;line-height:1.45;color:var(--g7);text-wrap:pretty">{{ pj.goal }}</span>
+            <div style="display:flex;flex-direction:column;gap:8px;margin-top:auto">
+              <div style="display:flex;font-size:12px;color:var(--g5)"><span>{{ pj.done }} of {{ pj.total }} issues</span><span style="margin-left:auto">Target {{ pj.target }}</span></div>
+              <div style="height:6px;border-radius:999px;background:var(--paper2);overflow:hidden"><div style="{{ pj.bar }}"></div></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;padding-top:14px;border-top:1px solid var(--line2)">
+              <span style="width:24px;height:24px;border-radius:50%;background:var(--white);border:1px solid var(--line);overflow:hidden;display:grid;place-items:center;flex:none"><sc-if value="{{ pj.lav.hasSrc }}"><img src="{{ pj.lav.src }}" alt="" style="width:100%;height:100%;display:block"></sc-if><sc-if value="{{ pj.lav.noSrc }}"><span style="font:700 9px var(--sans);color:var(--g7)">{{ pj.lav.i }}</span></sc-if></span>
+              <span style="font-size:13px;color:var(--g7);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ pj.lead }}</span>
+              <a href="{{ pj.epic }}" target="_blank" style="display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px;border:1.5px solid var(--ink);border-radius:999px;background:var(--white);font:600 11px/1 var(--mono);color:var(--ink);white-space:nowrap;text-decoration:none" style-hover="background:var(--orange05);color:var(--ink);text-decoration:none"><span style="{{ pj.gj }}"></span>{{ pj.ek }}</a>
+              <a href="{{ pj.doc }}" target="_blank" style="display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px;border:1.5px solid var(--ink);border-radius:999px;background:var(--white);font:600 11px/1 var(--mono);color:var(--ink);white-space:nowrap;text-decoration:none" style-hover="background:var(--orange05);color:var(--ink);text-decoration:none"><span style="{{ pj.gc }}"></span>{{ pj.dk }}</a>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <section style="background:var(--white);border:1px solid var(--line);border-radius:20px;padding:20px 24px 22px">
+      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:14px"><span style="font:700 16px/1.2 var(--sans)">Timeline</span><span style="font-size:12px;color:var(--g5)">This quarter · by week</span></div>
+      <div style="display:grid;grid-template-columns:190px minmax(0,1fr);gap:0 16px">
+        <span></span>
+        <div style="display:grid;grid-template-columns:repeat(13,minmax(0,1fr));border-bottom:1px solid var(--line);padding-bottom:8px">
+          <sc-for list="{{ weeks }}" as="w" hint-placeholder-count="13"><span style="{{ w.style }}">{{ w.t }}</span></sc-for>
+        </div>
+        <sc-for list="{{ projects }}" as="pj">
+          <div style="display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--line2);min-width:0">
+            <span style="width:28px;height:28px;border-radius:50%;background:var(--white);border:1px solid var(--line);overflow:hidden;display:grid;place-items:center;flex:none"><sc-if value="{{ pj.lav.hasSrc }}"><img src="{{ pj.lav.src }}" alt="" style="width:100%;height:100%;display:block"></sc-if><sc-if value="{{ pj.lav.noSrc }}"><span style="font:700 10px var(--sans);color:var(--g7)">{{ pj.lav.i }}</span></sc-if></span>
+            <span style="display:flex;flex-direction:column;gap:2px;min-width:0"><span style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ pj.name }}</span><span style="font-size:12px;color:var(--g5);white-space:nowrap">{{ pj.lead }}</span></span>
+          </div>
+          <div style="position:relative;border-bottom:1px solid var(--line2);min-height:52px">
+            <span style="{{ todayLine }}"></span>
+            <span style="{{ pj.tl }}"><span style="{{ pj.tlFill }}"></span></span>
+            <span style="{{ pj.ms }}" title="{{ pj.msLabel }}"></span>
+            <span style="{{ pj.msText }}">{{ pj.msLabel }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <section style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:baseline;gap:10px"><span style="font:700 16px/1.2 var(--sans)">Sprint board</span><a href="{{ sprint.u }}" target="_blank" style="margin-left:auto;font-size:13px;font-weight:500">Open in Jira</a></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;align-items:start">
+        <sc-for list="{{ board }}" as="col" hint-placeholder-count="4">
+          <div style="display:flex;flex-direction:column;gap:8px;padding:10px;border-radius:20px;background:var(--paper2)">
+            <div style="display:flex;align-items:center;gap:8px;padding:6px 8px 4px"><span style="{{ col.dot }}"></span><span style="font:700 13px var(--sans)">{{ col.label }}</span><span style="font:500 11px var(--mono);color:var(--g5)">{{ col.n }}</span></div>
+            <sc-for list="{{ col.items }}" as="c">
+              <a href="{{ c.u }}" target="_blank" style="display:flex;flex-direction:column;gap:10px;padding:12px;background:var(--white);border:1px solid var(--line);border-radius:14px;color:var(--ink);text-decoration:none" style-hover="border-color:var(--ink);color:var(--ink);text-decoration:none">
+                <span style="font-size:13px;line-height:1.4;text-wrap:pretty">{{ c.t }}</span>
+                <span style="display:flex;align-items:center;gap:8px"><span style="font:600 11px var(--mono);color:var(--g7)">{{ c.k }}</span><span title="{{ c.av.name }}" style="{{ c.who }}"><sc-if value="{{ c.av.hasSrc }}"><img src="{{ c.av.src }}" alt="" style="width:100%;height:100%;display:block"></sc-if><sc-if value="{{ c.av.noSrc }}"><span>{{ c.av.i }}</span></sc-if></span></span>
+              </a>
+            </sc-for>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <section style="background:var(--white);border:1px solid var(--line);border-radius:20px;overflow:hidden">
+      <div style="padding:18px 20px 12px;font:700 16px/1.2 var(--sans)">Recent team updates</div>
+      <sc-for list="{{ updates }}" as="u" hint-placeholder-count="4">
+        <a href="{{ u.u }}" target="_blank" style="display:grid;grid-template-columns:32px minmax(0,1fr) auto 14px;gap:14px;align-items:center;padding:12px 20px;border-top:1px solid var(--line2);color:var(--ink);text-decoration:none" style-hover="background:rgba(20,20,20,.03);color:var(--ink);text-decoration:none">
+          <span style="width:32px;height:32px;border-radius:50%;background:var(--white);border:1px solid var(--line);overflow:hidden;display:grid;place-items:center"><sc-if value="{{ u.av.hasSrc }}"><img src="{{ u.av.src }}" alt="" style="width:100%;height:100%;display:block"></sc-if><sc-if value="{{ u.av.noSrc }}"><span style="font:700 11px var(--sans);color:var(--g7)">{{ u.av.i }}</span></sc-if></span>
+          <span style="display:flex;flex-direction:column;gap:3px;min-width:0"><span style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--g5);white-space:nowrap;overflow:hidden"><span style="{{ u.g }}"></span><span style="font:500 12px var(--mono);color:var(--g7)">{{ u.where }}</span>· {{ u.who }}</span><span style="font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ u.t }}</span></span>
+          <span style="font-size:12px;color:var(--g5);white-space:nowrap">{{ u.when }}</span>
+          <span style="width:14px;height:14px;background:var(--g4);-webkit-mask:url(https://unpkg.com/lucide-static@0.460.0/icons/arrow-up-right.svg) center/contain no-repeat;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/arrow-up-right.svg) center/contain no-repeat"></span>
+        </a>
+      </sc-for>
+    </section>
+  </div>
+</main>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;page&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Chat&quot;,&quot;My focus&quot;,&quot;Team focus&quot;],&quot;default&quot;:&quot;Chat&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;role&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Backend engineer&quot;,&quot;Security lead&quot;],&quot;default&quot;:&quot;Backend engineer&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;chat&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Empty&quot;,&quot;Conversation&quot;],&quot;default&quot;:&quot;Empty&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+const LU='https://unpkg.com/lucide-static@0.460.0/icons/';
+const ic=(n,s=16,c='currentColor')=>{const m='url('+LU+n+'.svg) center/contain no-repeat';return{width:s,height:s,flex:'none',display:'inline-block',background:c,WebkitMask:m,mask:m};};
+const GI={Confluence:'book-open',Jira:'square-kanban',Slack:'hash',Drive:'hard-drive'};
+const glyph=(p,s=15,c)=>ic(GI[p],s,c);
+const AV={PN:'priya',SR:'sam',DO:'dana',JH:'jordan',MC:'maya'};
+const av=(i,name)=>({i,name,src:AV[i]?'assets/personas/'+AV[i]+'.svg':null,hasSrc:!!AV[i],noSrc:!AV[i]});
+const PC={ok:['var(--green)','var(--green1)'],warn:['var(--amber)','var(--amber1)'],bad:['var(--red)','var(--red1)'],n:['var(--g4)','var(--paper)'],a:['var(--blue)','var(--blue1)']};
+const pill=k=>({display:'inline-flex',alignItems:'center',gap:6,height:22,padding:'0 9px',borderRadius:999,fontSize:12,fontWeight:500,whiteSpace:'nowrap',flex:'none',color:'var(--ink2)',background:PC[k][1]});
+const dot=k=>({width:6,height:6,borderRadius:'50%',background:PC[k][0],flex:'none'});
+const SK={'In progress':'a','To do':'n','In review':'warn','Done':'ok'};
+const J=k=>'https://companya.atlassian.net/browse/'+k;
+const CF=(s,t)=>'https://companya.atlassian.net/wiki/spaces/'+s+'/pages/'+encodeURIComponent(t);
+const SL=c=>'https://companya.slack.com/archives/'+c;
+const DR='https://drive.google.com/drive/folders/companya';
+const WK=['28 Sep','5 Oct','12','19','26','2 Nov','9','16','23','30','7 Dec','14','21'];
+const TODAY=1.05;
+
+const DATA={
+eng:{name:'Priya Nair',first:'Priya',initials:'PN',role:'Backend engineer · Payments',summary:'4 things need you today.',
+ suggest:['What changed on my tickets since Friday?','Summarise the #payments-eng thread on retries','Where is the settlement runbook?'],
+ recent:['Settlement retry — what’s left to ship','Idempotency migration timeline','PCI scope for the ledger replica','How do I get staging DB access?','On-call handover notes, last week'],
+ chat:{q:'What’s left before the settlement retry change can ship?',
+  segs:[{t:'Two things. The backoff PR is approved but waits on the idempotency-key migration'},{c:1},{t:', which Arjun expects to merge on Wednesday'},{c:2},{t:'. Separately, step 4 of the settlement runbook still lists the old 3-retry limit — Lena flagged it, and it has to change before the release checklist can close'},{c:3},{t:'. Nothing else in the release epic is assigned to you'},{c:4},{t:'.'}],
+  sources:[{p:'Jira',t:'PAY-412',d:'Exponential backoff',u:J('PAY-412')},{p:'Slack',t:'#payments-eng',d:'Arjun, Fri 16:12',u:SL('C04PAYENG')},{p:'Confluence',t:'Settlement runbook',d:'Payments space',u:CF('PAY','Settlement runbook')},{p:'Jira',t:'PAY-400',d:'Settlement retry v2 epic',u:J('PAY-400')}]},
+ needs:[{p:'Jira',meta:'PAY-418 · Review requested by Jonas',t:'Retry jitter configuration',when:'2h ago',u:J('PAY-418')},
+  {p:'Slack',meta:'#payments-eng · Arjun mentioned you',t:'“Can you confirm the backoff cap before I merge the migration?”',when:'3h ago',u:SL('C04PAYENG')},
+  {p:'Confluence',meta:'Settlement runbook · 2 comments for you',t:'Update retry limit in step 4',when:'Yesterday',u:CF('PAY','Settlement runbook')},
+  {p:'Jira',meta:'PAY-431 · Due Wed 7 Oct',t:'Add retry metrics to the settlement dashboard',when:'Due in 2d',u:J('PAY-431')}],
+ tickets:{'In progress':[['PAY-412','Settlement retry: exponential backoff','High','Oct 9','In progress'],['PAY-418','Retry jitter configuration','Medium','Oct 9','In review'],['PAY-429','Remove legacy cron retry job','Low','Oct 16','In progress']],
+  'To do':[['PAY-431','Add retry metrics to the settlement dashboard','High','Oct 7','To do'],['PAY-437','Load-test retry path at 3× peak','Medium','Oct 14','To do'],['PAY-440','Alert when retries exceed 2% of batches','Medium','—','To do'],['PAY-441','Backfill failed settlements from 28 Sep','Low','—','To do']],
+  'Done this sprint':[['PAY-409','Retry state machine spec','Medium','Oct 1','Done'],['PAY-410','Add settlement_attempts table','High','Oct 2','Done']]},
+ docs:[{p:'Confluence',meta:'Edited by you yesterday',t:'Settlement runbook',u:CF('PAY','Settlement runbook')},{p:'Confluence',meta:'You own',t:'RFC-31 · Settlement retry v2',u:CF('PAY','RFC-31')},{p:'Drive',meta:'Shared with you Fri',t:'Retry load-test results — Sep',u:DR}],
+ asks:['Summarise what changed on my tickets since Friday','Draft a status update for PAY-412','What’s blocking the idempotency migration?'],
+ team:{name:'Payments Platform',sub:'6 people · Engineering · owns settlement, payouts and the ledger',space:CF('PAY','Home'),
+  members:[['PN','Priya Nair'],['MC','Maya Chen'],['AK','Arjun Kapoor'],['LM','Lena Moretti'],['JS','Jonas Schmidt'],['SR','Sam Reyes']],
+  sprint:{name:'Sprint 42',range:'28 Sep – 9 Oct',day:6,done:19,total:41,goal:'Ship settlement retry behind a flag and unblock the idempotency-key migration.',u:'https://companya.atlassian.net/jira/software/projects/PAY/boards/12'},
+  projects:[{name:'Settlement retry v2',goal:'Cut manual work on failed settlements by retrying them safely.',st:'ok',li:'PN',lead:'Priya Nair',target:'23 Oct',done:14,total:20,s:0,e:3.8,m:3.6,ml:'Ship',ek:'PAY-400',dk:'RFC-31',sp:'PAY'},
+   {name:'Idempotent payouts',goal:'Make every payout request safe to replay after a timeout.',st:'warn',li:'AK',lead:'Arjun Kapoor',target:'6 Nov',done:9,total:22,s:0.4,e:5.6,m:2.4,ml:'Migration',ek:'PAY-380',dk:'RFC-28',sp:'PAY'},
+   {name:'Ledger read replica',goal:'Move reporting queries off the primary ledger database.',st:'ok',li:'LM',lead:'Lena Moretti',target:'11 Dec',done:3,total:18,s:3,e:10.6,m:7,ml:'Cutover',ek:'PAY-390',dk:'ADR-019',sp:'PAY'}],
+  board:{'To do':[['PAY-431','Add retry metrics to the settlement dashboard','PN'],['PAY-433','Replica lag alert thresholds','LM'],['PAY-436','Document payout replay semantics','AK']],
+   'In progress':[['PAY-412','Settlement retry: exponential backoff','PN'],['PAY-420','Idempotency-key migration','AK'],['PAY-427','Provision replica with Terraform','SR']],
+   'In review':[['PAY-418','Retry jitter configuration','JS'],['PAY-415','Payout dedupe table','SR']],
+   'Done':[['PAY-409','Retry state machine spec','PN'],['PAY-410','Add settlement_attempts table','PN'],['PAY-405','Payout timeout dashboards','MC']]},
+  updates:[{p:'Slack',where:'#payments-eng',wi:'AK',who:'Arjun Kapoor',t:'Decision: retries capped at 5, with jitter',when:'2h ago',u:SL('C04PAYENG')},
+   {p:'Jira',where:'PAY-380',wi:'AK',who:'Arjun Kapoor',t:'Idempotent payouts moved to At risk — migration slipped a week',when:'Yesterday',u:J('PAY-380')},
+   {p:'Confluence',where:'ADR-019',wi:'LM',who:'Lena Moretti',t:'Ledger read replica approved',when:'Yesterday',u:CF('PAY','ADR-019')},
+   {p:'Drive',where:'Payments / Planning',wi:'MC',who:'Maya Chen',t:'Q4 Payments roadmap — updated',when:'Fri',u:DR}]}},
+sec:{name:'Dana Okafor',first:'Dana',initials:'DO',role:'Security lead',summary:'4 things need you today.',
+ suggest:['Which guests still have access past their end date?','Summarise open findings from the last incident review','What changed in access policies this week?'],
+ recent:['Guest accounts past contract end','Incident review — public bucket, actions','SOC 2 evidence still missing','Who approved the Nimbus renewal?','Key rotation status by service'],
+ chat:{q:'Which guest accounts still have access past their contract end date?',
+  segs:[{t:'Three. Both Nimbus Consulting guests ended on 30 September'},{c:1},{t:' but are still members of #proj-nimbus-ext'},{c:2},{t:'. The Halden Audit guest ends on 12 October and has a renewal request waiting for your approval'},{c:3},{t:'. All three are listed as open items in the Q4 access review'},{c:4},{t:'.'}],
+  sources:[{p:'Jira',t:'SEC-211',d:'Guest access review — Q4',u:J('SEC-211')},{p:'Slack',t:'#proj-nimbus-ext',d:'Channel members',u:SL('C05NIMBUS')},{p:'Jira',t:'SEC-214',d:'Renew Halden Audit guest',u:J('SEC-214')},{p:'Confluence',t:'Q4 access review',d:'Security space',u:CF('SEC','Q4 access review')}]},
+ needs:[{p:'Jira',meta:'SEC-214 · Approval needed',t:'Renew Halden Audit guest access',when:'1h ago',u:J('SEC-214')},
+  {p:'Slack',meta:'#sec-incidents · Mei mentioned you',t:'“Need your sign-off to close the public bucket finding.”',when:'2h ago',u:SL('C03SECINC')},
+  {p:'Confluence',meta:'Incident review 29 Sep · 3 comments for you',t:'Confirm owners for action items',when:'Yesterday',u:CF('SEC','Incident review 29 Sep')},
+  {p:'Jira',meta:'SEC-205 · Due Thu 8 Oct',t:'Rotate CI deploy key',when:'Due in 3d',u:J('SEC-205')}],
+ tickets:{'In progress':[['SEC-211','Guest access review — Q4','High','Oct 16','In progress'],['SEC-205','Rotate CI deploy key','Highest','Oct 8','In progress'],['SEC-209','Access-review evidence for CC6.2','Medium','Oct 23','In review']],
+  'To do':[['SEC-216','Remove expired Nimbus guests','High','Oct 6','To do'],['SEC-218','Write guest offboarding runbook','Medium','—','To do'],['SEC-220','Alert on stale service tokens','Medium','—','To do']],
+  'Done this sprint':[['SEC-201','Export audit log to SIEM','High','Sep 30','Done'],['SEC-203','Quarterly admin-role review','Medium','Oct 2','Done']]},
+ docs:[{p:'Confluence',meta:'You own',t:'Q4 access review checklist',u:CF('SEC','Q4 access review')},{p:'Confluence',meta:'Edited by you yesterday',t:'Incident review — 29 Sep',u:CF('SEC','Incident review 29 Sep')},{p:'Drive',meta:'Shared with Security',t:'SOC 2 evidence tracker',u:DR}],
+ asks:['Which guests still have access past their end date?','Summarise open findings from the last incident review','Draft the weekly security update'],
+ team:{name:'Security',sub:'5 people · owns access, audit and compliance',space:CF('SEC','Home'),
+  members:[['DO','Dana Okafor'],['JH','Jordan Hale'],['ML','Mei Lin'],['ID','Ines Duarte'],['TB','Tom Becker']],
+  sprint:{name:'Sprint 42',range:'28 Sep – 9 Oct',day:6,done:12,total:28,goal:'Close the Q4 guest-access review and rotate CI and payment-provider keys.',u:'https://companya.atlassian.net/jira/software/projects/SEC/boards/7'},
+  projects:[{name:'SOC 2 Type II evidence',goal:'Collect evidence for every control before fieldwork starts.',st:'ok',li:'JH',lead:'Jordan Hale',target:'13 Nov',done:31,total:48,s:0,e:6.6,m:6.4,ml:'Fieldwork',ek:'SEC-150',dk:'SOC 2 plan',sp:'SEC'},
+   {name:'Secrets rotation',goal:'Replace long-lived service credentials with 90-day keys.',st:'warn',li:'TB',lead:'Tom Becker',target:'30 Oct',done:6,total:15,s:0,e:4.6,m:1.5,ml:'CI keys',ek:'SEC-170',dk:'Rotation policy',sp:'SEC'},
+   {name:'Guest access review',goal:'Re-certify every external account and remove expired ones.',st:'ok',li:'DO',lead:'Dana Okafor',target:'16 Oct',done:7,total:10,s:0.4,e:2.6,m:2.5,ml:'Sign-off',ek:'SEC-211',dk:'Q4 access review',sp:'SEC'}],
+  board:{'To do':[['SEC-216','Remove expired Nimbus guests','DO'],['SEC-222','Rotate payment-provider restricted keys','TB'],['SEC-219','Collect vendor SOC reports','JH']],
+   'In progress':[['SEC-211','Guest access review — Q4','DO'],['SEC-205','Rotate CI deploy key','TB'],['SEC-213','Policy docs for CC1 controls','ML']],
+   'In review':[['SEC-209','Access-review evidence for CC6.2','JH'],['SEC-212','Vault policy for batch jobs','ID']],
+   'Done':[['SEC-201','Export audit log to SIEM','DO'],['SEC-203','Quarterly admin-role review','DO'],['SEC-207','Security training completion export','ID']]},
+  updates:[{p:'Slack',where:'#security',wi:'TB',who:'Tom Becker',t:'Decision: service tokens max 90 days, no exceptions',when:'1h ago',u:SL('C02SEC')},
+   {p:'Jira',where:'SEC-170',wi:'TB',who:'Tom Becker',t:'Secrets rotation moved to At risk — two services lack owners',when:'Yesterday',u:J('SEC-170')},
+   {p:'Confluence',where:'Incident review 29 Sep',wi:'DO',who:'Dana Okafor',t:'Public bucket incident review published',when:'Yesterday',u:CF('SEC','Incident review 29 Sep')},
+   {p:'Drive',where:'Security / Compliance',wi:'JH',who:'Jordan Hale',t:'SOC 2 evidence tracker — 31 of 48 controls done',when:'Fri',u:DR}]}}};
+
+const NAMES={};Object.values(DATA).forEach(d=>d.team.members.forEach(([i,n])=>NAMES[i]=n));
+const NAV=[{id:'chat',label:'Chat',icon:'message-square'},{id:'me',label:'My focus',icon:'circle-user-round'},{id:'team',label:'Team focus',icon:'users'}];
+const PAGES={Chat:'chat','My focus':'me','Team focus':'team'};
+const ROLES={'Backend engineer':'eng','Security lead':'sec'};
+
+class Component extends DCLogic {
+  state={page:null,role:null,phase:null,draft:'',question:null,tab:'In progress',copied:false,menu:false};
+  componentDidUpdate(p){
+    if(p.page!==this.props.page)this.setState({page:null});
+    if(p.role!==this.props.role)this.setState({role:null,phase:null,question:null});
+    if(p.chat!==this.props.chat)this.setState({phase:null,question:null});
+  }
+  componentWillUnmount(){clearTimeout(this.t);}
+  ask(q){clearTimeout(this.t);this.setState({page:'chat',phase:'thinking',question:q,draft:''});this.t=setTimeout(()=>this.setState({phase:'answer'}),1300);}
+  renderVals(){
+    const page=this.state.page||PAGES[this.props.page]||'chat';
+    const role=this.state.role||ROLES[this.props.role]||'eng';
+    const D=DATA[role], T=D.team;
+    const phase=this.state.phase||(this.props.chat==='Conversation'?'answer':'empty');
+    const nav=NAV.map(n=>{const on=n.id===page;return{label:n.label,cur:on?'page':undefined,icon:ic(n.icon,16,on?'var(--ink)':'var(--g7)'),go:()=>this.setState({page:n.id,menu:false}),
+      style:{display:'flex',alignItems:'center',gap:10,width:'100%',height:34,padding:'0 10px',border:0,borderRadius:8,textAlign:'left',cursor:'pointer',font:(on?700:400)+' 14px/1 var(--sans)',color:'var(--ink)',background:on?'var(--white)':'transparent',boxShadow:on?'var(--sh1)':'none'}};});
+    const segs=D.chat.segs.map(s=>s.c?{isCite:true,n:s.c,u:D.chat.sources[s.c-1].u,title:D.chat.sources[s.c-1].t}:{isText:true,t:s.t});
+    const tabs=Object.keys(D.tickets).map(k=>{const on=this.state.tab===k;return{label:k,n:D.tickets[k].length,on,go:()=>this.setState({tab:k}),
+      style:{display:'inline-flex',alignItems:'center',gap:6,height:28,padding:'0 10px',borderRadius:8,border:0,background:on?'var(--white)':'transparent',boxShadow:on?'var(--sh1)':'none',color:'var(--ink)',font:(on?700:400)+' 13px var(--sans)',cursor:'pointer',whiteSpace:'nowrap'}};});
+    const tickets=(D.tickets[this.state.tab]||D.tickets['In progress']).map(([k,t,pri,due,s])=>({k,t,pri,due,s,u:J(k),pill:pill(SK[s]),dot:dot(SK[s]),
+      priStyle:{fontSize:12,whiteSpace:'nowrap',color:pri==='Highest'?'var(--red)':pri==='High'?'var(--ink)':'var(--g5)',fontWeight:pri==='Highest'||pri==='High'?700:400}}));
+    const pct=x=>(x/13*100)+'%';
+    const projects=T.projects.map(p=>{const w=p.st==='warn';const f=(p.done/p.total*100)+'%';return{...p,lav:av(p.li,p.lead),epic:J(p.ek),doc:CF(p.sp,p.dk),msLabel:p.ml,statusLabel:w?'At risk':'On track',pill:pill(p.st),dot:dot(p.st),gj:glyph('Jira',12),gc:glyph('Confluence',12),
+      bar:{height:'100%',width:f,background:w?'var(--amber)':'var(--ink)',borderRadius:999},
+      tl:{position:'absolute',top:12,height:14,left:pct(p.s),width:pct(p.e-p.s),borderRadius:999,background:'var(--white)',border:'2px solid '+(w?'var(--amber)':'var(--ink)'),overflow:'hidden'},
+      tlFill:{position:'absolute',left:0,top:0,bottom:0,width:f,background:w?'var(--amber)':'var(--ink)'},
+      ms:{position:'absolute',top:14,left:'calc('+pct(p.m)+' - 5px)',width:10,height:10,transform:'rotate(45deg)',background:'var(--orange)',border:'2px solid var(--ink)',borderRadius:2},
+      msText:{position:'absolute',top:31,left:'calc('+pct(p.m)+' - 40px)',width:80,textAlign:'center',font:'500 11px var(--mono)',color:'var(--g7)',whiteSpace:'nowrap'}};});
+    const BD={'To do':'var(--g4)','In progress':'var(--blue)','In review':'var(--amber)','Done':'var(--green)'};
+    const board=Object.keys(T.board).map(k=>({label:k,n:T.board[k].length,dot:{width:8,height:8,borderRadius:'50%',background:BD[k]},
+      items:T.board[k].map(([k2,t,i])=>({k:k2,t,av:av(i,NAMES[i]),u:J(k2),who:{marginLeft:'auto',width:24,height:24,borderRadius:'50%',overflow:'hidden',display:'grid',placeItems:'center',font:'700 9px var(--sans)',background:'var(--white)',color:'var(--g7)',border:i===D.initials?'2px solid var(--orange)':'1px solid var(--line)'}}))}));
+    const sp=T.sprint, hasDraft=!!this.state.draft.trim();
+    return {
+      nav,isSec:role==='sec',isChat:page==='chat',notChat:page!=='chat',isMe:page==='me',isTeam:page==='team',
+      me:{...D,src:'assets/personas/'+AV[D.initials]+'.svg'},recent:D.recent,hello:'Morning, '+D.first+'.',
+      menuOpen:this.state.menu,toggleMenu:()=>this.setState(s=>({menu:!s.menu})),
+      people:Object.keys(DATA).map(k=>({name:DATA[k].name,role:DATA[k].role,src:'assets/personas/'+AV[DATA[k].initials]+'.svg',check:k===role?ic('check',14,'var(--ink)'):{width:14,flex:'none'},
+        go:()=>{clearTimeout(this.t);this.setState({role:k,menu:false,phase:null,question:null,tab:'In progress'});}})),
+      newChat:()=>{clearTimeout(this.t);this.setState({page:'chat',phase:'empty',question:null,draft:'',menu:false});},
+      chatEmpty:phase==='empty',chatConv:phase!=='empty',thinking:phase==='thinking',answered:phase==='answer',
+      question:this.state.question||D.chat.q,segs,sources:D.chat.sources.map((s,i)=>({...s,n:i+1,g:glyph(s.p,13,'var(--g5)')})),
+      draft:this.state.draft,onDraft:e=>this.setState({draft:e.target.value}),
+      onKey:e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();const q=this.state.draft.trim();if(q)this.ask(q);}},
+      send:()=>{const q=this.state.draft.trim();if(q)this.ask(q);},
+      sendStyle:{width:34,height:34,border:0,borderRadius:'50%',background:hasDraft?'var(--orange)':'var(--line)',display:'grid',placeItems:'center',cursor:'pointer',flex:'none',transition:'background 120ms cubic-bezier(.2,.7,.2,1)'},
+      suggest:D.suggest.map(t=>({t,go:()=>this.ask(t)})),
+      copyLabel:this.state.copied?'Copied':'Copy',copy:()=>{this.setState({copied:true});setTimeout(()=>this.setState({copied:false}),1400);},
+      regen:()=>this.ask(this.state.question||D.chat.q),
+      meHello:'Good morning, '+D.first+'.',needs:D.needs.map(n=>({...n,g:glyph(n.p,16,'var(--ink)')})),needsCount:D.needs.length,
+      tabs,tickets,docs:D.docs.map(d=>({...d,g:glyph(d.p,16,'var(--ink)')})),asks:D.asks.map(t=>({t,go:()=>this.ask(t)})),
+      secRows:[{n:'4',label:'Access requests awaiting you',cta:'Review in Admin',href:'Admin.dc.html'},{n:'3',label:'Guest accounts past their end date',cta:'Review in Admin',href:'Admin.dc.html'},{n:'2',label:'Audit events flagged this week',cta:'Open audit console',href:'Audit Console.dc.html'}],
+      team:{...T,members:T.members.map(([i,name])=>av(i,name))},
+      sprint:{...sp,bar:{position:'absolute',left:0,top:0,bottom:0,width:(sp.done/sp.total*100)+'%',background:'var(--ink)',borderRadius:999},time:{position:'absolute',top:-4,bottom:-4,left:(sp.day/10*100)+'%',width:3,borderRadius:2,background:'var(--orange)'}},
+      projects,board,updates:T.updates.map(u=>({...u,av:av(u.wi,u.who),g:glyph(u.p,12,'var(--g5)')})),
+      weeks:WK.map((t,i)=>({t,style:{font:(i===1?700:500)+' 11px var(--mono)',color:i===1?'var(--orange7)':'var(--g5)',whiteSpace:'nowrap',overflow:'hidden'}})),
+      todayLine:{position:'absolute',top:0,bottom:0,left:pct(TODAY),width:2,background:'var(--orange)'}
+    };
+  }
+}
+</script>
+</body>
+</html>

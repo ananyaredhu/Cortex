@@ -1,0 +1,21 @@
+<!-- @dsCard group="Components" viewport="700x340" name="Feedback" -->
+<!DOCTYPE html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"></script>
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<script src="../_preview.js"></script>
+<style>body{padding:20px}.l{font:var(--type-mono);color:var(--text-muted);margin-bottom:8px}</style></head><body><div id="root"></div>
+<script type="text/babel">
+CortexLoad().then((C) => {
+const {Dialog, Toast, Button, Input} = C;
+const Row = ({label, children}) => <div style={{marginBottom:16}}><div className="l">{label}</div><div style={{display:'flex',flexWrap:'wrap',gap:10,alignItems:'center'}}>{children}</div></div>;
+const A = (n) => '../../assets/personas/' + n + '.svg';
+ReactDOM.createRoot(document.getElementById('root')).render(<>
+<div style={{display:'grid',gridTemplateColumns:'1fr auto',gap:20,alignItems:'start',background:'var(--paper-2)',padding:16,borderRadius:20}}>
+<Dialog inline width={380} title="Connect Jira" description="Cortex reads issues and comments you already have access to. Nothing is shared beyond existing permissions." onClose={()=>{}}
+ footer={<><Button variant="secondary">Cancel</Button><Button variant="accent" icon="plug">Connect</Button></>}>
+<Input label="Site URL" defaultValue="companya.atlassian.net" /></Dialog>
+<div style={{display:'flex',flexDirection:'column',gap:10}}><Toast message="Jira connected · 2,318 issues indexing" action="View" onClose={()=>{}} /><Toast tone="success" message="Access updated for Sam" /><Toast tone="danger" icon="alert-triangle" message="Drive sync failed" action="Retry" /></div></div></>);
+});
+</script></body></html>

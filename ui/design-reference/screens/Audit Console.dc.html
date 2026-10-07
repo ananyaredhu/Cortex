@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#f3f3f0;font-family:'IBM Plex Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased;--bg:#f3f3f0;--panel:#f9f9f7;--surface:#fff;--ink:#16181d;--ink2:#4c525c;--ink3:#6a707a;--line:#e0e0da;--line2:#ebebe6;--accent:#3350b5;--accentSoft:#e9edfa;--glyph:#56606f;--ok:#17744a;--okSoft:#e4f2ea;--warn:#895800;--warnSoft:#faefd8;--bad:#b3261e;--badSoft:#fbe8e6;--quote:#f5f5f1}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}*{box-sizing:border-box}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+</style>
+</helmet>
+<div style="display:flex;flex-direction:column;min-height:100vh;min-width:1280px;background:var(--bg);color:var(--ink);font-size:13.5px;font-feature-settings:'tnum' 1">
+  <nav style="display:flex;align-items:center;gap:22px;height:52px;padding:0 24px;border-bottom:1px solid var(--line);background:var(--panel)">
+    <div style="display:flex;align-items:center;gap:9px"><div style="width:24px;height:24px;border-radius:6px;background:var(--ink);display:grid;place-items:center"><div style="width:9px;height:9px;border-radius:50%;border:2px solid var(--panel)"></div></div><span style="font-weight:600">Internal Brain</span></div>
+    <div style="display:flex;gap:4px">
+      <a href="Ask.dc.html" style="padding:6px 10px;border-radius:6px;color:var(--ink2);font-weight:500">Ask</a>
+      <a href="Audit Console.dc.html" style="padding:6px 10px;border-radius:6px;color:var(--ink);font-weight:600;background:var(--line2)">Audit</a>
+      <a href="Admin.dc.html" style="padding:6px 10px;border-radius:6px;color:var(--ink2);font-weight:500">Admin</a>
+    </div>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--ink2)"><span>Chan Kai · Compliance</span><div style="width:28px;height:28px;border-radius:50%;background:var(--line);display:grid;place-items:center;font-size:11px;font-weight:600">CK</div></div>
+  </nav>
+
+  <div style="display:flex;align-items:flex-start;gap:24px;padding:20px 24px 16px">
+    <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:baseline;gap:14px">
+        <h1 style="margin:0;font-size:20px;font-weight:600;letter-spacing:-.01em">Audit console</h1>
+        <div role="tablist" style="display:flex;gap:2px;padding:3px;border:1px solid var(--line);border-radius:8px;background:var(--surface)">
+          <sc-for list="{{ tabs }}" as="tb" hint-placeholder-count="3"><button role="tab" aria-selected="{{ tb.on }}" onClick="{{ tb.go }}" style="{{ tb.style }}">{{ tb.label }}</button></sc-for>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;padding:0 6px 0 14px;height:46px;border:1px solid var(--line);border-radius:10px;background:var(--surface)">
+        <span style="width:12px;height:12px;border-radius:50%;border:1.5px solid var(--ink3);flex:none"></span>
+        <span style="flex:1;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Show me everything user jdoe accessed related to the payment-gateway Confluence space in the last 30 days.</span>
+        <button style="height:34px;padding:0 14px;border:0;border-radius:7px;background:var(--accent);color:#fff;font:600 13px 'IBM Plex Sans',sans-serif;cursor:pointer">Run query</button>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:12.5px">
+        <span style="display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 10px;border:1px solid var(--line);border-radius:7px;background:var(--surface)"><span style="color:var(--ink3)">User</span><span style="font-weight:500">jdoe · Jordan Doe</span></span>
+        <span style="display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 10px;border:1px solid var(--line);border-radius:7px;background:var(--surface)"><span style="color:var(--ink3)">Platform / space</span><span style="width:9px;height:9px;border-radius:2px;background:var(--glyph)"></span><span style="font-weight:500">Confluence › PGW</span></span>
+        <span style="display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 10px;border:1px solid var(--line);border-radius:7px;background:var(--surface)"><span style="color:var(--ink3)">Date</span><span style="font-weight:500">2 Sep – 2 Oct</span></span>
+        <span style="display:inline-flex;align-items:center;height:30px;border:1px solid var(--line);border-radius:7px;background:var(--surface);overflow:hidden"><span style="padding:0 10px;color:var(--ink3)">Decision</span>
+          <sc-for list="{{ decisions }}" as="d"><button onClick="{{ d.go }}" aria-pressed="{{ d.on }}" style="{{ d.style }}">{{ d.label }}</button></sc-for>
+        </span>
+        <span style="color:var(--ink3);margin-left:4px">{{ resultLine }}</span>
+      </div>
+    </div>
+
+    <section aria-live="polite" style="{{ chain.box }}">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="{{ chain.icon }}">{{ chain.glyph }}</span>
+        <div style="display:flex;flex-direction:column;gap:1px;min-width:0">
+          <span style="{{ chain.titleStyle }}">{{ chain.title }}</span>
+          <span style="font-size:12px;color:var(--ink2)">{{ chain.sub }}</span>
+        </div>
+      </div>
+      <div style="display:flex;gap:3px;margin:12px 0 10px;align-items:center">
+        <sc-for list="{{ chain.blocks }}" as="b"><span style="{{ b.s }}"></span></sc-for>
+      </div>
+      <sc-if value="{{ chain.verifying }}"><div style="height:4px;border-radius:2px;background:var(--line2);overflow:hidden;margin-bottom:10px"><div style="{{ chain.bar }}"></div></div></sc-if>
+      <div style="display:flex;gap:6px;align-items:center">
+        <button onClick="{{ verify }}" disabled="{{ chain.verifying }}" style="height:30px;padding:0 12px;border:1px solid var(--line);background:var(--surface);border-radius:6px;font:600 12.5px 'IBM Plex Sans',sans-serif;color:var(--ink);cursor:pointer">Verify now</button>
+        <sc-if value="{{ chain.canTamper }}"><button onClick="{{ tamper }}" style="height:30px;padding:0 10px;border:1px dashed var(--ink3);background:transparent;border-radius:6px;font:500 12px 'IBM Plex Sans',sans-serif;color:var(--ink2);cursor:pointer">Tamper one row <span style="font-size:10.5px;color:var(--ink3)">demo</span></button></sc-if>
+        <sc-if value="{{ chain.broken }}"><button onClick="{{ restore }}" style="height:30px;padding:0 10px;border:1px dashed var(--ink3);background:transparent;border-radius:6px;font:500 12px 'IBM Plex Sans',sans-serif;color:var(--ink2);cursor:pointer">Restore row <span style="font-size:10.5px;color:var(--ink3)">demo</span></button></sc-if>
+        <span style="margin-left:auto;font:400 11px 'IBM Plex Mono',monospace;color:var(--ink3)">{{ chain.tail }}</span>
+      </div>
+    </section>
+  </div>
+
+  <sc-if value="{{ isRequests }}">
+  <div style="flex:1;display:grid;grid-template-columns:minmax(0,1fr) 520px;gap:0;border-top:1px solid var(--line);min-height:0">
+    <div style="padding:0 0 24px 24px;overflow:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead><tr style="text-align:left;color:var(--ink3);font-size:11.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase">
+          <th style="padding:12px 10px 10px 0;font-weight:600">Time (SGT)</th><th style="padding:12px 10px 10px;font-weight:600">Entry</th><th style="padding:12px 10px 10px;font-weight:600">User</th><th style="padding:12px 10px 10px;font-weight:600">Question</th><th style="padding:12px 10px 10px;font-weight:600">Platforms</th><th style="padding:12px 10px 10px;font-weight:600;text-align:right">Allowed</th><th style="padding:12px 10px 10px;font-weight:600;text-align:right">Denied</th><th style="padding:12px 10px 10px;font-weight:600;text-align:right">Ground.</th><th style="padding:12px 16px 10px 10px;font-weight:600">Chain</th>
+        </tr></thead>
+        <tbody>
+          <sc-for list="{{ rows }}" as="r" hint-placeholder-count="8">
+            <tr onClick="{{ r.pick }}" tabIndex="0" onKeyDown="{{ r.key }}" aria-selected="{{ r.sel }}" style="{{ r.style }}">
+              <td style="padding:0 10px 0 0;height:48px;white-space:nowrap;color:var(--ink2)">{{ r.time }}</td>
+              <td style="padding:0 10px;font:400 12px 'IBM Plex Mono',monospace;color:var(--ink2)">{{ r.entry }}</td>
+              <td style="padding:0 10px;font:500 12.5px 'IBM Plex Mono',monospace">jdoe</td>
+              <td style="padding:0 10px;max-width:320px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.q }}</td>
+              <td style="padding:0 10px"><span style="display:flex;gap:7px;align-items:center"><sc-for list="{{ r.plats }}" as="pg"><span title="{{ pg.p }}" style="{{ pg.g }}"></span></sc-for></span></td>
+              <td style="padding:0 10px;text-align:right">{{ r.allowed }}</td>
+              <td style="{{ r.deniedStyle }}">{{ r.denied }}</td>
+              <td style="padding:0 10px;text-align:right;color:var(--ink2)">{{ r.ground }}</td>
+              <td style="padding:0 16px 0 10px;white-space:nowrap"><span style="{{ r.chainStyle }}">{{ r.chain }}</span></td>
+            </tr>
+          </sc-for>
+        </tbody>
+      </table>
+    </div>
+
+    <aside aria-label="Request detail" style="border-left:1px solid var(--line);background:var(--panel);overflow:auto;padding:18px 22px 28px;display:flex;flex-direction:column;gap:18px">
+      <div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink3)"><span style="font:500 12px 'IBM Plex Mono',monospace;color:var(--ink)">{{ sel.req }}</span>· entry {{ sel.entry }} · {{ sel.full }}</div>
+        <div style="margin-top:8px;font-size:15.5px;line-height:1.5;font-weight:500;text-wrap:pretty">{{ sel.q }}</div>
+        <div style="margin-top:4px;font-size:12.5px;color:var(--ink2)">Jordan Doe (jdoe) · Payments SRE · asked from Ask web</div>
+      </div>
+      <sc-if value="{{ sel.isBroken }}">
+        <div role="alert" style="display:flex;flex-direction:column;gap:6px;padding:12px 14px;border:1px solid var(--bad);border-radius:9px;background:var(--badSoft);color:var(--bad);font-size:12.5px">
+          <span style="font-weight:600">This entry does not match its hash.</span>
+          <span style="font:400 11.5px/1.6 'IBM Plex Mono',monospace;color:var(--ink)">stored&nbsp;&nbsp;&nbsp; 5d0e…a71f<br>recomputed 91c3…0b48</span>
+          <span style="color:var(--ink2)">Changed field: denied_count (3 → 0). Entries after 10,441 can't be trusted until the chain is re-anchored.</span>
+        </div>
+      </sc-if>
+      <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:9px;background:var(--surface)">
+        <div style="flex:1;min-width:0"><div style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3)">Answer hash</div><div style="font:500 12.5px 'IBM Plex Mono',monospace;margin-top:3px">sha256 9e4b 71d0 … 3fa8 c21a</div><div style="font-size:11.5px;color:var(--ink3);margin-top:2px">Answer text isn't stored in the log.</div></div>
+        <button onClick="{{ toReplay }}" style="height:32px;padding:0 12px;border:1px solid var(--accent);background:var(--accentSoft);border-radius:7px;font:600 12.5px 'IBM Plex Sans',sans-serif;color:var(--accent);cursor:pointer">Replay answer</button>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);margin-bottom:8px">Per-document decisions</div>
+        <table style="width:100%;border-collapse:collapse;font-size:12.5px;background:var(--surface);border:1px solid var(--line);border-radius:9px;overflow:hidden">
+          <thead><tr style="text-align:left;color:var(--ink3);font-size:11px"><th style="padding:8px 10px;font-weight:600">Doc</th><th style="padding:8px 6px;font-weight:600">Title</th><th style="padding:8px 6px;font-weight:600">Decision</th><th style="padding:8px 6px;font-weight:600">Policy · ACL</th><th style="padding:8px 10px 8px 6px;font-weight:600">Live</th></tr></thead>
+          <tbody>
+            <sc-for list="{{ docs }}" as="d" hint-placeholder-count="5">
+              <tr style="border-top:1px solid var(--line2)">
+                <td style="padding:9px 10px;white-space:nowrap"><span style="display:flex;align-items:center;gap:6px"><span style="{{ d.g }}"></span><span style="font:400 11.5px 'IBM Plex Mono',monospace">{{ d.id }}</span></span></td>
+                <td style="{{ d.titleStyle }}">{{ d.title }}</td>
+                <td style="padding:9px 6px"><span style="{{ d.decStyle }}">{{ d.dec }}</span></td>
+                <td style="padding:9px 6px;font:400 11.5px 'IBM Plex Mono',monospace;color:var(--ink2);white-space:nowrap">3c9f · {{ d.acl }}</td>
+                <td style="padding:9px 10px 9px 6px;color:var(--ok);font-weight:600" aria-label="re-verified live">✓</td>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+        <div style="margin-top:6px;font-size:11.5px;color:var(--ink3)">Titles appear only where you (Chan Kai) have access yourself; otherwise “restricted item” with its id.</div>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);margin-bottom:8px">Pipeline stages</div>
+        <div style="display:flex;flex-direction:column">
+          <sc-for list="{{ stages }}" as="s" hint-placeholder-count="7">
+            <div style="display:grid;grid-template-columns:14px 1fr auto auto;gap:10px;align-items:center;padding:5px 0;font-size:12.5px"><span style="width:7px;height:7px;border-radius:50%;background:var(--ink2);margin-left:3px"></span><span>{{ s.l }}</span><span style="font:400 11.5px 'IBM Plex Mono',monospace;color:var(--ink3)">{{ s.d }}</span><span style="font:400 11.5px 'IBM Plex Mono',monospace;color:var(--ink2);width:92px;text-align:right">{{ s.t }}</span></div>
+          </sc-for>
+        </div>
+      </div>
+      <div style="font:400 11.5px/1.7 'IBM Plex Mono',monospace;color:var(--ink2);padding-top:10px;border-top:1px solid var(--line)">prev_hash&nbsp;&nbsp;4a1c…e902<br>entry_hash {{ sel.hash }}<br>signed_ckpt 14:00 SGT · key ib-audit-2026-10</div>
+    </aside>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isReplay }}">
+  <div style="border-top:1px solid var(--line);padding:20px 24px 32px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+      <span style="font:500 12px 'IBM Plex Mono',monospace">req_c41d</span><span style="color:var(--ink2);font-size:13px">Show me the PGW incident notes from September · jdoe</span>
+      <span style="margin-left:auto;display:flex;gap:8px;align-items:center;font-size:12px;color:var(--ink2)"><span style="padding:2px 7px;border-radius:4px;background:var(--warnSoft);color:var(--warn);font-weight:600">1 difference</span>Rendered because you have access to both documents.</span>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div style="border:1px solid var(--line);border-radius:12px;background:var(--surface)">
+        <div style="display:flex;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--line2);font-size:12px"><span style="font-weight:600;font-size:13px">What jdoe was shown</span><span style="font:400 11.5px 'IBM Plex Mono',monospace;color:var(--ink2)">2 Oct 13:52 · policy 3c9f · ACL v14</span></div>
+        <p style="margin:0;padding:16px 18px;font-size:14.5px;line-height:1.7">Two incidents were logged for the payment gateway in September: a 6-minute latency spike on 9 Sep<sup style="font:500 10px 'IBM Plex Mono',monospace;color:var(--accent);padding:0 3px">1</sup> and a pool resize on 23 Sep that was rolled back after 11 minutes<sup style="font:500 10px 'IBM Plex Mono',monospace;color:var(--accent);padding:0 3px">1</sup>. <span style="background:var(--warnSoft);box-shadow:0 0 0 2px var(--warnSoft);border-radius:2px">The resize was approved by the gateway change board on 22 Sep<sup style="font:500 10px 'IBM Plex Mono',monospace;color:var(--accent);padding:0 3px">2</sup>.</span></p>
+        <div style="padding:0 18px 16px;display:flex;flex-direction:column;gap:6px;font-size:12.5px">
+          <div style="display:flex;gap:10px;align-items:center;padding:8px 10px;border:1px solid var(--line2);border-radius:7px"><span style="font:500 11px 'IBM Plex Mono',monospace">1</span><span style="width:9px;height:9px;border-radius:2px;background:var(--glyph)"></span><span style="flex:1">PGW incident notes — Sep 2026</span><span style="font:400 11px 'IBM Plex Mono',monospace;color:var(--ink3)">CONF-88213 v7</span></div>
+          <div style="display:flex;gap:10px;align-items:center;padding:8px 10px;border:1px solid var(--warn);background:var(--warnSoft);border-radius:7px"><span style="font:500 11px 'IBM Plex Mono',monospace">2</span><span style="width:9px;height:9px;border-radius:2px;background:var(--glyph)"></span><span style="flex:1">Pool config change log</span><span style="font:400 11px 'IBM Plex Mono',monospace;color:var(--ink3)">CONF-88240 v12</span></div>
+        </div>
+      </div>
+      <div style="border:1px solid var(--line);border-radius:12px;background:var(--surface)">
+        <div style="display:flex;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--line2);font-size:12px"><span style="font-weight:600;font-size:13px">What jdoe would see now</span><span style="font:400 11.5px 'IBM Plex Mono',monospace;color:var(--ink2)">2 Oct 15:10 · policy 41ab · ACL v15</span></div>
+        <p style="margin:0;padding:16px 18px;font-size:14.5px;line-height:1.7">Two incidents were logged for the payment gateway in September: a 6-minute latency spike on 9 Sep<sup style="font:500 10px 'IBM Plex Mono',monospace;color:var(--accent);padding:0 3px">1</sup> and a pool resize on 23 Sep that was rolled back after 11 minutes<sup style="font:500 10px 'IBM Plex Mono',monospace;color:var(--accent);padding:0 3px">1</sup>. <span style="display:inline-flex;align-items:center;gap:6px;padding:0 6px;border:1px dashed var(--warn);border-radius:4px;color:var(--warn);font-size:12.5px">1 statement no longer available</span></p>
+        <div style="padding:0 18px 16px;display:flex;flex-direction:column;gap:6px;font-size:12.5px">
+          <div style="display:flex;gap:10px;align-items:center;padding:8px 10px;border:1px solid var(--line2);border-radius:7px"><span style="font:500 11px 'IBM Plex Mono',monospace">1</span><span style="width:9px;height:9px;border-radius:2px;background:var(--glyph)"></span><span style="flex:1">PGW incident notes — Sep 2026</span><span style="font:400 11px 'IBM Plex Mono',monospace;color:var(--ink3)">CONF-88213 v7</span></div>
+          <div style="display:flex;gap:10px;align-items:center;padding:8px 10px;border:1px dashed var(--warn);border-radius:7px;color:var(--ink2)"><span style="font:500 11px 'IBM Plex Mono',monospace">2</span><span style="width:9px;height:9px;border-radius:2px;border:1.5px solid var(--glyph)"></span><span style="flex:1;text-decoration:line-through">Pool config change log</span><span style="font-size:11.5px;color:var(--warn);font-weight:600">Restricted since 15:04 · moved to SEC</span></div>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:14px;display:flex;gap:18px;font-size:12px;color:var(--ink2)"><span>Replayed from logged doc versions and policy 3c9f — not from the live index.</span><span>Revocation took effect in answers 38 s after the ACL change.</span></div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isUser }}">
+  <div style="border-top:1px solid var(--line);padding:20px 24px 32px">
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px">
+      <span style="display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface);font-weight:500"><span style="width:22px;height:22px;border-radius:50%;background:var(--line);display:grid;place-items:center;font-size:10px;font-weight:600">JD</span>Jordan Doe · jdoe ▾</span>
+      <span style="font-size:12.5px;color:var(--ink2)">2 Sep – 2 Oct · 64 requests · 211 allowed · 17 denied</span>
+      <span style="margin-left:auto;display:flex;gap:14px;font-size:12px;color:var(--ink2)"><span style="display:flex;gap:6px;align-items:center"><span style="width:9px;height:9px;border-radius:50%;background:var(--ink2)"></span>allowed</span><span style="display:flex;gap:6px;align-items:center"><span style="width:9px;height:9px;border-radius:50%;border:1.5px solid var(--bad)"></span>denied</span></span>
+    </div>
+    <div style="border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:10px 18px 14px">
+      <sc-for list="{{ lanes }}" as="ln" hint-placeholder-count="4">
+        <div style="display:grid;grid-template-columns:120px 1fr;align-items:center;height:52px;border-bottom:1px solid var(--line2)">
+          <span style="display:flex;align-items:center;gap:8px;font-weight:500"><span style="{{ ln.g }}"></span>{{ ln.p }}</span>
+          <div style="position:relative;height:100%"><sc-for list="{{ ln.marks }}" as="m"><span title="{{ m.t }}" style="{{ m.s }}"></span></sc-for></div>
+        </div>
+      </sc-for>
+      <div style="display:grid;grid-template-columns:120px 1fr;padding-top:8px"><span></span><div style="display:flex;justify-content:space-between;font:400 11px 'IBM Plex Mono',monospace;color:var(--ink3)"><span>2 Sep</span><span>9 Sep</span><span>16 Sep</span><span>23 Sep</span><span>2 Oct</span></div></div>
+    </div>
+    <div style="margin-top:10px;font-size:12px;color:var(--ink3)">Lanes by platform; hollow red markers are denials. Click a marker to open its request.</div>
+  </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;chain&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;verified&quot;,&quot;broken&quot;],&quot;default&quot;:&quot;verified&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;view&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;requests&quot;,&quot;replay&quot;,&quot;user&quot;],&quot;default&quot;:&quot;requests&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+const G={Confluence:'sq',Jira:'di',Slack:'ci',Drive:'tr'};
+function glyph(p,c){const g=G[p];c=c||'var(--glyph)';if(g==='sq')return{width:10,height:10,borderRadius:2,background:c,flex:'none',display:'inline-block'};if(g==='di')return{width:8,height:8,margin:1,transform:'rotate(45deg)',background:c,flex:'none',display:'inline-block'};if(g==='ci')return{width:10,height:10,borderRadius:'50%',background:c,flex:'none',display:'inline-block'};return{width:0,height:0,borderLeft:'5.5px solid transparent',borderRight:'5.5px solid transparent',borderBottom:'10px solid '+c,flex:'none',display:'inline-block'};}
+const ROWS=[
+ ['2 Oct 13:58',10480,'Which gateway timeouts changed after the May postmortem?',['Confluence','Jira'],7,2,'100%'],
+ ['2 Oct 13:52',10441,'Show me the PGW incident notes from September',['Confluence'],2,3,'94%'],
+ ['2 Oct 09:17',10312,'Summarise the PGW failover runbook',['Confluence'],4,0,'98%'],
+ ['1 Oct 17:20',10270,'Who owns the payment-gateway pool config?',['Confluence','Slack'],3,1,'100%'],
+ ['30 Sep 11:04',10128,'What is the current pool size in prod?',['Confluence','Jira'],5,0,'100%'],
+ ['26 Sep 15:41',9874,'PGW on-call escalation path',['Confluence','Slack'],6,0,'97%'],
+ ['23 Sep 10:12',9612,'Link the pool-resize change request',['Confluence','Jira'],2,4,'100%'],
+ ['18 Sep 14:30',9301,'Latency SLO for the payment gateway',['Confluence'],3,0,'100%'],
+ ['11 Sep 16:02',8950,'PGW architecture diagram location',['Confluence','Drive'],2,1,'100%'],
+ ['4 Sep 09:48',8566,'Gateway deploy freeze dates',['Confluence'],1,0,'100%']];
+const DOCS=[['Confluence','CONF-88213','PGW incident notes — Sep 2026','allowed','v14'],['Confluence','CONF-88240','Pool config change log','allowed','v14'],['Confluence','CONF-90117','Security review — PGW mTLS keys','denied','v3',true],['Confluence','CONF-90231',null,'denied','v2'],['Confluence','CONF-90232',null,'denied','v2']];
+const STAGES=[['Received','','13:52:07.012'],['Finding sources','180 ms','13:52:07.192'],['Checking access','40 ms','13:52:07.232'],['Live re-verify','610 ms','13:52:07.842'],['Writing answer','1.9 s','13:52:09.771'],['Checking citations','220 ms','13:52:09.990'],['Logged & chained','14 ms','13:52:10.004']];
+class Component extends DCLogic {
+  state={tab:null,sel:10441,decision:'All',chain:null,progress:0,tampered:null,checked:'14:00'};
+  componentDidUpdate(pp){ if(pp.chain!==this.props.chain) this.setState({chain:null,tampered:null}); if(pp.view!==this.props.view) this.setState({tab:null}); }
+  componentWillUnmount(){clearInterval(this.t);}
+  chainState(){ return this.state.chain ?? (this.props.chain==='broken'?'broken':'verified'); }
+  tampered(){ return this.state.tampered ?? this.props.chain==='broken'; }
+  runVerify(end){ clearInterval(this.t); this.setState({chain:'verifying',progress:0}); const stop=end==='broken'?0.955:1;
+    this.t=setInterval(()=>{ let p=this.state.progress+0.045; if(p>=stop){ clearInterval(this.t); const d=new Date(); this.setState({progress:stop,chain:end,checked:'just now'}); } else this.setState({progress:p}); },40); }
+  renderVals(){
+    const cs=this.chainState(), tamp=this.tampered(), tab=this.state.tab ?? this.props.view ?? 'requests';
+    const broken=cs==='broken', verifying=cs==='verifying';
+    const col=broken?'var(--bad)':verifying?'var(--ink2)':'var(--ok)';
+    const blocks=Array.from({length:32},(_,i)=>{const bad=broken&&i===22, after=broken&&i>22, lit=verifying?i/32<this.state.progress:true;
+      return {s:{flex:1,height:14,borderRadius:2,transition:'background .15s',background:bad?'var(--bad)':after?'transparent':lit?(verifying?'var(--ink2)':'var(--ok)'):'var(--line2)',border:after?'1.5px solid var(--bad)':'0',opacity:bad||after?1:(verifying&&lit?.8:.9)}};});
+    const n=Math.floor(this.state.progress*10482);
+    const chain={broken,verifying,canTamper:!broken&&!verifying&&!tamp,blocks,
+      box:{width:420,flex:'none',padding:'14px 16px',borderRadius:12,background:broken?'var(--badSoft)':'var(--surface)',border:'1.5px solid '+(broken?'var(--bad)':verifying?'var(--line)':'var(--ok)'),transition:'background .25s, border-color .25s'},
+      icon:{width:32,height:32,borderRadius:'50%',display:'grid',placeItems:'center',flex:'none',fontSize:15,fontWeight:700,color:'#fff',background:col},
+      glyph:broken?'!':verifying?'…':'✓',
+      titleStyle:{fontSize:14.5,fontWeight:600,color:broken?'var(--bad)':'var(--ink)'},
+      title:broken?'Chain broken at 13:52':verifying?'Recomputing hashes…':'Log integrity verified',
+      sub:broken?'Entry 10,441 does not match its hash — chain broken at 13:52.':verifying?n.toLocaleString('en-US')+' / 10,482 entries':'10,482 entries · last checkpoint signed 14:00 SGT',
+      bar:{height:'100%',width:(this.state.progress*100)+'%',background:'var(--ink2)'},
+      tail:broken?'41 entries unverifiable':verifying?'sha256 chain':'checked '+this.state.checked};
+    const rows=ROWS.filter(r=>this.state.decision==='All'||(this.state.decision==='Denied'?r[5]>0:r[4]>0)).map(r=>{const sel=this.state.sel===r[1];const isBad=broken&&r[1]===10441;const after=broken&&r[1]>10441;
+      return {time:r[0],entry:'#'+r[1].toLocaleString('en-US'),q:r[2],plats:r[3].map(p=>({p,g:glyph(p)})),allowed:r[4],denied:r[5],ground:r[6],sel,
+        pick:()=>this.setState({sel:r[1]}),key:(e)=>{if(e.key==='Enter')this.setState({sel:r[1]});},
+        deniedStyle:{padding:'0 10px',textAlign:'right',color:r[5]?'var(--ink)':'var(--ink3)',fontWeight:r[5]?600:400},
+        chain:isBad?'✕ mismatch':after?'○ unverified':'✓ linked',
+        chainStyle:{fontSize:12,fontWeight:600,padding:'2px 7px',borderRadius:4,color:isBad?'var(--bad)':after?'var(--ink2)':'var(--ok)',background:isBad?'var(--badSoft)':after?'var(--line2)':'var(--okSoft)'},
+        style:{cursor:'pointer',borderTop:'1px solid var(--line2)',background:isBad?'var(--badSoft)':sel?'var(--accentSoft)':'transparent',boxShadow:sel?'inset 3px 0 0 var(--accent)':'none'}};});
+    const r=ROWS.find(x=>x[1]===this.state.sel)||ROWS[1];
+    const sel={req:'req_'+(r[1]===10441?'c41d':r[1].toString(16).slice(-4)),entry:r[1].toLocaleString('en-US'),full:r[0]+':07 SGT',q:r[2],isBroken:broken&&r[1]===10441,hash:broken&&r[1]===10441?'5d0e…a71f ✕':'5d0e…a71f'};
+    const docs=DOCS.map(d=>({id:d[1],g:glyph(d[0]),title:d[2]?(d[5]?d[2]+'  · visible to you':d[2]):'restricted item',dec:d[3]==='allowed'?'✓ allowed':'✕ denied',acl:d[4],
+      titleStyle:{padding:'9px 6px',color:d[2]?'var(--ink)':'var(--ink3)',fontStyle:d[2]?'normal':'italic'},
+      decStyle:{fontSize:11.5,fontWeight:600,padding:'2px 6px',borderRadius:4,whiteSpace:'nowrap',color:d[3]==='allowed'?'var(--ok)':'var(--bad)',background:d[3]==='allowed'?'var(--okSoft)':'var(--badSoft)'}}));
+    const stages=STAGES.map(s=>({l:s[0],d:s[1],t:s[2]}));
+    const lanes=['Confluence','Jira','Slack','Drive'].map((p,li)=>{let seed=li*97+13;const rnd=()=>{seed=(seed*9301+49297)%233280;return seed/233280;};const cnt=[26,14,18,6][li];
+      return {p,g:glyph(p),marks:Array.from({length:cnt},(_,i)=>{const x=rnd()*98+1,den=rnd()<[0.12,0.15,0.08,0.2][li];return {t:den?'denied':'allowed',s:{position:'absolute',left:x+'%',top:'50%',width:11,height:11,marginTop:-5.5,marginLeft:-5.5,borderRadius:G[p]==='ci'?'50%':G[p]==='sq'?2:G[p]==='di'?1:'50%',transform:G[p]==='di'?'rotate(45deg)':'none',background:den?'var(--surface)':'var(--ink2)',border:den?'1.5px solid var(--bad)':'1.5px solid var(--surface)',cursor:'pointer'}};})};});
+    const tabs=[['requests','Requests'],['replay','Replay'],['user','User timeline']].map(([k,l])=>({label:l,on:tab===k,go:()=>this.setState({tab:k}),style:{height:28,padding:'0 12px',border:0,borderRadius:6,font:"500 12.5px 'IBM Plex Sans',sans-serif",cursor:'pointer',background:tab===k?'var(--ink)':'transparent',color:tab===k?'#fff':'var(--ink2)'}}));
+    const decisions=['All','Allowed','Denied'].map(d=>({label:d,on:this.state.decision===d,go:()=>this.setState({decision:d}),style:{height:28,padding:'0 10px',border:0,borderLeft:'1px solid var(--line)',font:"500 12.5px 'IBM Plex Sans',sans-serif",cursor:'pointer',background:this.state.decision===d?'var(--accentSoft)':'transparent',color:this.state.decision===d?'var(--accent)':'var(--ink2)'}}));
+    return {tabs,decisions,chain,rows,sel,docs,stages,lanes,resultLine:rows.length+' requests · '+rows.reduce((a,b)=>a+b.allowed,0)+' allowed · '+rows.reduce((a,b)=>a+b.denied,0)+' denied',
+      isRequests:tab==='requests',isReplay:tab==='replay',isUser:tab==='user',toReplay:()=>this.setState({tab:'replay'}),
+      verify:()=>this.runVerify(tamp?'broken':'verified'),
+      tamper:()=>{this.setState({tampered:true,sel:10441});this.runVerify('broken');},
+      restore:()=>{this.setState({tampered:false});this.runVerify('verified');}};
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+:root {
+  --border-1: 1px solid var(--border-subtle);
+  --border-ink: 2px solid var(--border-strong);   /* graph nodes, focus-worthy outlines */
+
+  --shadow-0: none;
+  --shadow-1: 0 1px 2px rgba(20,20,20,.06);
+  --shadow-2: 0 8px 24px -8px rgba(20,20,20,.14), 0 1px 2px rgba(20,20,20,.06);   /* menus, popovers */
+  --shadow-3: 0 24px 64px -16px rgba(20,20,20,.28);                                /* dialogs */
+  --ring: 0 0 0 3px color-mix(in srgb, var(--orange) 35%, transparent);
+
+  --ease-out: cubic-bezier(.2,.7,.2,1);
+  --ease-in-out: cubic-bezier(.6,0,.3,1);
+  --dur-fast: 120ms; --dur-base: 180ms; --dur-slow: 320ms;
+
+  --edge-ink: 2px;      /* graph edge, UI scale */
+  --edge-accent: 3px;   /* edge into Cortex */
+  --edge-dash: 1 7;     /* indirect relation (round caps) */
+}

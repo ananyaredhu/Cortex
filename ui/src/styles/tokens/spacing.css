@@ -1,0 +1,15 @@
+:root {
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 20px;
+  --space-6: 24px; --space-8: 32px; --space-10: 40px; --space-12: 48px; --space-16: 64px;
+
+  --radius-xs: 6px;   /* badges, kbd, id chips */
+  --radius-sm: 10px;  /* inputs, buttons */
+  --radius-md: 14px;  /* menus, small cards, app icons */
+  --radius-lg: 20px;  /* cards, panels */
+  --radius-xl: 28px;  /* hero tiles, persona tiles */
+  --radius-pill: 999px;
+
+  --control-sm: 28px; --control-md: 36px; --control-lg: 44px;
+  --sidebar-w: 248px;
+  --content-max: 760px;
+}

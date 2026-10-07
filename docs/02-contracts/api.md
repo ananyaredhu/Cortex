@@ -1,14 +1,21 @@
 # HTTP API
 
-version: 0.1 (draft, freezes Day 3)
+version: 0.2 (proposed: additions for the UI, all optional, pending approval by A, B and C)
 Producer: Workstream B. Consumer: C (UI, console). The MCP server exposes the same pipeline: see [mcp-tools](mcp-tools.md).
 
 Base path `/v1`. JSON. **Auth:** `Authorization: Bearer <JWT>` from the mock IdP on **every** request (validated per request: signature, expiry, audience). JWT claims: `sub`, `email`, `roles`, `aud`.
 
 Errors: `{ "error": {"code": "...", "message": "..."} }`. Refusals are **not errors**: they return 200 with `refused: true` and the uniform refusal shape.
 
+**Optional fields (0.2).** Fields marked *(0.2, optional)* may be absent or `null`. Clients must render without them; producers add them when ready. A response that has a field in one case must have it in every case of the same endpoint (refusal included), so the shape never depends on what exists.
+
+**Roles.** `compliance` for the audit endpoints. `admin` endpoints accept `security-lead` or `compliance` in the Company A personas (there is no separate admin persona).
+
 ## `POST /v1/ask`
-Request: `{ "question": "...", "conversation_id": "optional", "skill_hint": "optional" }`
+Request: `{ "question": "...", "conversation_id": "optional", "skill_hint": "optional", "sources": ["jira", "slack"], "time_range": "any" }`
+- `sources` *(0.2, optional)*: limit the search to these sources (`confluence`, `jira`, `slack`, `gdrive`). Absent or empty means all.
+- `time_range` *(0.2, optional)*: `last_week`, `last_quarter` or `any` (default).
+
 Response:
 ```json
 {
@@ -16,36 +23,79 @@ Response:
   "conversation_id": "c_1",
   "answer": "...",
   "claims": [{"text": "...", "citations": ["jira:DBMIG-142"]}],
-  "citations": [{"doc_id": "jira:DBMIG-142", "title": "...", "url": "...", "source": "jira", "as_of": "2026-10-10T13:58:00Z", "why_visible": ["role:DBMIG:developer"]}],
+  "citations": [{"doc_id": "jira:DBMIG-142", "title": "...", "url": "...", "source": "jira", "as_of": "2026-10-10T13:58:00Z",
+                 "why_visible": ["role:DBMIG:developer"], "excerpt": "Database migration cutover is blocked ..."}],
   "refused": false,
   "abstained": false,
-  "freshness": {"oldest_source_as_of": "...", "stale_refetched": 0},
-  "skill": "status-and-blockers"
+  "freshness": {"oldest_source_as_of": "...", "stale_refetched": 0,
+                "per_source": {"jira": {"last_sync": "2026-10-10T14:03:00Z", "status": "ok"}}},
+  "skill": "status-and-blockers",
+  "coverage": {"jira": {"searched": true, "shown": 2}, "slack": {"searched": true, "shown": 1},
+               "confluence": {"searched": true, "shown": 0}, "gdrive": {"searched": false, "shown": 0}},
+  "grounding": {"score": 0.96, "removed_claims": 0},
+  "policy_version": "pol-0.3",
+  "unavailable_sources": [],
+  "clarify": null
 }
 ```
-Refusal: `{ "refused": true, "answer": "I couldn't find anything you have access to about that.", "claims": [], "citations": [] }`. Same shape and similar timing for forbidden and nonexistent content. No counts, no titles.
+Fields added in 0.2 (all optional):
+- `citations[].excerpt`: up to 280 characters of the cited document, sanitized like the context packet. Shown as a quoted excerpt, never as the assistant's words.
+- `freshness.per_source`: per source, the connector's `last_sync` and `status` (`ok` within the SLA, `stale` beyond it, `unavailable` if the source could not be read for this request).
+- `coverage`: per source, whether it was searched and how many cited documents came from it. **Only what the asker may see is counted. No count of candidates, denied or filtered documents appears anywhere in this response** (a denied count is an existence signal: see [acl-model](acl-model.md)).
+- `grounding`: share of claims verified against an allowed source (0 to 1), and how many unsupported claims the checker removed. `null` when refused.
+- `policy_version`: the policy the PDP used for this request.
+- `unavailable_sources`: sources that could not be read for this request (the answer comes from the others).
+- `clarify`: `{"question": "...", "options": ["...", "..."]}` when the question is ambiguous between things the asker may see; then `answer` is empty and `refused` is false. Options are built only from allowed documents.
+
+Refusal: `{ "refused": true, "answer": "I couldn't find anything you have access to about that.", "claims": [], "citations": [] }`, with every 0.2 field present in the same shape (`coverage` shows `shown: 0` for each searched source). Same shape and similar timing for forbidden and nonexistent content. No counts, no titles.
+
+## `POST /v1/ask/stream` *(0.2, optional)*
+Same request as `/v1/ask`. Server-sent events, so the UI can show real pipeline progress instead of a timed animation:
+- `event: stage`, `data: {"stage": "retrieve" | "authorize" | "verify_live" | "generate" | "check", "status": "start" | "done"}`
+- `event: result`, `data:` the `/v1/ask` response.
+
+All five stages are always sent, in that order, for every request (refusals included), so the stream does not reveal what exists.
+
+## `GET /v1/conversations` *(0.2, optional)*
+The caller's own conversations, newest first: `{ "conversations": [{"conversation_id": "c_1", "title": "<first question>", "last_asked_at": "..."}] }`. Titles are the caller's own question text.
 
 ## `GET /v1/mywork`
 Personalized home for the logged-in user: assigned issues, projects, recent pages, channels, suggested questions, pending stale-answer alerts. Everything is fetched through the PDP: nothing the user cannot see.
+```json
+{
+  "user": {"display_name": "Priya", "roles": ["engineer"]},
+  "issues": [{"doc_id": "jira:DBMIG-142", "title": "...", "status": "In Progress", "url": "..."}],
+  "projects": ["jira:DBMIG"],
+  "channels": ["slack:C_DBMIG"],
+  "recent_pages": [{"doc_id": "confluence:PAY/runbook-payment-service", "title": "...", "updated_at": "...", "url": "..."}],
+  "suggested_questions": ["..."],
+  "alerts": []
+}
+```
+`issues[].status` and the `url` fields are *(0.2, optional)*.
 
 ## `GET /v1/explain-access?doc_id=...`
-Why can I see this? Returns `proof_path` for an allowed document. For a forbidden or nonexistent one, returns the uniform "not found" response.
+Why can I see this? Returns `{"found": true, "proof_path": [...]}` for an allowed document. For a forbidden or nonexistent one, returns the uniform `{"found": false}`.
 
 ## `GET /v1/alerts`
 Stale-answer alerts: answers the user received whose sources changed afterwards (`request_id`, `changed_doc`, `changed_at`, `summary`).
 
 ## Audit (compliance role only)
-- `POST /v1/audit/query` with `{ "question": "..." }` (natural language) or `{ "filter": {user, space, from, to, decision} }` returns events, with timestamps, retrieved IDs and allow/deny decisions.
+- `POST /v1/audit/query` with `{ "question": "..." }` (natural language) or `{ "filter": {user, space, from, to, decision} }` returns `{events, count}`, with timestamps, retrieved IDs and allow/deny decisions.
 - `GET /v1/audit/verify` returns `{ok, checked, checkpoints}` or `{ok:false, first_broken_seq, reason}`.
 - `GET /v1/audit/time-travel?user=...&at=...` returns what a user could see at a past time (when bi-temporal ACL snapshots are available).
+- `GET /v1/audit/replay?request_id=...` *(0.2, optional)*: `{ "then": {"answer", "citations", "policy_version"}, "now": {"answer", "citations", "policy_version"}, "differences": [{"doc_id": "...", "change": "revoked" | "edited" | "deleted"}] }`. `then` is rebuilt from the logged document versions and policy, not from the live index. Titles and text appear only for documents the **viewing** officer may see; anything else is `{"doc_id": "...", "restricted": true}`.
 
 ## Admin and ops (admin role)
-- `GET /v1/freshness` returns lag p50/p95 per source and last sync.
-- `GET /v1/leakci/latest` returns the latest Leak-CI and red-team scoreboard.
+- `GET /v1/freshness` returns the freshness report Workstream A produces (`connectors/ingestion/freshness.py`, `summarize`): `{as_of, window_hours, sources: {<source>: {last_run_at, last_ok_at, last_error, freshness_lag_seconds: {count, p50, p95, max}, pipeline_lag_seconds: {...}, by_trigger: {...}}}}`.
+- `GET /v1/leakci/latest` returns the latest Leak-CI and red-team scoreboard: `{as_of, cases, leaks}` and *(0.2, optional)* `suites: [{"name", "category", "passed", "failed", "last_run_at"}]`.
+- `GET /v1/policy/versions` *(0.2, optional)*: `{versions: [{"policy_version", "author", "created_at", "pr_url"}], "active": "..."}`.
+- `POST /v1/policy/evaluate` *(0.2, optional)* with `{"user": "<email>", "doc_id": "..."}`: `{"allowed": bool, "rule": "...", "proof_path": [...], "policy_version": "..."}`. Admin only, logged as `admin_view`, never available to other roles (it would otherwise reveal which documents exist).
 - `GET /v1/health`.
 
 ## Demo and test helpers (simulators only, never in production)
-Simulator admin endpoints (owned by A) to revoke a permission, restrict a page, edit a document, and add or remove hidden documents (for Leak-CI). Documented in `simulators/README.md`.
+Simulator admin endpoints (owned by A) to revoke a permission, restrict a page, edit a document, and add or remove hidden documents (for Leak-CI). Documented in `simulators/README.md`. The stub API has its own: `/sim/advance`, `/sim/reset`, `/sim/tamper`.
 
 ## Changelog
+- 0.2 (proposed): optional UI fields on `/ask` (`excerpt`, `freshness.per_source`, `coverage`, `grounding`, `policy_version`, `unavailable_sources`, `clarify`) and its `sources` and `time_range` filters; `/ask/stream`; `/conversations`; `/audit/replay`; `/policy/versions` and `/policy/evaluate`; `/mywork` and `/freshness` shapes written down; roles for the admin endpoints. Explicit rule: no candidate or denied counts in any asker-facing response.
 - 0.1: first draft.

@@ -1,0 +1,27 @@
+<!-- @dsCard group="Components" viewport="700x360" name="Form controls" -->
+<!DOCTYPE html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"></script>
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<script src="../_preview.js"></script>
+<style>body{padding:20px}.l{font:var(--type-mono);color:var(--text-muted);margin-bottom:8px}</style></head><body><div id="root"></div>
+<script type="text/babel">
+CortexLoad().then((C) => {
+const {Input, Select, Checkbox, Radio, Switch} = C;
+const Row = ({label, children}) => <div style={{marginBottom:16}}><div className="l">{label}</div><div style={{display:'flex',flexWrap:'wrap',gap:10,alignItems:'center'}}>{children}</div></div>;
+const A = (n) => '../../assets/personas/' + n + '.svg';
+ReactDOM.createRoot(document.getElementById('root')).render(<>
+<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
+<div style={{display:'flex',flexDirection:'column',gap:14}}>
+<Input label="Workspace name" defaultValue="Company A" hint="Shown to everyone you invite" />
+<Input icon="search" placeholder="Search people, docs, tickets…" />
+<Input label="Email" defaultValue="sam@contractor" error="Use a companya.com address" />
+<Select label="Default access" options={['Everyone at Company A','Team only','Just me']} /></div>
+<div style={{display:'flex',flexDirection:'column',gap:16}}>
+<Checkbox label="Include archived pages" defaultChecked />
+<Checkbox label="Index private channels" description="Only channels you're a member of" />
+<Radio defaultValue="team" options={[{value:'all',label:'Everyone'},{value:'team',label:'Team only',description:'Engineering, Security'},{value:'me',label:'Just me'}]} />
+<Switch defaultChecked label="Sync Confluence" /><Switch label="Sync Drive" /></div></div></>);
+});
+</script></body></html>
