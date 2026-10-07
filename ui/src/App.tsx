@@ -2,7 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { usePersona } from "./auth/PersonaContext";
 import { canAdmin, canAudit } from "./auth/personas";
 import { Sidebar } from "./components/Sidebar";
-import { Ask } from "./routes/Ask";
+import { AskPage } from "./ask/AskPage";
 import { Placeholder } from "./routes/Placeholder";
 
 export function App() {
@@ -13,7 +13,7 @@ export function App() {
       <main className="app__main">
         <Routes>
           <Route path="/" element={<Placeholder title="My work" phase="Phase 4" mockup="Workspace.dc.html" />} />
-          <Route path="/ask" element={<Ask />} />
+          <Route path="/ask" element={<AskPage />} />
           <Route
             path="/audit"
             element={

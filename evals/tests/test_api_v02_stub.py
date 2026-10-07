@@ -97,3 +97,20 @@ def test_replay_shows_revocation_and_hides_titles_the_officer_cannot_see():
     assert {"doc_id": "slack:C_AUTHPRIV/thread-1", "change": "revoked"} in r["differences"]
     assert all("title" not in c for c in r["then"]["citations"] if c.get("restricted"))
     assert client.get("/v1/audit/replay", params={"request_id": rid}, headers=H("priya")).status_code == 403
+
+
+def test_unavailable_source_is_skipped_and_named_the_same_way_for_everyone():
+    client.post("/sim/source-status", json={"source": "slack", "status": "unavailable"})
+    r = _ask("priya", "What's the status of the database migration, and were there blockers raised in Slack last week?")
+    assert r["unavailable_sources"] == ["slack"]
+    assert all(c["source"] != "slack" for c in r["citations"])
+    assert r["coverage"]["slack"] == {"searched": False, "shown": 0}
+    a, b = _ask("sam", BREACH), _ask("sam", NONEXISTENT)
+    assert _uniform(a) == _uniform(b)
+
+
+def test_stale_source_is_reported_per_source():
+    client.post("/sim/source-status", json={"source": "confluence", "status": "stale"})
+    r = _ask("priya", "What's the latest runbook for payment-service incident failover?")
+    assert r["freshness"]["per_source"]["confluence"]["status"] == "stale"
+    assert r["freshness"]["per_source"]["jira"]["status"] == "ok"

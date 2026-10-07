@@ -51,18 +51,31 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .persona-switch__menu li { display: flex; align-items: center; gap: var(--space-2); padding: 6px 8px; border-radius: 8px; font-size: var(--fs-13); cursor: pointer; }
 .persona-switch__menu li:hover, .persona-switch__menu li[aria-selected="true"] { background: var(--accent-soft); }
 
-/* Ask (Phase 0 shell) */
-.guest-badge { display: inline-block; margin-bottom: var(--space-4); padding: 4px 10px; border-radius: var(--radius-pill); background: var(--info-soft); font-size: var(--fs-12); }
-.composer { position: relative; background: var(--surface-card); border: var(--border-1); border-radius: var(--radius-lg); box-shadow: var(--shadow-1); padding: var(--space-4); }
-.composer textarea { width: 100%; border: 0; resize: none; outline: none; background: transparent; font: var(--type-body); color: var(--text-strong); }
-.composer button { position: absolute; right: 12px; bottom: 12px; width: 36px; height: 36px; border: 0; border-radius: 50%; background: var(--accent); color: var(--text-on-accent); display: grid; place-items: center; }
-.composer button:disabled { opacity: .4; cursor: default; }
-.footnote { font-size: var(--fs-12); color: var(--text-muted); }
-.stages { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-3); font-size: var(--fs-13); }
-.stages li { color: var(--text-faint); }
-.stages li[data-state="start"] { color: var(--text-strong); }
-.stages li[data-state="done"] { color: var(--success); }
-.answer { margin-top: var(--space-6); padding: var(--space-6); }
-.answer__text { white-space: pre-wrap; margin-top: 0; }
-.answer__sources { padding-left: var(--space-5); display: flex; flex-direction: column; gap: var(--space-2); }
-.answer__sources li { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+/* Shared controls */
+.small { font-size: var(--fs-12); }
+.h3 { font: var(--type-h3); margin: 0 0 var(--space-2); display: flex; align-items: center; gap: var(--space-2); }
+.num { font-variant-numeric: tabular-nums; text-align: right; }
+.guest-badge { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: var(--radius-pill); background: var(--info-soft); color: var(--text-strong); font-size: var(--fs-12); white-space: nowrap; }
+.footnote { font-size: var(--fs-12); color: var(--text-muted); margin: var(--space-2) 0 0; }
+.chip { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px; border: var(--border-1); border-radius: var(--radius-pill); background: var(--surface-card); font-size: var(--fs-12); color: var(--text-body); }
+.chip:hover { border-color: var(--border-strong); }
+.chip[aria-pressed="true"] { background: var(--surface-inverse); border-color: var(--surface-inverse); color: var(--text-on-inverse); }
+.ghost { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: var(--text-body); font-size: var(--fs-13); }
+.ghost:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); }
+.ghost--accent { color: var(--accent-text); }
+.ghost.small { height: 24px; font-size: var(--fs-12); }
+.icon-button { display: inline-grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 8px; background: transparent; color: var(--text-muted); }
+.icon-button:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); color: var(--text-strong); }
+
+/* Trust state: always colour plus an icon or a label, never colour alone */
+.status { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-12); }
+.status__dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.status--ok { color: var(--success); }
+.status--warn { color: oklch(0.5 0.12 70); }
+.status--bad { color: var(--danger); }
+.banner { display: flex; align-items: flex-start; gap: var(--space-2); padding: 10px 12px; border-radius: var(--radius-sm); font-size: var(--fs-13); color: var(--text-strong); }
+.banner--stale { background: var(--warning-soft); }
+.banner--error { background: var(--danger-soft); }
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; } }

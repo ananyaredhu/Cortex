@@ -11,7 +11,7 @@ cd ui && npm install && npm run dev    # http://localhost:5173, proxies /v1 and 
 ```
 Point at another API with `API_TARGET=http://host:port npm run dev`. `npm test` runs the Vitest suite; `npm run build` typechecks and builds.
 
-Pick who you are with the persona switcher (bottom left). The stub accepts `Authorization: Bearer dev:<persona>`; [src/auth/token.ts](src/auth/token.ts) is the only place to change when the mock IdP issues JWTs.
+Pick who you are with the persona switcher (bottom left). To see the stale and unreachable banners, mark a source in the stub: `curl -X POST localhost:8000/sim/source-status -H "Content-Type: application/json" -d '{"source": "slack", "status": "unavailable"}'` (`stale`, `unavailable` or `ok`; `/sim/reset` clears it). The stub accepts `Authorization: Bearer dev:<persona>`; [src/auth/token.ts](src/auth/token.ts) is the only place to change when the mock IdP issues JWTs.
 
 ## Layout
 | Path | What |
@@ -20,7 +20,8 @@ Pick who you are with the persona switcher (bottom left). The stub accepts `Auth
 | `src/api/client.ts` | One function per endpoint, including the `/ask/stream` SSE reader |
 | `src/auth/` | Personas (fixture ids, roles, avatars), the token adapter, the persona context |
 | `src/components/` | Sidebar, Avatar, SourceGlyph. Port further Cortex components from `design-reference/cortex-design-system/components/` as they are needed |
-| `src/routes/` | Screens. Ask is a wiring proof; the others are placeholders naming their mockup |
+| `src/ask/` | The Ask screen: page, answer card, Trust panel, stepper, composer, empty state, and `format.ts` (claims to markers, banners) |
+| `src/routes/` | Placeholders for screens not built yet, each naming its mockup |
 | `src/styles/tokens/` | Cortex tokens, copied unchanged from `design-reference/cortex-design-system/tokens/` |
 | `design-reference/screens/` | The mockup screens (open with any static server: `python -m http.server` inside the folder) |
 | `design-reference/cortex-design-system/` | The Cortex design system: tokens, React components, guidelines, UI kit |
@@ -36,7 +37,7 @@ Pick who you are with the persona switcher (bottom left). The stub accepts `Auth
 | Phase | When | What |
 |---|---|---|
 | 0 | Wed 7 Oct | Contract 0.2 proposal, stub additions, this scaffold, drift list. **Done** |
-| 1 | Wed 7 to Thu 8 | Ask: answer card from `claims[]` with `[n]` markers, citation chips with excerpt popover, uniform refusal, Trust panel (coverage, freshness, grounding, policy, request id), stale and error banners, "why can I see this?" |
+| 1 | Wed 7 Oct | Ask: answer card from `claims[]` with `[n]` markers, citation chips with excerpt popover, uniform refusal, Trust panel (coverage, freshness, grounding, policy, request id), stale and error banners, "why can I see this?". **Done** |
 | 2 | Fri 9 (Day 8 demo) | Split-screen `/compare`, demo controls drawer, Playwright runs of scenarios 1, 3 and 4 against the stub; an `evals/` check that Sam's breach answer and the nonexistent-report answer render identical DOM |
 | 3 | Sat 10 to Sun 11 | Audit console (query, timeline, drawer, decision table, chain widget with verify and tamper, replay) and Admin (connector health, SLA chart, Leak-CI suites, policy versions, evaluate sandbox) |
 | 4 | Mon 12 to Tue 13 | My Work and stale-answer alerts, mobile Ask with the Trust bottom sheet, accessibility pass, dark theme check, the same Playwright suite against the real API |

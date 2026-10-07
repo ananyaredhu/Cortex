@@ -8,7 +8,7 @@ Auth (stub only): `Authorization: Bearer dev:<persona_id>`, e.g. `Bearer dev:pri
 The real API validates a JWT from the mock IdP on every request.
 
 The 0.2 fields are filled with plausible stub values: grounding is always 1.0, `time_range` is accepted and ignored,
-`clarify` is always null, and every source is always reachable.
+`clarify` is always null. Sources are fresh and reachable unless `/sim/source-status` says otherwise.
 
 Run: uvicorn brain.stub_api.app:app --reload --port 8000
 """
@@ -28,6 +28,7 @@ STATE = State()
 AUDIT: list[dict] = []
 ANSWERED: dict[str, list[dict]] = {}   # persona -> [{request_id, doc_ids}]
 CONVERSATIONS: dict[str, dict[str, dict]] = {}   # persona -> conversation_id -> {title, last_asked_at}
+SOURCE_STATUS: dict[str, str] = {}   # source -> "stale" | "unavailable" (absent: "ok"), set by /sim/source-status
 SALT = "stub-salt"
 REFUSAL = "I couldn't find anything you have access to about that."
 SOURCES = ("confluence", "jira", "slack", "gdrive")
@@ -94,6 +95,11 @@ class EvaluateBody(BaseModel):
     doc_id: str
 
 
+class SourceStatusBody(BaseModel):
+    source: str
+    status: str   # ok | stale | unavailable
+
+
 class AdvanceBody(BaseModel):
     event_id: str
 
@@ -130,7 +136,9 @@ def _sse(event: str, data: dict) -> str:
 
 def _answer(me: dict, body: AskBody) -> dict:
     toks = STATE.persona_tokens[me["id"]]
-    searched = [s for s in SOURCES if not body.sources or s in body.sources]
+    wanted = [s for s in SOURCES if not body.sources or s in body.sources]
+    unavailable = [s for s in wanted if SOURCE_STATUS.get(s) == "unavailable"]
+    searched = [s for s in wanted if s not in unavailable]
     scored = sorted(((_score(body.question, d), d) for d in STATE.docs.values() if d["source"] in searched),
                     key=lambda x: -x[0])
     candidates = [(s, d) for s, d in scored if s >= 2][:8]
@@ -173,13 +181,14 @@ def _answer(me: dict, body: AskBody) -> dict:
             "claims": claims, "citations": citations, "refused": refused, "abstained": False,
             "freshness": {"oldest_source_as_of": min((c["as_of"] for c in citations), default=None),
                           "stale_refetched": 0,
-                          "per_source": {s: {"last_sync": STATE.data["now"], "status": "ok"} for s in SOURCES}},
+                          "per_source": {s: {"last_sync": STATE.data["now"], "status": SOURCE_STATUS.get(s, "ok")}
+                                         for s in SOURCES}},
             "skill": body.skill_hint,
             # counts only what the asker is shown: never candidates or denials (api.md 0.2, coverage)
             "coverage": {s: {"searched": s in searched, "shown": sum(c["source"] == s for c in citations)}
                          for s in SOURCES},
             "grounding": None if refused else {"score": 1.0, "removed_claims": 0},
-            "policy_version": POLICY_VERSION, "unavailable_sources": [], "clarify": None}
+            "policy_version": POLICY_VERSION, "unavailable_sources": unavailable, "clarify": None}
 
 
 @app.get("/v1/conversations")
@@ -338,7 +347,20 @@ def sim_reset():
     AUDIT.clear()
     ANSWERED.clear()
     CONVERSATIONS.clear()
+    SOURCE_STATUS.clear()
     return {"ok": True}
+
+
+@app.post("/sim/source-status")
+def sim_source_status(body: SourceStatusBody):
+    """Demo the stale and unreachable banners: mark a source stale, unavailable, or back to ok."""
+    if body.source not in SOURCES or body.status not in ("ok", "stale", "unavailable"):
+        raise HTTPException(422, "unknown source or status")
+    if body.status == "ok":
+        SOURCE_STATUS.pop(body.source, None)
+    else:
+        SOURCE_STATUS[body.source] = body.status
+    return {"source_status": SOURCE_STATUS}
 
 
 @app.post("/sim/tamper")
