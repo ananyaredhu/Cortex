@@ -9,6 +9,7 @@ Each one passes the same [contract tests](../connectors/tests/contract/) as ever
 |---|---|---|
 | [Confluence](confluence/) | Working | 8101 |
 | [Jira](jira/) | Working | 8102 |
+| [Slack](slack/) | Read-only, for scale runs | 8103 |
 
 ## Confluence
 
@@ -86,7 +87,6 @@ and `/sim/webhooks`. Leave it unset for local development.
 
 ### Known limits (Confluence)
 - Not simulated yet: moving a page, edit restrictions, anonymous access, personal spaces, CQL search.
-- The scale seed (12k+ pages) is a later task.
 
 ## Jira
 
@@ -157,6 +157,31 @@ that fills a project role costs two tokens, the group's and the role's, so it pr
 ### Known limits (Jira)
 - Not simulated: reporter and assignee as level members, permission schemes shared between projects,
   moving issues between projects, workflows, JQL beyond `project = KEY`.
+
+## Slack (for scale runs)
+```
+SIM_SEED=scale .venv/Scripts/uvicorn simulators.slack.app:app --port 8103
+```
+The in-memory Slack that the Slack connector's tests use (`connectors/slack/fake.py`), served over HTTP:
+`POST /api/<method>` answers the Web API methods the connector calls, and `GET /sim/identity-map` gives the identity
+map a real workspace keeps in `identity-map.local.json`. The real connector runs against it unchanged
+(`simulators/slack/connector.py`). Read-only: no admin endpoints, no events, and no token is checked, so never
+expose it. Real Slack stays the source for the demo; this exists to test 200+ channels.
+
+## Scale seed
+`SIM_SEED=scale` on the Confluence and Slack simulators loads Company A plus a generated company
+([`scale.py`](scale.py)): 400 people in 40 teams, 80 spaces with 12,000 nested pages (8% restricted subtrees), and
+220 Slack channels (a quarter private) with about 1,760 threads and 3,200 replies. It is deterministic, and
+`SCALE_PAGES`, `SCALE_CHANNELS` and `SCALE_PEOPLE` shrink it for a quick try. Priya, Dana and Maya join a few
+generated teams and private channels; Jordan and Sam join none.
+
+The permission shapes are kept simple (restrictions only narrow and are never nested), so the generator states each
+document's tokens from its own spec. `connectors/ingestion/scale_run.py` ingests the seed into a separate
+`brain_scale` database and checks the index against that spec.
+
+First full run (7 Oct, fake embedder): about 12 documents/s for both sources (Confluence 17 min, Slack 2.3 min),
+bounded by per-document writes to Postgres; every check passed. Numbers and details in `docs/status/ws-a.md`. Run the scale Confluence simulator on another port
+(e.g. 8111, with `CONFLUENCE_SIM_URL`) to keep the demo one on 8101 untouched.
 
 ## Shared code
 [`common.py`](common.py) holds what both simulators use: the change feed with its full crawl, webhook delivery,

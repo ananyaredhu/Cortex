@@ -12,6 +12,7 @@ Three groups of endpoints:
   `Authorization: Bearer <token>` on them.
 
 Run: uvicorn simulators.confluence.app:app --port 8101
+     SIM_SEED=scale uvicorn simulators.confluence.app:app --port 8101    (Company A plus 12k generated pages, simulators/scale.py)
 """
 import hmac
 import os
@@ -80,14 +81,27 @@ class WebhookIn(BaseModel):
 
 
 class ResetIn(BaseModel):
-    seed: str = "company_a"   # company_a | empty
+    seed: str = "company_a"   # company_a | scale | empty
+
+
+SEEDS = ("company_a", "scale", "empty")
+
+
+def _seed(sim: ConfluenceSim, seed: str) -> None:
+    if seed not in SEEDS:
+        raise ValueError(f"SIM_SEED must be one of {', '.join(SEEDS)}")
+    if seed in ("company_a", "scale"):
+        seed_company_a(sim)
+    if seed == "scale":
+        from simulators.scale import Scale, generate, seed_confluence
+        seed_confluence(sim, generate(Scale.from_env()))
 
 
 def create_app(sim: ConfluenceSim | None = None, *, admin_token: str | None = None,
                base_url: str = "http://localhost:8101") -> FastAPI:
     if sim is None:
         sim = ConfluenceSim()
-        seed_company_a(sim)
+        _seed(sim, os.environ.get("SIM_SEED") or "company_a")
     app = FastAPI(title="Confluence simulator", version="0.1")
     app.state.sim = sim
     app.state.deliver = deliver
@@ -312,11 +326,10 @@ def create_app(sim: ConfluenceSim | None = None, *, admin_token: str | None = No
     @admin.post("/admin/reset")
     def reset(body: ResetIn | None = None) -> dict:
         seed = (body or ResetIn()).seed
-        if seed not in ("company_a", "empty"):
-            raise Invalid("seed must be 'company_a' or 'empty'")
+        if seed not in SEEDS:
+            raise Invalid("seed must be 'company_a', 'scale' or 'empty'")
         sim.clear()
-        if seed == "company_a":
-            seed_company_a(sim)
+        _seed(sim, seed)
         delivered["pos"] = len(sim.changelog.entries)
         return {"seed": seed, "pages": len(sim.pages)}
 
