@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { ChevronsUpDown, Home, MessageSquare, ScrollText, Settings2, Sparkles } from "lucide-react";
+import { ChevronsUpDown, Columns3, Home, MessageSquare, ScrollText, Settings2, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
@@ -36,6 +36,9 @@ export function Sidebar() {
         </NavLink>
         <NavLink to="/ask">
           <MessageSquare size={16} aria-hidden /> Ask
+        </NavLink>
+        <NavLink to="/compare">
+          <Columns3 size={16} aria-hidden /> Compare people
         </NavLink>
         {canAudit(persona) && (
           <NavLink to="/audit">

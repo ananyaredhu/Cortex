@@ -123,6 +123,7 @@ export function AskPage() {
                 </div>
                 {t.answer ? (
                   <AnswerCard
+                    asker={persona.id}
                     answer={t.answer}
                     onChoose={(q) => ask(q)}
                     onWhyMore={() => {

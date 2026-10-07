@@ -1,26 +1,30 @@
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, Check, Copy, ExternalLink, ShieldQuestion, Sparkles, WifiOff } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { api } from "../api/client";
 import type { AskResponse, Citation } from "../api/types";
-import { usePersona } from "../auth/PersonaContext";
+import type { PersonaId } from "../auth/personas";
 import { SourceGlyph, SOURCE_LABEL } from "../components/SourceGlyph";
 import { answerSegments, banners, shortId, uncitedClaims, when } from "./format";
 
 /**
  * One answer. Refusals use the same card, sections and footer as any other answer, and nothing in it
  * depends on why the answer was refused: a forbidden and a nonexistent document must look identical.
+ * `asker` is whose answer this is: "why can I see this?" is asked as them (split-screen has several).
  */
 export function AnswerCard({
+  asker,
   answer,
   onWhyMore,
   onChoose,
 }: {
+  asker: PersonaId;
   answer: AskResponse;
-  onWhyMore: () => void;
+  onWhyMore?: () => void; // absent where there is no Trust panel (split-screen)
   onChoose: (question: string) => void;
 }) {
   const [active, setActive] = useState<number | null>(null);
+  const tipId = useId();
   const [copied, setCopied] = useState(false);
   const segments = answerSegments(answer);
   const tip = active !== null ? answer.citations[active - 1] : null;
@@ -61,7 +65,7 @@ export function AnswerCard({
               type="button"
               className={`cite${active === s.n ? " cite--on" : ""}`}
               aria-label={`Source ${s.n}: ${s.citation.title}`}
-              aria-describedby={active === s.n ? "cite-tip" : undefined}
+              aria-describedby={active === s.n ? tipId : undefined}
               onMouseEnter={() => setActive(s.n)}
               onFocus={() => setActive(s.n)}
               onBlur={() => setActive(null)}
@@ -86,7 +90,7 @@ export function AnswerCard({
       )}
 
       {tip && (
-        <div id="cite-tip" role="tooltip" className="cite-tip">
+        <div id={tipId} role="tooltip" className="cite-tip">
           <div className="cite-tip__head">
             <SourceGlyph source={tip.source} size={14} /> {SOURCE_LABEL[tip.source]} · {tip.title}
           </div>
@@ -119,6 +123,7 @@ export function AnswerCard({
           <ol className="sources">
             {answer.citations.map((c, i) => (
               <SourceRow
+                asker={asker}
                 key={c.doc_id}
                 n={i + 1}
                 citation={c}
@@ -134,30 +139,33 @@ export function AnswerCard({
         <button type="button" className="ghost" onClick={copy}>
           {copied ? <Check size={14} aria-hidden /> : <Copy size={14} aria-hidden />} {copied ? "Copied" : "Copy"}
         </button>
-        <button type="button" className="ghost ghost--accent" onClick={onWhyMore} aria-controls="trust-why">
-          <ShieldQuestion size={14} aria-hidden /> Why might I not see everything?
-        </button>
+        {onWhyMore && (
+          <button type="button" className="ghost ghost--accent" onClick={onWhyMore} aria-controls="trust-why">
+            <ShieldQuestion size={14} aria-hidden /> Why might I not see everything?
+          </button>
+        )}
       </footer>
     </article>
   );
 }
 
 function SourceRow({
+  asker,
   n,
   citation: c,
   lit,
   onHover,
 }: {
+  asker: PersonaId;
   n: number;
   citation: Citation;
   lit: boolean;
   onHover: (on: boolean) => void;
 }) {
-  const { persona } = usePersona();
   const [why, setWhy] = useState(false);
   const proof = useQuery({
-    queryKey: ["explain", persona.id, c.doc_id],
-    queryFn: () => api(persona.id).explainAccess(c.doc_id),
+    queryKey: ["explain", asker, c.doc_id],
+    queryFn: () => api(asker).explainAccess(c.doc_id),
     enabled: why,
   });
 

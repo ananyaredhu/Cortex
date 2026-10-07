@@ -53,16 +53,16 @@ describe("AnswerCard", () => {
   it("renders a forbidden and a nonexistent refusal identically", () => {
     // Scenario 3: the stub returns the same body apart from the ids for Sam's breach question
     // and for a report that doesn't exist. The card must not add any difference of its own.
-    const a = wrap(<AnswerCard answer={refusal("req_0007")} onWhyMore={() => {}} onChoose={() => {}} />);
+    const a = wrap(<AnswerCard asker="sam" answer={refusal("req_0007")} onWhyMore={() => {}} onChoose={() => {}} />);
     const htmlA = a.container.innerHTML;
     a.unmount();
-    const b = wrap(<AnswerCard answer={refusal("req_0008")} onWhyMore={() => {}} onChoose={() => {}} />);
+    const b = wrap(<AnswerCard asker="sam" answer={refusal("req_0008")} onWhyMore={() => {}} onChoose={() => {}} />);
     expect(b.container.innerHTML).toBe(htmlA);
     expect(screen.getByText("No sources to show for this answer.")).toBeInTheDocument();
   });
 
   it("shows the source excerpt when a citation marker gets focus", () => {
-    wrap(<AnswerCard answer={ANSWER} onWhyMore={() => {}} onChoose={() => {}} />);
+    wrap(<AnswerCard asker="sam" answer={ANSWER} onWhyMore={() => {}} onChoose={() => {}} />);
     fireEvent.focus(screen.getAllByRole("button", { name: /Source 1:/ })[0]);
     expect(screen.getByRole("tooltip")).toHaveTextContent("replica lag stays above the 5 second threshold");
   });
@@ -70,7 +70,7 @@ describe("AnswerCard", () => {
   it("asks the chosen clarification", () => {
     const onChoose = vi.fn();
     const r = { ...ANSWER, clarify: { question: "Which migration?", options: ["DBMIG", "Ledger"] } };
-    wrap(<AnswerCard answer={r} onWhyMore={() => {}} onChoose={onChoose} />);
+    wrap(<AnswerCard asker="sam" answer={r} onWhyMore={() => {}} onChoose={onChoose} />);
     fireEvent.click(screen.getByRole("button", { name: "Ledger" }));
     expect(onChoose).toHaveBeenCalledWith("Ledger");
   });

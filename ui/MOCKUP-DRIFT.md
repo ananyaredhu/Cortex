@@ -47,8 +47,8 @@ Status: **Done** = handled in the Phase 0 branch (`ws-c/ui-phase0`). **Proposed*
 | 25 | "Synced 2 min ago" on the home page; `/v1/freshness` is admin-only. | Take it from the latest answer's `freshness.per_source`, or add a `last_sync` summary to `/mywork` later. | Later |
 | 26 | Hardcoded `companya.atlassian.net` and Slack links. | Use each item's `url` from the API (now optional in `/mywork`). | Proposed; stub done |
 | 27 | Stale-answer alerts exist in the contract and stub but have no screen. | Put them at the top of My Work ("Needs you"), plus a count in the sidebar. They are a listed demo moment. | Build (Phase 4) |
-| 28 | **Split-screen personas** (Priya, Sam and Dana ask the same question) is a planned demo moment with no mockup. | New `/compare` route: three columns, each its own request with its own persona token (never mixed client-side), each rendered with the Ask answer card. | Build (Phase 2) |
-| 29 | Demo controls: only "Tamper one row" exists in the mockup. Scenarios 2 and 4 need "advance e1/e2" and reset. | A drawer behind `VITE_DEMO_CONTROLS`, calling `/sim/*` (stub) or A's simulator admin endpoints (real). Never in production builds. | Build (Phase 2) |
+| 28 | **Split-screen personas** (Priya, Sam and Dana ask the same question) is a planned demo moment with no mockup. | New `/compare` route: three columns, each its own request with its own persona token (never mixed client-side), each rendered with the Ask answer card. | Done (Phase 2, `/compare`) |
+| 29 | Demo controls: only "Tamper one row" exists in the mockup. Scenarios 2 and 4 need "advance e1/e2" and reset. | A drawer behind `VITE_DEMO_CONTROLS`, calling `/sim/*` (stub) or A's simulator admin endpoints (real). Never in production builds. | Done (Phase 2, stub endpoints) |
 
 ## Audit console
 
