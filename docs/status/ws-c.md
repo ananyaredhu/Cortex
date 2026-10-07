@@ -10,7 +10,8 @@ Update at the end of each day. Newest first. Keep it short: done, next, blockers
 - **Done:** stub API implements 0.2; console endpoints now enforce roles (`/audit/verify` compliance; freshness, Leak-CI and policy security-lead or compliance); `/freshness` returns A's report shape. 12 new tests in `evals/tests/test_api_v02_stub.py`, including: no denied or candidate counts in answers, identical 0.2 fields and stream stages for forbidden and nonexistent content, replay hides titles the officer cannot see.
 - **Found:** the mockup's Trust panel ("found → allowed → shown" per platform) would leak existence of hidden documents; replaced by `coverage` (shown only). 48 drifts between the mockup and the repo, each with a resolution, in `ui/MOCKUP-DRIFT.md`.
 - **Next (C):** review the drift list; Phase 1 Ask screen (answer card, Trust panel); Phase 2 split-screen and demo controls for the Day 8 demo. Plan in `ui/README.md`.
-- **Blockers:** api.md 0.2 approval; jdoe persona and audit seed (A, B).
+- **Decided:** scenario 5 queries Priya's history in the `PAY` space instead of the handbook's "jdoe" (no new persona or seed needed); `docs/04-scenarios.md` updated.
+- **Blockers:** api.md 0.2 approval.
 
 ## Fri 2 Oct (Day 1)
 - **Done:** repo scaffold and docs.
