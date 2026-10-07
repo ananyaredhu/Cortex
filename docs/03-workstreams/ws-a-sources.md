@@ -57,10 +57,10 @@ Day 1 = Fri 2 Oct. Day 3 = contracts freeze. Day 8 = demoable build.
 ### Days 11 to 12 (Mon 12 to Tue 13 Oct)
 - [x] Hidden-document add/remove/edit tooling for Leak-CI (with C) (7 Oct, `python -m simulators.leakci`: plant, edit, remove, list, clear and verify, on Confluence and Jira; C wires it into the Leak-CI tests)
 - [x] Webhook and poll hardening, rate-limit back-off, retries (7 Oct: a failing source no longer stops the others or the process; per-source back-off with `Retry-After`; database reconnect; expired simulator cursors recrawl on their own, contract 0.3 addition)
-- [ ] Support B on revocation-to-enforcement timing measurement
+- [x] Support B on revocation-to-enforcement timing measurement (7 Oct: `python -m connectors.ingestion.revocation_timing` times A's stages on four simulator scenarios, with a hook for B's `/v1/ask` stage; live `check_access` denies within about 5 to 8 ms)
 
 ### Days 13 to 15 (Wed 14 to Fri 16 Oct)
-- [ ] Bug fixes, final data reset, deployment support, `simulators/README.md`
+- [ ] Bug fixes, final data reset, deployment support, `simulators/README.md` (tools ready 7 Oct: `python -m connectors.reset_demo` checks and resets the demo data, `connectors/DEPLOY.md` is for C's deployment, `simulators/README.md` is current; the final reset itself runs just before submission)
 
 ## Definition of done
 - All four connectors pass the shared contract tests.

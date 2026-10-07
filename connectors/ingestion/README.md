@@ -11,6 +11,9 @@ python -m connectors.ingestion --poll 5            # keep going, 5 seconds betwe
 python -m connectors.ingestion --once --recrawl    # forget cursors and crawl again (rarely needed: see "Failures")
 python -m connectors.ingestion --once --sources confluence,jira,slack,gdrive   # all four (Slack and Drive are real)
 python -m connectors.ingestion.check_index         # compare the index with the fixtures, through the seed manifests
+python -m connectors.ingestion.freshness_report    # lag per source (see "Freshness")
+python -m connectors.ingestion.revocation_timing   # revocation-to-enforcement, A's stages (see the module docstring)
+python -m connectors.reset_demo [--apply]          # back to the seeded story before a demo; deployment: connectors/DEPLOY.md
 ```
 With `--poll`, add `--drive-webhook PORT` to have Drive push notifications wake ingestion early (`connectors/gdrive/README.md`, "Push notifications"), and `--slack-events` to have Slack events through Socket Mode do the same for Slack (`connectors/slack/README.md`, "Events").
 The simulators must be running for Confluence and Jira (`make sim-confluence`, `make sim-jira`).

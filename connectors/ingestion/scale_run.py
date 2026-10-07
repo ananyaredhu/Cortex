@@ -23,47 +23,26 @@ import os
 import random
 import re
 import time
-from pathlib import Path
-from urllib.parse import urlparse, urlunparse
-
-import psycopg
 
 from connectors.env import load_dotenv
 from connectors.ingestion.embedding import FakeEmbedder, from_env
 from connectors.ingestion.freshness import percentile
 from connectors.ingestion.pg_store import DEFAULT_URL, PostgresStore
 from connectors.ingestion.pipeline import Ingestor
+from connectors.ingestion.scratch_db import prepare as scratch_prepare
 from fixtures.loader import load
 from simulators.confluence import ConfluenceConnector
 from simulators.scale import PUBLIC_ORG, Company, Scale, generate
 from simulators.slack.connector import connector as slack_sim
 
-_INIT_SQL = Path(__file__).resolve().parents[2] / "db" / "init.sql"
 DEFAULT_SCALE_URL = "postgresql://brain:brain@localhost:5432/brain_scale"
 K = 10
 
 
 # -- the database ---------------------------------------------------------------------------------
-def _database(url: str) -> str:
-    return urlparse(url).path.lstrip("/")
-
-
 def prepare(url: str, *, reset: bool) -> None:
     """Create the scale database from db/init.sql if it is missing (or always, with reset). Never the demo one."""
-    name = _database(url)
-    if not name.startswith("brain_scale"):
-        raise SystemExit(f"refusing database {name!r}: the scale run only writes to a database named brain_scale...")
-    admin = urlunparse(urlparse(url)._replace(path="/postgres"))
-    with psycopg.connect(admin, autocommit=True) as conn:
-        exists = conn.execute("SELECT 1 FROM pg_database WHERE datname = %s", (name,)).fetchone()
-        if exists and reset:
-            conn.execute(f'DROP DATABASE "{name}" WITH (FORCE)')
-            exists = None
-        if not exists:
-            conn.execute(f'CREATE DATABASE "{name}"')
-    with psycopg.connect(url, autocommit=True) as conn:
-        if conn.execute("SELECT to_regclass('chunks')").fetchone()[0] is None:
-            conn.execute(_INIT_SQL.read_text(encoding="utf-8"))
+    scratch_prepare(url, prefix="brain_scale", reset=reset)
 
 
 def _embedder(name: str):
