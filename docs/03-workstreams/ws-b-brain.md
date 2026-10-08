@@ -28,37 +28,37 @@ Connectors, `chunks` schema and simulator admin endpoints from A. UI needs and g
 
 ### Days 1 to 2 (Fri 2 to Sat 3 Oct)
 - [ ] **Model probe script:** reachability from Singapore, latency, rate limits, structured output, context length, cost for DeepSeek-V3 (ADP/TokenHub), Hunyuan, Qwen, small open-weight models (check #1)
-- [ ] Model gateway interface with config-driven backends; embedding interface (bge-m3 default)
+- [x] Model gateway interface with config-driven backends; embedding interface (bge-m3 default). 8 Oct: `brain/gateway/` (template generator in use; the OpenAI-compatible backend is wired but unrun, no key yet); the query vector uses A's bge-m3 embedder
 - [ ] Time bge-m3 and checker candidates on CPU (check #2, #6) with C
-- [ ] LangGraph pipeline skeleton; audit hash-chain library with tests (genesis, append, verify, tamper test)
+- [x] LangGraph pipeline skeleton; audit hash-chain library with tests (genesis, append, verify, tamper test). 8 Oct: `brain/pipeline/graph.py`, `brain/audit/chain.py` with edit, delete, insert, reorder and checkpoint-signature tests
 - [ ] Draft contract changes you need (PRs to `docs/02-contracts/`)
 
 ### Day 3 (Sun 4 Oct): contracts freeze
-- [ ] Ship a **stub** `/v1/ask`, `/v1/mywork`, `/v1/audit/*` returning fixtures that match [api](../02-contracts/api.md), so C can build the UI
-- [ ] Agree the `chunks` schema with A
+- [x] Ship a **stub** `/v1/ask`, `/v1/mywork`, `/v1/audit/*` returning fixtures that match [api](../02-contracts/api.md), so C can build the UI (shipped with the scaffold; C extended it to 0.2)
+- [x] Agree the `chunks` schema with A (connector-interface 0.3; B's reads in `brain/retrieval/index.py`)
 
 ### Days 3 to 5 (Sun 4 to Tue 6 Oct)
-- [ ] PDP: token computation, prefilter, JIT `check_access` with short-TTL cache, fail closed, decisions with proof paths
-- [ ] Hybrid retrieval over the real index; per-source fan-out and fusion
-- [ ] Audit service: events, signed checkpoints, `/verify`
+- [x] PDP: token computation, prefilter, JIT `check_access` with short-TTL cache, fail closed, decisions with proof paths. 8 Oct: `brain/policy/`, caches dropped by the outbox consumer
+- [x] Hybrid retrieval over the real index; per-source fan-out and fusion. 8 Oct: keyword leg ORs the question's terms (ranked by distinct terms matched), vector leg with the iterative scan and a measured 0.45 cutoff, RRF
+- [x] Audit service: events, signed checkpoints, `/verify`. 8 Oct: `brain/audit/`, one writer of `audit_events`, Ed25519 checkpoints every 100 events, `/audit/query` under RBAC, `/audit/replay`
 
 ### Days 5 to 8 (Tue 6 to Fri 9 Oct)
-- [ ] Router and query rewrite (small model); context packet builder (quotas, dedupe, ordering, budget, spotlighting)
-- [ ] Generator with structured claims plus citations; checker layers 1 and 2
-- [ ] Uniform refusal with timing normalization
-- [ ] **Day 8 demoable:** scenarios 1, 3 and 4 run end to end on seed data
+- [ ] Router and query rewrite (small model); **context packet builder done** 8 Oct (`brain/packet.py`: quotas, dedupe, snippet, sanitize and flag, attention order, budget)
+- [ ] Generator with structured claims plus citations; checker layers 1 and 2. 8 Oct: structured claims from the extractive template generator; **layer 1 done** (`brain/checker/layer1.py`); an LLM generator and layer 2 wait for a model key
+- [x] Uniform refusal with timing normalization. 8 Oct: one refusal body, every node runs on every request, floor latency `BRAIN_FLOOR_LATENCY_MS`; tested equal for forbidden and nonexistent, 0.2 fields included
+- [x] **Day 8 demoable:** scenarios 1, 3 and 4 run end to end on seed data. 8 Oct: all nine golden cases pass on the real pipeline in fixture mode (`evals/tests/test_golden_brain.py`); the non-scripted ones also on the Postgres index with the simulators and real Slack and Drive
 
 ### Days 9 to 10 (Sat 10 to Sun 11 Oct)
 - [ ] Four skills and the loader (status-and-blockers, incident-investigation, design-discussion-summary, audit-inquiry)
 - [ ] Stateless MCP server with per-request JWT validation; pin tool descriptions
-- [ ] Link-edge authorization; answer-level ACL labels; checker layer 3 for hard cases
-- [ ] Freshness read-through (version check and inline re-fetch)
+- [ ] Link-edge authorization; answer-level ACL labels (8 Oct: labels computed and stored on every answer, `brain/policy/labels.py`; not yet used to gate memory); checker layer 3 for hard cases
+- [x] Freshness read-through (version check and inline re-fetch). 8 Oct: `freshness` node; tested with e1 applied at the source but not ingested
 
 ### Days 11 to 12 (Mon 12 to Tue 13 Oct)
-- [ ] Context profile and `/v1/mywork` data
-- [ ] Stale-answer alerts engine
-- [ ] Audit agent (NL to filters, under RBAC); replayable audit and time-travel queries
-- [ ] Measure and publish revocation-to-enforcement time
+- [ ] Context profile; **`/v1/mywork` data done** 8 Oct (index rows through prefilter and live check)
+- [x] Stale-answer alerts engine. 8 Oct: cited versions remembered per answer, compared with the index, served only for documents still visible
+- [ ] Audit agent (NL to filters, under RBAC); **replay done** 8 Oct (`/v1/audit/replay`: revoked, edited, deleted per cited document); time-travel queries
+- [x] Measure and publish revocation-to-enforcement time. 8 Oct, `python -m brain.timing --rounds 3` on the simulators: the next `/v1/ask` after the revocation refuses at p50 198 to 230 ms (p95 256 to 907 ms, first-connection outliers) across A's four scenarios, including the ingestion pass that writes the outbox event
 - [ ] Stretch: sensitivity-aware model routing (restricted content only to in-region models)
 
 ### Days 13 to 15 (Wed 14 to Fri 16 Oct)
