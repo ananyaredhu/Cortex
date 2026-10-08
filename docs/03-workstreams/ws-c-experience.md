@@ -28,22 +28,22 @@ Mock IdP and JWT claims; UI; `evals/` suites and the scoreboard; `deploy/`; the 
 - [ ] Post the questions in the track WhatsApp group (mocks acceptable? track judging criteria? correct submission link?) (check #12)
 - [ ] Verify CodeBuddy MCP config and which instruction file it reads (check #8); find out what the WorkBuddy multipliers mean (check #11)
 - [ ] Hosting: Lighthouse/CVM in Singapore, cost and credits (check #10)
-- [ ] Draft contract changes you need (PRs to `docs/02-contracts/`)
+- [x] Draft contract changes you need (PRs to `docs/02-contracts/`)
 
 ### Day 3 (Sun 4 Oct): contracts freeze
 - [ ] Mock IdP issuing JWTs for the personas
-- [ ] UI shell running against B's **stub** API
+- [x] UI shell running against B's **stub** API
 
 ### Days 3 to 5 (Sun 4 to Tue 6 Oct)
-- [ ] Chat UI with citations, "as of" times, "why can I see this?", uniform refusal display
-- [ ] Persona switcher and split-screen view
+- [x] Chat UI with citations, "as of" times, "why can I see this?", uniform refusal display
+- [x] Persona switcher and split-screen view
 - [ ] Golden test harness skeleton with the seven scenarios and expected allowed and denied sets
 - [ ] WorkBuddy MCP client check against a local MCP server (check #7); sandbox check (check #9)
 - [ ] Deployment pipeline to Singapore
 
 ### Days 6 to 8 (Wed 7 to Fri 9 Oct)
-- [ ] **My Work** home (assigned tickets, projects, channels, recent pages, suggested questions)
-- [ ] Admin and audit console skeleton
+- [x] **My Work** home (assigned tickets, projects, channels, recent pages, suggested questions)
+- [x] Admin and audit console skeleton
 - [ ] **Day 8 demoable:** scenarios 1, 3 and 4 shown in the UI against real data; schedule review
 
 ### Days 9 to 10 (Sat 10 to Sun 11 Oct)
@@ -54,7 +54,7 @@ Mock IdP and JWT claims; UI; `evals/` suites and the scoreboard; `deploy/`; the 
 
 ### Days 11 to 12 (Mon 12 to Tue 13 Oct)
 - [ ] Red-team harness: prompt injection in documents, existence side-channel probes, canary strings, revocation races; public scoreboard (leaks 0/N, freshness p95, citation precision)
-- [ ] Accessibility pass (keyboard, ARIA, contrast)
+- [x] Accessibility pass (keyboard, ARIA, contrast)
 - [ ] Stretch: TRTC voice question and spoken answer
 
 ### Days 13 to 15 (Wed 14 to Fri 16 Oct)
