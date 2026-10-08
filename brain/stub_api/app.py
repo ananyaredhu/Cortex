@@ -8,7 +8,7 @@ Auth (stub only): `Authorization: Bearer dev:<persona_id>`, e.g. `Bearer dev:pri
 The real API validates a JWT from the mock IdP on every request.
 
 The 0.2 fields are filled with plausible stub values: grounding is always 1.0, `time_range` is accepted and ignored,
-`clarify` is always null, and every source is always reachable.
+`clarify` is always null. Sources are fresh and reachable unless `/sim/source-status` says otherwise.
 
 Run: uvicorn brain.stub_api.app:app --reload --port 8000
 """
@@ -26,8 +26,9 @@ from fixtures.loader import State, can_see
 app = FastAPI(title="Internal Brain stub API", version="0.1")
 STATE = State()
 AUDIT: list[dict] = []
-ANSWERED: dict[str, list[dict]] = {}   # persona -> [{request_id, doc_ids}]
+ANSWERED: dict[str, list[dict]] = {}   # persona -> [{request_id, question, doc_ids}]
 CONVERSATIONS: dict[str, dict[str, dict]] = {}   # persona -> conversation_id -> {title, last_asked_at}
+SOURCE_STATUS: dict[str, str] = {}   # source -> "stale" | "unavailable" (absent: "ok"), set by /sim/source-status
 SALT = "stub-salt"
 REFUSAL = "I couldn't find anything you have access to about that."
 SOURCES = ("confluence", "jira", "slack", "gdrive")
@@ -94,6 +95,11 @@ class EvaluateBody(BaseModel):
     doc_id: str
 
 
+class SourceStatusBody(BaseModel):
+    source: str
+    status: str   # ok | stale | unavailable
+
+
 class AdvanceBody(BaseModel):
     event_id: str
 
@@ -130,7 +136,9 @@ def _sse(event: str, data: dict) -> str:
 
 def _answer(me: dict, body: AskBody) -> dict:
     toks = STATE.persona_tokens[me["id"]]
-    searched = [s for s in SOURCES if not body.sources or s in body.sources]
+    wanted = [s for s in SOURCES if not body.sources or s in body.sources]
+    unavailable = [s for s in wanted if SOURCE_STATUS.get(s) == "unavailable"]
+    searched = [s for s in wanted if s not in unavailable]
     scored = sorted(((_score(body.question, d), d) for d in STATE.docs.values() if d["source"] in searched),
                     key=lambda x: -x[0])
     candidates = [(s, d) for s, d in scored if s >= 2][:8]
@@ -152,7 +160,8 @@ def _answer(me: dict, body: AskBody) -> dict:
 
     refused = not allowed
     answer = REFUSAL if refused else "Here is what I found:\n" + "\n".join(lines)
-    ANSWERED.setdefault(me["id"], []).append({"request_id": request_id, "doc_ids": [d["doc_id"] for d in allowed]})
+    ANSWERED.setdefault(me["id"], []).append({"request_id": request_id, "question": body.question,
+                                              "doc_ids": [d["doc_id"] for d in allowed]})
 
     decisions = [{"doc_id": d["doc_id"], "allowed": True, "proof_path": c["why_visible"],
                   "acl_snapshot_hash": d["acl"]["snapshot_hash"], "policy_version": "stub-0.1",
@@ -173,13 +182,14 @@ def _answer(me: dict, body: AskBody) -> dict:
             "claims": claims, "citations": citations, "refused": refused, "abstained": False,
             "freshness": {"oldest_source_as_of": min((c["as_of"] for c in citations), default=None),
                           "stale_refetched": 0,
-                          "per_source": {s: {"last_sync": STATE.data["now"], "status": "ok"} for s in SOURCES}},
+                          "per_source": {s: {"last_sync": STATE.data["now"], "status": SOURCE_STATUS.get(s, "ok")}
+                                         for s in SOURCES}},
             "skill": body.skill_hint,
             # counts only what the asker is shown: never candidates or denials (api.md 0.2, coverage)
             "coverage": {s: {"searched": s in searched, "shown": sum(c["source"] == s for c in citations)}
                          for s in SOURCES},
             "grounding": None if refused else {"score": 1.0, "removed_claims": 0},
-            "policy_version": POLICY_VERSION, "unavailable_sources": [], "clarify": None}
+            "policy_version": POLICY_VERSION, "unavailable_sources": unavailable, "clarify": None}
 
 
 @app.get("/v1/conversations")
@@ -225,26 +235,54 @@ def explain_access(doc_id: str, authorization: str | None = Header(None)):
 @app.get("/v1/alerts")
 def alerts(authorization: str | None = Header(None)):
     me = _persona(authorization)
+    toks = STATE.persona_tokens[me["id"]]
     out = []
     for ev_id in STATE.applied:
         ev = next(e for e in STATE.data["events"] if e["id"] == ev_id)
-        if ev["type"] != "upsert":
+        doc = STATE.docs.get(ev.get("doc_id", ""))
+        # Content changes only, and only to documents the person may still see: an alert about a document
+        # they have lost would tell them it changed.
+        if ev["type"] != "upsert" or doc is None or not can_see(toks, doc):
             continue
         for ans in ANSWERED.get(me["id"], []):
             if ev["doc_id"] in ans["doc_ids"]:
-                out.append({"request_id": ans["request_id"], "changed_doc": ev["doc_id"],
-                            "changed_at": ev["at"], "summary": ev.get("note", "A source changed after your answer")})
+                out.append({"request_id": ans["request_id"], "question": ans["question"], "changed_doc": ev["doc_id"],
+                            "changed_title": doc["title"], "changed_at": ev["at"],
+                            "summary": f"{doc['title']} changed after your answer"})
     return {"alerts": out}
 
 
 @app.post("/v1/audit/query")
 def audit_query(body: dict, authorization: str | None = Header(None)):
+    """Filters: `user` (email), `space` (e.g. "confluence:PAY", matched on allowed document ids only: denied ones
+    are salted hashes by design), `decision` ("allowed" or "denied": events with at least one such decision).
+    `question` (natural language) is accepted and ignored by the stub. The query is itself logged."""
     me = _persona(authorization)
     if "compliance" not in me["roles"]:
         raise HTTPException(403, "compliance role required")
-    user = (body.get("filter") or {}).get("user")
-    events = [e for e in AUDIT if user is None or e["actor"]["user_id"] == user]
-    return {"events": events, "count": len(events)}
+    f = body.get("filter") or {}
+    user, space, decision = f.get("user"), f.get("space"), f.get("decision")
+    events = [e for e in AUDIT
+              if (user is None or e["actor"]["user_id"] == user)
+              and (space is None or any(d.get("doc_id", "").startswith(space + "/") for d in e["decisions"]))
+              and (decision in (None, "all") or any(d["allowed"] is (decision == "allowed") for d in e["decisions"]))]
+    shown = [_for_officer(e, STATE.persona_tokens[me["id"]]) for e in events]
+    _append_audit({"request_id": f"aq_{len(AUDIT) + 1:04d}", "event_type": "audit_query",
+                   "actor": {"user_id": me["email"], "roles": me["roles"], "client": "ui"},
+                   "query": {"text": body.get("question") or json.dumps(f, sort_keys=True), "skill": None},
+                   "decisions": [], "flags": []})
+    return {"events": shown, "count": len(shown)}
+
+
+def _for_officer(event: dict, officer_tokens: set[str]) -> dict:
+    """An answer's text goes to the officer only if they may see every document it cites; the hash always does."""
+    answer = event.get("answer")
+    if not answer:
+        return event
+    cited = [STATE.docs.get(c) for c in answer["citations"]]
+    if all(d is not None and can_see(officer_tokens, d) for d in cited):
+        return event
+    return {**event, "answer": {**{k: v for k, v in answer.items() if k != "text"}, "text": None, "text_withheld": True}}
 
 
 @app.get("/v1/audit/verify")
@@ -320,6 +358,11 @@ def policy_evaluate(body: EvaluateBody, authorization: str | None = Header(None)
     if who is None or d is None:
         raise HTTPException(404, "unknown user or document")
     shared = sorted(STATE.persona_tokens[who["id"]] & set(d["acl"]["tokens"]))
+    admin = _persona(authorization)
+    _append_audit({"request_id": f"ev_{len(AUDIT) + 1:04d}", "event_type": "admin_view",
+                   "actor": {"user_id": admin["email"], "roles": admin["roles"], "client": "ui"},
+                   "query": {"text": f"policy evaluate {body.user} {body.doc_id}", "skill": None},
+                   "decisions": [], "flags": []})
     return {"allowed": bool(shared), "rule": "token-overlap", "policy_version": POLICY_VERSION,
             "proof_path": [f"user:{who['email']}", shared[0]] if shared else []}
 
@@ -338,7 +381,20 @@ def sim_reset():
     AUDIT.clear()
     ANSWERED.clear()
     CONVERSATIONS.clear()
+    SOURCE_STATUS.clear()
     return {"ok": True}
+
+
+@app.post("/sim/source-status")
+def sim_source_status(body: SourceStatusBody):
+    """Demo the stale and unreachable banners: mark a source stale, unavailable, or back to ok."""
+    if body.source not in SOURCES or body.status not in ("ok", "stale", "unavailable"):
+        raise HTTPException(422, "unknown source or status")
+    if body.status == "ok":
+        SOURCE_STATUS.pop(body.source, None)
+    else:
+        SOURCE_STATUS[body.source] = body.status
+    return {"source_status": SOURCE_STATUS}
 
 
 @app.post("/sim/tamper")

@@ -1,0 +1,47 @@
+/* Admin: connector health, SLA, trap tests, policy (design-reference/screens/Admin.dc.html). */
+.admin { height: 100%; overflow: auto; padding: var(--space-6); display: flex; flex-direction: column; gap: var(--space-5); }
+.admin header p { margin: var(--space-1) 0 0; }
+.admin section > .eyebrow { margin: 0 0 var(--space-3); }
+.admin__cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--space-3); }
+.admin__card { padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); }
+.admin__card header { display: flex; align-items: center; gap: var(--space-2); }
+.admin__card header .status { margin-left: auto; }
+.admin__card .kv { margin: 0; }
+.num-left { font-variant-numeric: tabular-nums; }
+.status--none { color: var(--text-muted); }
+.admin__split { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: var(--space-4); }
+.admin__panel { padding: var(--space-5); }
+.admin__panel > p { margin: 0 0 var(--space-3); }
+.admin__hero { display: flex; align-items: center; gap: var(--space-3); }
+.admin__big { font: var(--fw-bold) var(--fs-40)/1 var(--font-sans); font-variant-numeric: tabular-nums; color: var(--success-text); }
+.admin__big.is-bad { color: var(--danger-text); }
+.admin__suites, .admin__versions { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.admin__suites li, .admin__versions li { display: flex; align-items: center; gap: var(--space-2); padding: 8px 0; border-top: var(--border-1); font-size: var(--fs-13); }
+.admin__suites li > span:nth-child(2) { flex: 1; }
+.admin__versions li > .muted { margin-left: auto; }
+.admin__eval { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-3); }
+.admin__eval label { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-12); color: var(--text-muted); flex: 1; min-width: 180px; }
+.admin__eval select, .admin__eval input { height: var(--control-md); padding: 0 10px; border: var(--border-1); border-radius: var(--radius-sm); background: var(--surface-card); color: var(--text-strong); font: var(--type-small); }
+.admin__verdict { display: flex; flex-direction: column; gap: 4px; margin-top: var(--space-3); padding: var(--space-3); border-radius: var(--radius-sm); }
+.admin__verdict strong { display: flex; align-items: center; gap: 6px; }
+.admin__verdict.is-allow { background: var(--success-soft); }
+.admin__verdict.is-deny { background: var(--danger-soft); }
+
+/* Lag chart: one measure, neutral bars, recessive grid */
+.lag { margin: 0; }
+.lag__plot { position: relative; display: flex; flex-direction: column; gap: 10px; padding: 34px 0 4px; }
+/* The axis overlay spans exactly the bar track column, so ticks, target and bars share one scale. */
+.lag__axis { position: absolute; top: 0; bottom: 0; left: 96px; right: 64px; pointer-events: none; }
+.lag__grid, .lag__target { position: absolute; top: 0; bottom: 0; border-left: 1px solid var(--border-subtle); }
+.lag__grid span, .lag__target span { position: absolute; top: 0; left: 4px; font: 400 10px/1 var(--font-mono); color: var(--text-muted); white-space: nowrap; }
+.lag__target { border-left: 2px dashed var(--text-muted); }
+.lag__target span { color: var(--text-body); top: 14px; }
+.lag__target--worst { border-left-color: var(--danger); }
+.lag__row { position: relative; display: grid; grid-template-columns: 96px 1fr 64px; align-items: center; outline-offset: 2px; }
+.lag__name { font-size: var(--fs-13); }
+.lag__track { position: relative; height: 16px; display: flex; align-items: center; }
+.lag__bar { display: block; height: 12px; border-radius: 0 4px 4px 0; background: var(--text-body); }
+.lag__bar.is-hover { background: var(--text-strong); }
+.lag__value { padding-left: 6px; font-size: 11px; color: var(--text-body); white-space: nowrap; }
+.lag__tip { position: absolute; left: 96px; top: 22px; z-index: 2; display: flex; gap: var(--space-3); padding: 6px 10px; border: var(--border-1); border-radius: var(--radius-sm); background: var(--surface-raised); box-shadow: var(--shadow-2); font-size: var(--fs-12); white-space: nowrap; }
+@media (max-width: 720px) { .admin { padding: var(--space-4); } .admin__split { grid-template-columns: 1fr; } }

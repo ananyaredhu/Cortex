@@ -4,11 +4,15 @@ import type {
   AskRequest,
   AskResponse,
   AuditEvent,
+  AuditFilter,
   Conversation,
   ExplainAccess,
   FreshnessReport,
   LeakCiReport,
   MyWork,
+  PolicyDecision,
+  PolicyVersions,
+  Replay,
   Stage,
   StaleAlert,
   VerifyResult,
@@ -48,9 +52,14 @@ export function api(persona: PersonaId) {
     alerts: () => call<{ alerts: StaleAlert[] }>(persona, "/v1/alerts"),
     explainAccess: (docId: string) =>
       call<ExplainAccess>(persona, `/v1/explain-access?doc_id=${encodeURIComponent(docId)}`),
-    auditQuery: (body: { question?: string; filter?: Record<string, string> }) =>
+    auditQuery: (body: { question?: string; filter?: AuditFilter }) =>
       call<{ events: AuditEvent[]; count: number }>(persona, "/v1/audit/query", post(body)),
     auditVerify: () => call<VerifyResult>(persona, "/v1/audit/verify"),
+    auditReplay: (requestId: string) =>
+      call<Replay>(persona, `/v1/audit/replay?request_id=${encodeURIComponent(requestId)}`),
+    policyVersions: () => call<PolicyVersions>(persona, "/v1/policy/versions"),
+    policyEvaluate: (user: string, docId: string) =>
+      call<PolicyDecision>(persona, "/v1/policy/evaluate", post({ user, doc_id: docId })),
     freshness: () => call<FreshnessReport>(persona, "/v1/freshness"),
     leakci: () => call<LeakCiReport>(persona, "/v1/leakci/latest"),
   };

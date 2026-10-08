@@ -8,7 +8,7 @@ import { Sidebar } from "../components/Sidebar";
 
 beforeEach(() => {
   localStorage.clear();
-  vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => new Response(JSON.stringify({ conversations: [] }))));
+  vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => new Response(JSON.stringify({ conversations: [], alerts: [] }))));
 });
 
 const renderSidebar = () =>

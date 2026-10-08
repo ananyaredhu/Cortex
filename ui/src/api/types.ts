@@ -71,6 +71,8 @@ export interface StaleAlert {
   changed_doc: string;
   changed_at: string;
   summary: string;
+  question?: string; // 0.2
+  changed_title?: string; // 0.2
 }
 
 export interface MyWork {
@@ -105,7 +107,8 @@ export interface AuditEvent {
   actor: { user_id: string; roles: string[]; client: string };
   query?: { text: string; skill?: string | null };
   decisions: AuditDecision[];
-  answer?: { text?: string; sha256: string; citations: string[]; refused: boolean };
+  // text is null (text_withheld) unless the viewing officer may see every cited document (api.md 0.2)
+  answer?: { text?: string | null; text_withheld?: boolean; sha256: string; citations: string[]; refused: boolean };
   flags?: string[];
   prev_hash: string;
   hash: string;
@@ -142,4 +145,32 @@ export interface LeakCiReport {
   cases: number;
   leaks: number;
   suites?: { name: string; category: string; passed: number; failed: number; last_run_at: string }[]; // 0.2
+}
+
+export interface AuditFilter {
+  user?: string;
+  space?: string;
+  decision?: "all" | "allowed" | "denied";
+  from?: string;
+  to?: string;
+}
+
+export type ReplayCitation = { doc_id: string; title: string; source: Source } | { doc_id: string; restricted: true };
+
+export interface Replay {
+  then: { answer_sha256?: string; citations: ReplayCitation[]; policy_version: string };
+  now: { citations: ReplayCitation[]; policy_version: string };
+  differences: { doc_id: string; change: "revoked" | "edited" | "deleted" }[];
+}
+
+export interface PolicyVersions {
+  active: string;
+  versions: { policy_version: string; author: string; created_at: string; pr_url: string | null }[];
+}
+
+export interface PolicyDecision {
+  allowed: boolean;
+  rule: string;
+  proof_path: string[];
+  policy_version: string;
 }

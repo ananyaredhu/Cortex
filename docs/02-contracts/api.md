@@ -79,9 +79,11 @@ Why can I see this? Returns `{"found": true, "proof_path": [...]}` for an allowe
 
 ## `GET /v1/alerts`
 Stale-answer alerts: answers the user received whose sources changed afterwards (`request_id`, `changed_doc`, `changed_at`, `summary`).
+*(0.2, optional)* `question` (the user's own question, so the UI can ask it again) and `changed_title`. Alerts cover content changes to documents the user **may still see**; a document they have lost access to never produces an alert (it would reveal that it changed).
 
 ## Audit (compliance role only)
 - `POST /v1/audit/query` with `{ "question": "..." }` (natural language) or `{ "filter": {user, space, from, to, decision} }` returns `{events, count}`, with timestamps, retrieved IDs and allow/deny decisions.
+- *(0.2)* In returned events, `answer.text` is `null` with `answer.text_withheld: true` unless the **viewing** officer may see every document the answer cites; `answer.sha256` is always there. The filter's `space` matches allowed document ids only (denied ones are salted hashes by design). Every audit query is itself logged as `audit_query`.
 - `GET /v1/audit/verify` returns `{ok, checked, checkpoints}` or `{ok:false, first_broken_seq, reason}`.
 - `GET /v1/audit/time-travel?user=...&at=...` returns what a user could see at a past time (when bi-temporal ACL snapshots are available).
 - `GET /v1/audit/replay?request_id=...` *(0.2, optional)*: `{ "then": {"answer", "citations", "policy_version"}, "now": {"answer", "citations", "policy_version"}, "differences": [{"doc_id": "...", "change": "revoked" | "edited" | "deleted"}] }`. `then` is rebuilt from the logged document versions and policy, not from the live index. Titles and text appear only for documents the **viewing** officer may see; anything else is `{"doc_id": "...", "restricted": true}`.
@@ -97,5 +99,5 @@ Stale-answer alerts: answers the user received whose sources changed afterwards 
 Simulator admin endpoints (owned by A) to revoke a permission, restrict a page, edit a document, and add or remove hidden documents (for Leak-CI). Documented in `simulators/README.md`. The stub API has its own: `/sim/advance`, `/sim/reset`, `/sim/tamper`.
 
 ## Changelog
-- 0.2 (proposed): optional UI fields on `/ask` (`excerpt`, `freshness.per_source`, `coverage`, `grounding`, `policy_version`, `unavailable_sources`, `clarify`) and its `sources` and `time_range` filters; `/ask/stream`; `/conversations`; `/audit/replay`; `/policy/versions` and `/policy/evaluate`; `/mywork` and `/freshness` shapes written down; roles for the admin endpoints. Explicit rule: no candidate or denied counts in any asker-facing response.
+- 0.2 (proposed): optional UI fields on `/ask` (`excerpt`, `freshness.per_source`, `coverage`, `grounding`, `policy_version`, `unavailable_sources`, `clarify`) and its `sources` and `time_range` filters; `/ask/stream`; `/conversations`; `/audit/replay`; `/policy/versions` and `/policy/evaluate`; audit answer text withheld from officers who may not see its sources; `question` and `changed_title` on alerts, which only cover documents still visible; `/mywork` and `/freshness` shapes written down; roles for the admin endpoints. Explicit rule: no candidate or denied counts in any asker-facing response.
 - 0.1: first draft.

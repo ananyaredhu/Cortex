@@ -9,9 +9,14 @@ Phase 0 (this scaffold) was a head start from Workstream A while Workstream C wa
 make stub-api          # the stub Brain API on :8000 (from the repo root)
 cd ui && npm install && npm run dev    # http://localhost:5173, proxies /v1 and /sim to :8000
 ```
-Point at another API with `API_TARGET=http://host:port npm run dev`. `npm test` runs the Vitest suite; `npm run build` typechecks and builds.
+Point at another API with `API_TARGET=http://host:port npm run dev`. `npm run dev:demo` adds the **demo controls** (bottom left): the scripted changes for scenarios 2 and 4, source health, tampering with an audit entry, and reset. They call the stub's `/sim` endpoints and are never in a production build.
 
-Pick who you are with the persona switcher (bottom left). The stub accepts `Authorization: Bearer dev:<persona>`; [src/auth/token.ts](src/auth/token.ts) is the only place to change when the mock IdP issues JWTs.
+Tests:
+- `npm test`: Vitest, components and helpers.
+- `npm run e2e`: Playwright runs of scenarios 1 to 5, the split-screen, the Admin page, role gating, the stale-answer alert, two security checks (uniform refusal; answer text withheld from an officer who can't open its sources), axe accessibility checks on every screen in light and dark, keyboard paths, and the phone layout, through the UI. It starts its own stub (:8010) and UI (:5180), so close nothing first; it needs the repo's `.venv`. First time: `npx playwright install chromium` (set `PLAYWRIGHT_BROWSERS_PATH` to put the 700 MB browser somewhere other than your user folder). `API_TARGET=http://host:port npm run e2e` runs the same specs against another API.
+- `npm run build`: typecheck and production build.
+
+Pick who you are with the persona switcher (bottom left). To see the stale and unreachable banners, mark a source in the stub: `curl -X POST localhost:8000/sim/source-status -H "Content-Type: application/json" -d '{"source": "slack", "status": "unavailable"}'` (`stale`, `unavailable` or `ok`; `/sim/reset` clears it). The stub accepts `Authorization: Bearer dev:<persona>`; [src/auth/token.ts](src/auth/token.ts) is the only place to change when the mock IdP issues JWTs.
 
 ## Layout
 | Path | What |
@@ -19,8 +24,15 @@ Pick who you are with the persona switcher (bottom left). The stub accepts `Auth
 | `src/api/types.ts` | Types for api.md 0.2. Fields marked 0.2 are optional: always handle their absence |
 | `src/api/client.ts` | One function per endpoint, including the `/ask/stream` SSE reader |
 | `src/auth/` | Personas (fixture ids, roles, avatars), the token adapter, the persona context |
-| `src/components/` | Sidebar, Avatar, SourceGlyph. Port further Cortex components from `design-reference/cortex-design-system/components/` as they are needed |
-| `src/routes/` | Screens. Ask is a wiring proof; the others are placeholders naming their mockup |
+| `src/components/` | Sidebar (a drawer on phones), ThemeToggle, Avatar, SourceGlyph. Port further Cortex components from `design-reference/cortex-design-system/components/` as they are needed |
+| `src/home/` | My Work: changed answers ("Needs you"), tickets, recent pages, projects and channels, suggested questions |
+| `src/audit/` | Audit console: page, chain widget, entry drawer with replay |
+| `src/admin/` | Admin: connector cards, lag chart, Leak-CI, policy versions, evaluate sandbox |
+| `src/compare/` | Split-screen: one question, one column per persona, each its own request |
+| `src/demo/` | Demo controls (only with `npm run dev:demo`) |
+| `e2e/` | Playwright specs. `uniform-refusal.spec.ts` is a security check: it lives here for the Node tooling, and its API-level twin is in `evals/tests/` |
+| `src/ask/` | The Ask screen: page, answer card, Trust panel, stepper, composer, empty state, and `format.ts` (claims to markers, banners) |
+| `src/routes/` | Placeholders for screens not built yet, each naming its mockup |
 | `src/styles/tokens/` | Cortex tokens, copied unchanged from `design-reference/cortex-design-system/tokens/` |
 | `design-reference/screens/` | The mockup screens (open with any static server: `python -m http.server` inside the folder) |
 | `design-reference/cortex-design-system/` | The Cortex design system: tokens, React components, guidelines, UI kit |
@@ -36,7 +48,7 @@ Pick who you are with the persona switcher (bottom left). The stub accepts `Auth
 | Phase | When | What |
 |---|---|---|
 | 0 | Wed 7 Oct | Contract 0.2 proposal, stub additions, this scaffold, drift list. **Done** |
-| 1 | Wed 7 to Thu 8 | Ask: answer card from `claims[]` with `[n]` markers, citation chips with excerpt popover, uniform refusal, Trust panel (coverage, freshness, grounding, policy, request id), stale and error banners, "why can I see this?" |
-| 2 | Fri 9 (Day 8 demo) | Split-screen `/compare`, demo controls drawer, Playwright runs of scenarios 1, 3 and 4 against the stub; an `evals/` check that Sam's breach answer and the nonexistent-report answer render identical DOM |
-| 3 | Sat 10 to Sun 11 | Audit console (query, timeline, drawer, decision table, chain widget with verify and tamper, replay) and Admin (connector health, SLA chart, Leak-CI suites, policy versions, evaluate sandbox) |
-| 4 | Mon 12 to Tue 13 | My Work and stale-answer alerts, mobile Ask with the Trust bottom sheet, accessibility pass, dark theme check, the same Playwright suite against the real API |
+| 1 | Wed 7 Oct | Ask: answer card from `claims[]` with `[n]` markers, citation chips with excerpt popover, uniform refusal, Trust panel (coverage, freshness, grounding, policy, request id), stale and error banners, "why can I see this?". **Done** |
+| 2 | Wed 7 Oct (for the Day 8 demo) | Split-screen `/compare`, demo controls, Playwright runs of scenarios 1 to 4 and the split-screen against the stub, and a check that Sam's breach answer and the nonexistent-report answer render identically. **Done** |
+| 3 | Wed 7 Oct | Audit console (query and filters, results table, entry drawer with the decision table, chain widget with verify and demo tamper, replay) and Admin (connector health, SLA chart, Leak-CI suites, policy versions, evaluate sandbox). Not built: the per-user access timeline and the policy diff. **Done** |
+| 4 | Wed 7 Oct | My Work and stale-answer alerts, phone layout (drawer navigation, Trust bottom sheet, sideways source chips), accessibility pass (axe on every screen in light and dark, skip link, keyboard persona menu), theme toggle. **Done**, except running the suite against the real API, which waits for B |

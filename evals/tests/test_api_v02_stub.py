@@ -97,3 +97,65 @@ def test_replay_shows_revocation_and_hides_titles_the_officer_cannot_see():
     assert {"doc_id": "slack:C_AUTHPRIV/thread-1", "change": "revoked"} in r["differences"]
     assert all("title" not in c for c in r["then"]["citations"] if c.get("restricted"))
     assert client.get("/v1/audit/replay", params={"request_id": rid}, headers=H("priya")).status_code == 403
+
+
+def test_unavailable_source_is_skipped_and_named_the_same_way_for_everyone():
+    client.post("/sim/source-status", json={"source": "slack", "status": "unavailable"})
+    r = _ask("priya", "What's the status of the database migration, and were there blockers raised in Slack last week?")
+    assert r["unavailable_sources"] == ["slack"]
+    assert all(c["source"] != "slack" for c in r["citations"])
+    assert r["coverage"]["slack"] == {"searched": False, "shown": 0}
+    a, b = _ask("sam", BREACH), _ask("sam", NONEXISTENT)
+    assert _uniform(a) == _uniform(b)
+
+
+def test_stale_source_is_reported_per_source():
+    client.post("/sim/source-status", json={"source": "confluence", "status": "stale"})
+    r = _ask("priya", "What's the latest runbook for payment-service incident failover?")
+    assert r["freshness"]["per_source"]["confluence"]["status"] == "stale"
+    assert r["freshness"]["per_source"]["jira"]["status"] == "ok"
+
+
+def _audit(persona: str, **flt) -> list[dict]:
+    return client.post("/v1/audit/query", json={"filter": flt}, headers=H(persona)).json()["events"]
+
+
+def test_audit_filters_by_user_space_and_decision():
+    _ask("priya", "What's the latest runbook for payment-service incident failover?")
+    _ask("sam", BREACH)
+    pay = _audit("jordan", user="priya@companya.com", space="confluence:PAY")
+    assert pay and all(e["actor"]["user_id"] == "priya@companya.com" for e in pay)
+    denied = _audit("jordan", decision="denied")
+    assert denied and all(any(not d["allowed"] for d in e["decisions"]) for e in denied)
+
+
+def test_audit_query_is_itself_logged():
+    _audit("jordan")
+    events = _audit("jordan")
+    assert events[-1]["event_type"] == "audit_query" and events[-1]["actor"]["user_id"] == "jordan@companya.com"
+
+
+def test_officer_gets_answer_text_only_for_sources_they_may_see():
+    _ask("dana", BREACH)   # cites the security-only breach report, which Jordan may not see
+    ask_events = [e for e in _audit("jordan", user="dana@companya.com") if e["event_type"] == "ask"]
+    assert ask_events[0]["answer"]["text"] is None and ask_events[0]["answer"]["text_withheld"] is True
+    assert ask_events[0]["answer"]["sha256"].startswith("sha256:")
+    assert "CANARY" not in json.dumps(ask_events)
+
+
+def test_policy_evaluate_is_logged():
+    client.post("/v1/policy/evaluate", json={"user": "sam@contractor.io", "doc_id": "jira:SEC-17"}, headers=H("dana"))
+    assert _audit("jordan")[-1]["event_type"] == "admin_view"
+
+
+def test_alerts_carry_the_question_and_skip_documents_no_longer_visible():
+    q = "What's the latest runbook for payment-service incident failover?"
+    _ask("priya", q)
+    client.post("/sim/advance", json={"event_id": "e1"})
+    a = client.get("/v1/alerts", headers=H("priya")).json()["alerts"]
+    assert a[0]["question"] == q and a[0]["changed_title"] == "Payment-service incident runbook"
+    # Revocation (e2) is not a content change: no alert, and nothing about the private thread.
+    _ask("priya", "What are the open concerns in the auth service threat model?")
+    client.post("/sim/advance", json={"event_id": "e2"})
+    dump = json.dumps(client.get("/v1/alerts", headers=H("priya")).json())
+    assert "C_AUTHPRIV" not in dump

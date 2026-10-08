@@ -12,17 +12,18 @@ export interface Persona {
   id: PersonaId;
   name: string;
   role: string;
+  email: string;
   roles: string[];
   avatar: string;
   guest?: string; // shown as the calm guest badge
 }
 
 export const PERSONAS: Persona[] = [
-  { id: "priya", name: "Priya", role: "Backend engineer", roles: ["engineer"], avatar: priya },
-  { id: "sam", name: "Sam", role: "Contractor", roles: ["contractor"], avatar: sam, guest: "Guest access · contractor.io" },
-  { id: "dana", name: "Dana", role: "Security lead", roles: ["security-lead"], avatar: dana },
-  { id: "jordan", name: "Jordan", role: "Compliance officer", roles: ["compliance"], avatar: jordan },
-  { id: "maya", name: "Maya", role: "Engineering manager", roles: ["manager"], avatar: maya },
+  { id: "priya", name: "Priya", role: "Backend engineer", email: "priya@companya.com", roles: ["engineer"], avatar: priya },
+  { id: "sam", name: "Sam", role: "Contractor", email: "sam@contractor.io", roles: ["contractor"], avatar: sam, guest: "Guest access · contractor.io" },
+  { id: "dana", name: "Dana", role: "Security lead", email: "dana@companya.com", roles: ["security-lead"], avatar: dana },
+  { id: "jordan", name: "Jordan", role: "Compliance officer", email: "jordan@companya.com", roles: ["compliance"], avatar: jordan },
+  { id: "maya", name: "Maya", role: "Engineering manager", email: "maya@companya.com", roles: ["manager"], avatar: maya },
 ];
 
 export const canAudit = (p: Persona) => p.roles.includes("compliance");
