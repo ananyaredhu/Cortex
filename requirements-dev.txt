@@ -6,3 +6,6 @@ psycopg[binary]>=3.1
 pytest>=8.0
 ruff>=0.5
 pre-commit>=3.7
+langgraph>=1.0      # the query pipeline (brain/pipeline)
+PyJWT>=2.8          # bearer JWTs from the mock IdP (brain/auth.py)
+cryptography>=42    # Ed25519 checkpoints in the audit chain (brain/audit/chain.py)

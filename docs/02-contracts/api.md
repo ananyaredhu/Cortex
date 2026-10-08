@@ -1,6 +1,6 @@
 # HTTP API
 
-version: 0.2 (proposed: additions for the UI, all optional, pending approval by A, B and C)
+version: 0.2 (additions for the UI, all optional; proposed by C, approved by A and B on 8 Oct and implemented by the Brain in `brain/api/app.py`)
 Producer: Workstream B. Consumer: C (UI, console). The MCP server exposes the same pipeline: see [mcp-tools](mcp-tools.md).
 
 Base path `/v1`. JSON. **Auth:** `Authorization: Bearer <JWT>` from the mock IdP on **every** request (validated per request: signature, expiry, audience). JWT claims: `sub`, `email`, `roles`, `aud`.
@@ -85,7 +85,7 @@ Stale-answer alerts: answers the user received whose sources changed afterwards 
 - `POST /v1/audit/query` with `{ "question": "..." }` (natural language) or `{ "filter": {user, space, from, to, decision} }` returns `{events, count}`, with timestamps, retrieved IDs and allow/deny decisions.
 - *(0.2)* In returned events, `answer.text` is `null` with `answer.text_withheld: true` unless the **viewing** officer may see every document the answer cites; `answer.sha256` is always there. The filter's `space` matches allowed document ids only (denied ones are salted hashes by design). Every audit query is itself logged as `audit_query`.
 - `GET /v1/audit/verify` returns `{ok, checked, checkpoints}` or `{ok:false, first_broken_seq, reason}`.
-- `GET /v1/audit/time-travel?user=...&at=...` returns what a user could see at a past time (when bi-temporal ACL snapshots are available).
+- `GET /v1/audit/time-travel?user=...&at=...` returns what a user could see at a past time (when bi-temporal ACL snapshots are available). Returns 501 until then.
 - `GET /v1/audit/replay?request_id=...` *(0.2, optional)*: `{ "then": {"answer", "citations", "policy_version"}, "now": {"answer", "citations", "policy_version"}, "differences": [{"doc_id": "...", "change": "revoked" | "edited" | "deleted"}] }`. `then` is rebuilt from the logged document versions and policy, not from the live index. Titles and text appear only for documents the **viewing** officer may see; anything else is `{"doc_id": "...", "restricted": true}`.
 
 ## Admin and ops (admin role)

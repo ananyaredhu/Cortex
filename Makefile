@@ -18,6 +18,12 @@ stub-api:         ## run the stub Brain API on :8000 (auth: Authorization: Beare
 ui:               ## run the Cortex UI on :5173, proxying /v1 and /sim to the stub API (run stub-api first)
 	cd ui && npm install && npm run dev
 
+brain-api:        ## run the real Brain API on :8000 (Postgres, simulators, Slack and Drive from .env)
+	.venv/bin/uvicorn brain.api.main:app --port 8000
+
+brain-api-fixture: ## run the real pipeline over the fixture corpus on :8000 (no database; /sim/advance for scripted events)
+	BRAIN_RUNTIME=fixture .venv/bin/uvicorn brain.api.main:app --port 8000
+
 sim-confluence:   ## run the Confluence simulator on :8101, seeded with Company A
 	.venv/bin/uvicorn simulators.confluence.app:app --reload --port 8101
 
