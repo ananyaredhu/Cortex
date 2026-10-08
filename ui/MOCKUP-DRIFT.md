@@ -43,7 +43,7 @@ Status: **Done** = handled in the Phase 0 branch (`ws-c/ui-phase0`). **Proposed*
 
 | # | Drift | Resolution | Status |
 |---|---|---|---|
-| 24 | Needs-you list, ticket priority and due dates, sprint, team, project timeline, sprint board, "Security" card. None of it is in `/v1/mywork` or the fixtures. | Build only what `/mywork` returns: issues (with optional `status`), projects, channels, recent pages, suggested questions, alerts. Drop the rest. | Done (Phase 4, `/`) |
+| 24 | Needs-you list, ticket priority and due dates, sprint, team, project timeline, sprint board, "Security" card. None of it is in `/v1/mywork` or the fixtures. | Build only what `/mywork` returns: issues (with optional `status`), projects, channels, recent pages, suggested questions, alerts. Drop the rest. | Done (Phase 4, `/`). The Team focus section is planned for later as a light, access-checked `GET /v1/team` view (team projects with status counts, channels, recent updates); sprint, board and timeline need Jira data A does not ingest yet |
 | 25 | "Synced 2 min ago" on the home page; `/v1/freshness` is admin-only. | Take it from the latest answer's `freshness.per_source`, or add a `last_sync` summary to `/mywork` later. | Later |
 | 26 | Hardcoded `companya.atlassian.net` and Slack links. | Use each item's `url` from the API (now optional in `/mywork`). | Proposed; stub done |
 | 27 | Stale-answer alerts exist in the contract and stub but have no screen. | Put them at the top of My Work ("Needs you"), plus a count in the sidebar. They are a listed demo moment. | Done (Phase 4): "Needs you" on My Work with "Ask again", and a count on the My work link. Alerts now carry the question and only cover documents still visible (api.md 0.2) |
