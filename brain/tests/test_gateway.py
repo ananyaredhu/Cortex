@@ -94,6 +94,31 @@ def test_sse_parser_handles_multiline_data_and_trailing_event():
         reply_text([("error", {"Type": "error"})])
 
 
+def test_adp_retries_once_on_a_throttling_error_and_gives_up_on_others():
+    calls: list[int] = []
+
+    def throttled_then_ok(request: httpx.Request) -> httpx.Response:
+        calls.append(1)
+        if len(calls) == 1:
+            body = _sse([("error", {"Type": "error", "Error": {"Code": 460011, "Message": "Model QPM concurrency limit"}})])
+        else:
+            body = _sse([_completed(json.dumps(REPLY)), ("done", "[DONE]")])
+        return httpx.Response(200, content=body.encode(), headers={"content-type": "text/event-stream"})
+
+    gen = AdpGenerator("k", transport=httpx.MockTransport(throttled_then_ok), retry_after_s=0)
+    assert gen.generate(PACKET).claims == REPLY["claims"] and len(calls) == 2
+
+    calls.clear()
+
+    def bad_key(request: httpx.Request) -> httpx.Response:
+        calls.append(1)
+        body = _sse([("error", {"Type": "error", "Error": {"Code": 4505004, "Message": "Invalid AppKey"}})])
+        return httpx.Response(200, content=body.encode(), headers={"content-type": "text/event-stream"})
+
+    gen = AdpGenerator("k", transport=httpx.MockTransport(bad_key), retry_after_s=0)
+    assert gen.generate(PACKET).abstained and len(calls) == 1
+
+
 def test_parse_claims_drops_empty_claims_and_tolerates_bad_shapes():
     raw = {"answer": "a", "claims": [{"text": " ", "citations": []}, {"text": "ok", "citations": ["d"]}, "junk"]}
     out = parse_claims(json.dumps(raw), "m")

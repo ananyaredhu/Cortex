@@ -13,7 +13,9 @@ The agent must be published, must have no knowledge base attached (documents upl
 and the AppKey lives only in `.env` (`ADP_APP_KEY`).
 """
 import json
+import logging
 import re
+import time
 import uuid
 from collections.abc import Iterable
 
@@ -22,15 +24,25 @@ import httpx
 from .models import SYSTEM_PROMPT, Generated
 
 DEFAULT_CHAT_URL = "https://wss.lke.tencentcloud.com/adp/v2/chat"
+TRANSIENT = {460011, 460020, 460031}       # model QPM limit, model timeout, application QPS limit: worth one retry
+log = logging.getLogger(__name__)
+
+
+class AdpError(ValueError):
+    def __init__(self, code: int | None, message: str = "") -> None:
+        super().__init__(f"ADP error {code}")
+        self.code = code
+        self.message = message
 FENCE = re.compile(r"^\s*```(?:json)?\s*(.*?)\s*```\s*$", re.S)
 
 
 class AdpGenerator:
     def __init__(self, app_key: str, *, chat_url: str = DEFAULT_CHAT_URL, model: str = "adp", timeout: float = 120.0,
-                 transport: httpx.BaseTransport | None = None) -> None:
+                 transport: httpx.BaseTransport | None = None, retry_after_s: float = 1.5) -> None:
         self.model = model                     # the audit label: the model the agent is configured with
         self._app_key = app_key
         self._url = chat_url
+        self._retry_after = retry_after_s
         self._client = httpx.Client(timeout=timeout, transport=transport)
 
     def request_body(self, packet: dict) -> dict:
@@ -50,18 +62,38 @@ class AdpGenerator:
     def generate(self, packet: dict) -> Generated:
         if not packet["evidence"]:
             return Generated("", [], abstained=True, model=self.model)
-        try:
-            with self._client.stream("POST", self._url, json=self.request_body(packet),
-                                     headers={"Content-Type": "application/json", "Accept": "text/event-stream"}) as r:
-                r.raise_for_status()
-                content_type = r.headers.get("content-type", "")
-                if "text/event-stream" in content_type:
-                    text = reply_text(parse_sse(r.iter_lines()))
-                else:
-                    text = reply_text_from_json(r.json())
-        except (httpx.HTTPError, ValueError, KeyError, TypeError):
-            return Generated("", [], abstained=True, model=self.model)
-        return parse_claims(text, self.model)
+        for attempt in (1, 2):
+            try:
+                text = self._call(packet)
+            except AdpError as exc:
+                log.warning("ADP error %s on attempt %d (%s)", exc.code, attempt, exc.message[:80])
+                if exc.code in TRANSIENT and attempt == 1:
+                    time.sleep(self._retry_after)
+                    continue
+                return Generated("", [], abstained=True, model=self.model)
+            except httpx.HTTPError as exc:
+                log.warning("ADP request failed on attempt %d: %s", attempt, type(exc).__name__)
+                if attempt == 1 and isinstance(exc, (httpx.TimeoutException, httpx.TransportError)):
+                    time.sleep(self._retry_after)
+                    continue
+                return Generated("", [], abstained=True, model=self.model)
+            except (ValueError, KeyError, TypeError) as exc:
+                log.warning("ADP reply unreadable: %s", type(exc).__name__)
+                return Generated("", [], abstained=True, model=self.model)
+            out = parse_claims(text, self.model)
+            if out.abstained:
+                log.warning("ADP reply had no parseable claims (%d chars)", len(text))
+            return out
+        return Generated("", [], abstained=True, model=self.model)
+
+    def _call(self, packet: dict) -> str:
+        with self._client.stream("POST", self._url, json=self.request_body(packet),
+                                 headers={"Content-Type": "application/json", "Accept": "text/event-stream"}) as r:
+            if r.status_code >= 400:
+                raise AdpError(r.status_code, "http")
+            if "text/event-stream" in r.headers.get("content-type", ""):
+                return reply_text(parse_sse(r.iter_lines()))
+            return reply_text_from_json(r.json())
 
 
 # -- SSE and reply extraction -----------------------------------------------------------------------
@@ -96,7 +128,9 @@ def reply_text(events: list[tuple[str, dict | str]]) -> str:
     """The reply: from `response.completed` when present, else assembled from text deltas and replacements."""
     for name, data in events:
         if name == "error" or (isinstance(data, dict) and data.get("Type") == "error"):
-            raise ValueError("ADP error event")
+            err = data.get("Error", {}) if isinstance(data, dict) else {}
+            code = err.get("Code")
+            raise AdpError(int(code) if isinstance(code, (int, str)) and str(code).isdigit() else None, str(err.get("Message", "")))
     for name, data in events:
         if name == "response.completed" and isinstance(data, dict):
             return reply_text_from_json(data)

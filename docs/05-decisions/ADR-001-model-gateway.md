@@ -26,5 +26,9 @@ Build-time guidance: Hy3 and Hy4 preview (0.00x) for routine work; Fast, Balance
 - Token budget is a risk: cache repeated calls, use the small model where enough, run Leak-CI as a separate batch.
 - Only authorized content is ever sent to a hosted model. Denied content never leaves the policy plane.
 
+## Probe results
+- **9 Oct, Tencent Cloud ADP, agent model GPT-5.6 Terra** (`python -m brain.gateway.probe`, 3 rounds from this laptop): reachable; 3 of 3 replies parsed as JSON claims with every citation naming a packet document; latency 2.9 s, 3.5 s and 13.9 s per call. Called through the Chat API by AppKey (`brain/gateway/adp.py`), with our claims instruction in `SystemRole` and online search disabled per turn. This is the generator in use. Context length, rate limits and cost not yet measured; the agent must stay without a knowledge base.
+- Hunyuan, TokenHub, LKEAP: not probed.
+
 ## To verify
 Hunyuan and TokenHub access from Singapore; free allowances and rate limits; whether ADP's built-in DeepSeek is reachable as a raw completion endpoint (its Chat API calls a published ADP app with its own prompt, so we call model endpoints directly and treat ADP as optional).
