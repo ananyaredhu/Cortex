@@ -8,6 +8,7 @@ question's terms (a natural-language question rarely contains every term of a pa
 """
 import math
 import re
+import threading
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -127,8 +128,14 @@ DOC_COLUMNS = "doc_id, source, kind, title, url, parent_id, links, author, updat
 
 class PostgresIndex:
     def __init__(self, conn: psycopg.Connection) -> None:
-        """`conn` in autocommit mode; the vector leg opens its own transaction for the SET LOCAL."""
+        """`conn` in autocommit mode; the vector leg opens its own transaction for the SET LOCAL.
+
+        One connection serves every request thread. psycopg serializes plain statements itself, but a transaction
+        block entered from two threads at once is OutOfOrderTransactionNesting, so the vector leg takes a lock
+        (concurrent asks, for example the split-screen, otherwise fail at the retrieve stage).
+        """
         self._conn = conn
+        self._lock = threading.Lock()
 
     @classmethod
     def connect(cls, url: str) -> "PostgresIndex":
@@ -136,7 +143,7 @@ class PostgresIndex:
 
     def vector_search(self, source: str, vector: list[float], model: str, tokens: list[str], k: int) -> list[Hit]:
         q = "[" + ",".join(f"{x:.7f}" for x in vector) + "]"
-        with self._conn.transaction():
+        with self._lock, self._conn.transaction():
             self._conn.execute("SET LOCAL hnsw.iterative_scan = relaxed_order")
             rows = self._conn.execute(VECTOR_SQL, {"q": q, "tokens": list(tokens), "model": model, "source": source,
                                                    "k": k}).fetchall()
