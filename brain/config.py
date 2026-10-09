@@ -35,9 +35,12 @@ class Settings:
     max_vector_distance: float = 0.45         # bge-m3 cosine distance; see brain/retrieval/hybrid.py
     max_evidence: int = 5
     per_source_quota: int = 3
+    generator_backend: str = "auto"           # auto | adp | openai | template
     generator_base_url: str | None = None
     generator_api_key: str | None = None
-    generator_model: str = "deepseek-v3"
+    generator_model: str = "deepseek-v3"      # the model's name: sent to an OpenAI-compatible backend, a label for ADP
+    adp_app_key: str | None = None            # ADP Chat API AppKey of the published agent (brain/gateway/adp.py)
+    adp_chat_url: str = "https://wss.lke.tencentcloud.com/adp/v2/chat"
     extra: dict[str, str] = field(default_factory=dict)
 
     @classmethod
@@ -57,7 +60,10 @@ class Settings:
             denied_id_salt=env("AUDIT_DENIED_SALT") or cls.denied_id_salt,
             audit_signing_key=env("AUDIT_SIGNING_KEY") or None,
             floor_latency_ms=int(env("BRAIN_FLOOR_LATENCY_MS") or cls.floor_latency_ms),
+            generator_backend=(env("GENERATOR_BACKEND") or cls.generator_backend).strip().lower(),
             generator_base_url=env("GENERATOR_BASE_URL") or None,
             generator_api_key=env("GENERATOR_API_KEY") or None,
             generator_model=env("GENERATOR_MODEL") or cls.generator_model,
+            adp_app_key=env("ADP_APP_KEY") or None,
+            adp_chat_url=env("ADP_CHAT_URL") or cls.adp_chat_url,
         )

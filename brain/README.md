@@ -28,11 +28,18 @@ bge-m3 loads at start-up (about 30 s warm, several minutes the first time). Noth
 
 Every request runs every node, refusals included, and `/ask/stream` always sends the same five stages.
 
-## Generators (`gateway/models.py`)
-`TemplateGenerator` is extractive (one claim per evidence item, quoting its snippet) and needs no model: the slice-1
-generator and the fallback when nothing is configured. `OpenAICompatibleGenerator` is selected when
-`GENERATOR_BASE_URL` and `GENERATOR_API_KEY` are set; it asks for JSON claims with citations and abstains on any
-failure. It has not been run against a live endpoint yet (no key on 8 Oct).
+## Generators (`gateway/`)
+`GENERATOR_BACKEND` picks one (`auto` takes the first configured):
+- `adp` (`gateway/adp.py`): Tencent Cloud ADP's Chat API with the published agent's `ADP_APP_KEY`. The context
+  packet is the one message, our JSON-claims instruction goes in `SystemRole` (overriding the agent's prompt for the
+  turn), online search is disabled for the turn, and the reply is read from the `response.completed` event.
+  `GENERATOR_MODEL` is the label for the model the agent is configured with. The agent must be published and must
+  have no knowledge base attached. Probe it with `python -m brain.gateway.probe`.
+- `openai` (`gateway/models.py`): any `/chat/completions` endpoint with `GENERATOR_BASE_URL`, `GENERATOR_API_KEY`
+  and `GENERATOR_MODEL`. Not yet run against a live endpoint.
+- `template`: extractive, one claim per evidence item quoting its snippet. No model; the fallback.
+
+Every backend abstains on any failure or unparseable reply: no unverified text reaches the checker.
 
 ## Audit (`audit/`)
 `chain.py`: canonical JSON, SHA-256 links from a fixed genesis, Ed25519 checkpoints every 100 events, `verify`.
