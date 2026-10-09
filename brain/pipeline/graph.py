@@ -238,7 +238,7 @@ class Brain:
     def _check(self, state: State) -> dict:
         allowed_ids = {e["doc_id"] for e in state["packet"]["evidence"]}
         checked = check(state["generated"], allowed_ids, state["denied_docs"])
-        evidence_text = {e.doc_id: e.raw for e in state["evidence"]}
+        evidence_text = {e.doc_id: f"{e.title}. {e.raw}" for e in state["evidence"]}
         grounded = check_layer2(checked.claims, evidence_text, self.scorer, threshold=self.settings.grounding_threshold)
         if grounded.removed_claims:
             checked = CheckResult(rebuild_answer(checked.answer, grounded.claims, grounded.removed_claims), grounded.claims,

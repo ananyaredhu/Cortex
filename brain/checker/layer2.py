@@ -1,9 +1,12 @@
 """Layer 2: a small grounding model, run locally, checks each claim against the evidence it cites (ADR-003).
 
 Claim-versus-document verification with a cross-encoder from a different family than the generator: a MiniCheck
-model, or a natural-language-inference model where "entailment" stands for "supported". The premise is the cited
-evidence (only authorized text, already in the packet), the hypothesis is the claim. A claim whose best support
-score is under the threshold is dropped; if none survive, the answer abstains.
+model, or a natural-language-inference model where "entailment" stands for "supported". The hypothesis is the claim;
+the premises are the cited evidence (only authorized text, already in the packet), as the whole snippet and as short
+sentence windows, because NLI models are trained on short premises and under-score a claim against a long block
+(measured 9 Oct: true claims at 4 permille against a 600-character snippet, 990 against the right three sentences).
+A claim's score is its best over all windows of all its citations. Under the threshold it is dropped; if none
+survive, the answer abstains.
 
 `CHECKER_MODEL` names the model (`none` disables the layer). Timings per candidate: `python -m brain.checker.timing`.
 """
@@ -97,19 +100,35 @@ def scorer_from_env(name: str | None = None) -> GroundingScorer | None:
     return CrossEncoderScorer(name)
 
 
+SENTENCE = re.compile(r"(?<=[.!?])\s+")
+WINDOW, STRIDE = 3, 2
+
+
+def premises(text: str, max_chars: int = 1200) -> list[str]:
+    """The whole text (cut) plus sliding windows of a few sentences."""
+    text = " ".join(text.split())
+    out = [text[:max_chars]]
+    sentences = [x for x in SENTENCE.split(text) if x.strip()]
+    for start in range(0, max(1, len(sentences) - WINDOW + 1), STRIDE):
+        window = " ".join(sentences[start:start + WINDOW])
+        if window and window != out[0]:
+            out.append(window)
+    return out
+
+
 def check_layer2(claims: list[dict], evidence_text: dict[str, str], scorer: GroundingScorer | None, *,
-                 threshold: float = 0.5, max_premise_chars: int = 2400) -> Layer2Result:
-    """Keep the claims the model finds supported by at least one of their cited documents."""
+                 threshold: float = 0.5, max_premise_chars: int = 1200) -> Layer2Result:
+    """Keep the claims the model finds supported by at least one window of one of their cited documents."""
     if scorer is None or not claims:
         return Layer2Result(list(claims), 0, [], "none", skipped=True)
     pairs: list[tuple[str, str]] = []
     owners: list[int] = []
     for i, claim in enumerate(claims):
         for doc_id in claim.get("citations", []):
-            premise = evidence_text.get(doc_id, "")
-            if premise:
-                pairs.append((premise[:max_premise_chars], claim["text"]))
-                owners.append(i)
+            for premise in premises(evidence_text.get(doc_id, ""), max_premise_chars):
+                if premise:
+                    pairs.append((premise, claim["text"]))
+                    owners.append(i)
     raw = scorer.score(pairs)
     best = [0.0] * len(claims)
     for i, s in zip(owners, raw, strict=True):

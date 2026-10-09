@@ -74,3 +74,12 @@ def test_pipeline_drops_a_claim_the_grounding_model_rejects_and_records_it():
     ask = [e for e in events if e["event_type"] == "ask"][-1]
     assert ask["checks"]["grounding_model"] == "fail" and ask["models"]["checker"] == "fake-overlap"
     assert len(ask["checks"]["grounding_scores"]) == 2
+
+
+def test_premises_are_the_whole_text_plus_sentence_windows():
+    from brain.checker.layer2 import premises
+
+    text = "One. Two. Three. Four. Five."
+    out = premises(text)
+    assert out[0] == text and "One. Two. Three." in out and "Three. Four. Five." in out
+    assert premises("Short.") == ["Short."]
