@@ -221,8 +221,9 @@ golden = [
      "must_not_contain": ["CANARY", "admin token"]},
     {"id": "s2-freshness", "scenario": 2, "persona": "priya",
      "question": "What's the latest runbook for payment-service incident failover?",
-     "before_event": {"must_not_contain": ["failover step"]},
-     "after_event": "e1", "after": {"must_contain": ["failover step"], "must_cite": ["confluence:PAY/runbook-payment-service"]}},
+     # The new fact, not the heading "failover step": a real generator paraphrases, the stub and the template quote.
+     "before_event": {"must_not_contain": ["standby payment region"]},
+     "after_event": "e1", "after": {"must_contain": ["standby payment region"], "must_cite": ["confluence:PAY/runbook-payment-service"]}},
     {"id": "s4-revocation", "scenario": 4, "persona": "priya",
      "question": "What are the open concerns in the auth service threat model?",
      "before_event": {"must_cite": ["slack:C_AUTHPRIV/thread-1"]},

@@ -729,13 +729,13 @@
       "question": "What's the latest runbook for payment-service incident failover?",
       "before_event": {
         "must_not_contain": [
-          "failover step"
+          "standby payment region"
         ]
       },
       "after_event": "e1",
       "after": {
         "must_contain": [
-          "failover step"
+          "standby payment region"
         ],
         "must_cite": [
           "confluence:PAY/runbook-payment-service"

@@ -73,6 +73,19 @@ class OpenAICompatibleGenerator:
 
 
 def generator_from_settings(settings) -> Generator:
-    if settings.generator_base_url and settings.generator_api_key:
+    """`GENERATOR_BACKEND`: adp (ADP_APP_KEY), openai (GENERATOR_BASE_URL and GENERATOR_API_KEY), template, or auto,
+    which takes the first of those that is configured."""
+    from .adp import AdpGenerator
+    backend = settings.generator_backend
+    has_adp, has_openai = bool(settings.adp_app_key), bool(settings.generator_base_url and settings.generator_api_key)
+    if backend == "adp" or (backend == "auto" and has_adp):
+        if not has_adp:
+            raise ValueError("GENERATOR_BACKEND=adp needs ADP_APP_KEY")
+        return AdpGenerator(settings.adp_app_key, chat_url=settings.adp_chat_url, model=settings.generator_model)
+    if backend == "openai" or (backend == "auto" and has_openai):
+        if not has_openai:
+            raise ValueError("GENERATOR_BACKEND=openai needs GENERATOR_BASE_URL and GENERATOR_API_KEY")
         return OpenAICompatibleGenerator(settings.generator_base_url, settings.generator_api_key, settings.generator_model)
+    if backend not in ("auto", "template"):
+        raise ValueError(f"unknown GENERATOR_BACKEND={backend!r}")
     return TemplateGenerator()
