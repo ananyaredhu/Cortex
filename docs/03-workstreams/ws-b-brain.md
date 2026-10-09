@@ -29,7 +29,7 @@ Connectors, `chunks` schema and simulator admin endpoints from A. UI needs and g
 ### Days 1 to 2 (Fri 2 to Sat 3 Oct)
 - [ ] **Model probe script:** reachability from Singapore, latency, rate limits, structured output, context length, cost for DeepSeek-V3 (ADP/TokenHub), Hunyuan, Qwen, small open-weight models (check #1). 9 Oct: `python -m brain.gateway.probe` exists; ADP probed (reachable, JSON claims, 3 to 14 s per call); rate limits, context length, cost and the other candidates still open
 - [x] Model gateway interface with config-driven backends; embedding interface (bge-m3 default). 8 Oct: `brain/gateway/` (template generator in use; the OpenAI-compatible backend is wired but unrun, no key yet); the query vector uses A's bge-m3 embedder
-- [ ] Time bge-m3 and checker candidates on CPU (check #2, #6) with C
+- [x] Time bge-m3 and checker candidates on CPU (check #2, #6) with C. bge-m3 by A on 6 Oct; checker candidates 9 Oct (`python -m brain.checker.timing`): nli-deberta-v3-xsmall chosen, MiniCheck for offline grading, 3B chat model deferred to the server
 - [x] LangGraph pipeline skeleton; audit hash-chain library with tests (genesis, append, verify, tamper test). 8 Oct: `brain/pipeline/graph.py`, `brain/audit/chain.py` with edit, delete, insert, reorder and checkpoint-signature tests
 - [ ] Draft contract changes you need (PRs to `docs/02-contracts/`)
 
@@ -44,7 +44,7 @@ Connectors, `chunks` schema and simulator admin endpoints from A. UI needs and g
 
 ### Days 5 to 8 (Tue 6 to Fri 9 Oct)
 - [ ] Router and query rewrite (small model); **context packet builder done** 8 Oct (`brain/packet.py`: quotas, dedupe, snippet, sanitize and flag, attention order, budget)
-- [ ] Generator with structured claims plus citations; checker layers 1 and 2. 8 Oct: **layer 1 done** (`brain/checker/layer1.py`). 9 Oct: **generator done** through Tencent Cloud ADP (`brain/gateway/adp.py`, agent model GPT-5.6 Terra): all nine golden cases pass with it, zero canaries. Layer 2 open
+- [ ] Generator with structured claims plus citations; checker layers 1 and 2. 8 Oct: **layer 1 done** (`brain/checker/layer1.py`). 9 Oct: **generator done** through Tencent Cloud ADP (`brain/gateway/adp.py`, agent model GPT-5.6 Terra): all nine golden cases pass with it, zero canaries. **Layer 2 done** 9 Oct (`brain/checker/layer2.py`, nli-deberta-v3-xsmall, scores in the audit event)
 - [x] Uniform refusal with timing normalization. 8 Oct: one refusal body, every node runs on every request, floor latency `BRAIN_FLOOR_LATENCY_MS`; tested equal for forbidden and nonexistent, 0.2 fields included
 - [x] **Day 8 demoable:** scenarios 1, 3 and 4 run end to end on seed data. 8 Oct: all nine golden cases pass on the real pipeline in fixture mode (`evals/tests/test_golden_brain.py`); the non-scripted ones also on the Postgres index with the simulators and real Slack and Drive
 

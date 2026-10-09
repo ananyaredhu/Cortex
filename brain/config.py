@@ -40,6 +40,8 @@ class Settings:
     generator_api_key: str | None = None
     generator_model: str = "deepseek-v3"      # the model's name: sent to an OpenAI-compatible backend, a label for ADP
     adp_app_key: str | None = None            # ADP Chat API AppKey of the published agent (brain/gateway/adp.py)
+    checker_model: str = "none"              # layer 2 grounding model (brain/checker/layer2.py); none disables it
+    grounding_threshold: float = 0.05         # for nli-deberta-v3-xsmall (ADR-003); MiniCheck models sit around 0.5
     adp_chat_url: str = "https://wss.lke.tencentcloud.com/adp/v2/chat"
     extra: dict[str, str] = field(default_factory=dict)
 
@@ -65,5 +67,7 @@ class Settings:
             generator_api_key=env("GENERATOR_API_KEY") or None,
             generator_model=env("GENERATOR_MODEL") or cls.generator_model,
             adp_app_key=env("ADP_APP_KEY") or None,
+            checker_model=env("CHECKER_MODEL") or cls.checker_model,
+            grounding_threshold=float(env("GROUNDING_THRESHOLD") or cls.grounding_threshold),
             adp_chat_url=env("ADP_CHAT_URL") or cls.adp_chat_url,
         )

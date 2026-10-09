@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from brain.audit.chain import Signer
 from brain.audit.service import AuditService
 from brain.audit.store import AuditStore, MemoryAuditStore, PostgresAuditStore
+from brain.checker import scorer_from_env
 from brain.config import Settings
 from brain.gateway import TemplateGenerator, generator_from_settings
 from brain.pipeline.graph import Brain
@@ -95,7 +96,10 @@ def env_runtime(settings: Settings | None = None) -> Runtime:
                                              checkpoint_every=settings.checkpoint_every)
     embedder = embedder_from_env(settings.embedding_backend)
     embedder.embed(["warm up"])      # bge-m3 loads on first use (about 30 s warm, minutes cold): pay it now, not on the first question
-    brain = Brain(settings, connectors, index, store, embedder, generator_from_settings(settings), audit_store)
+    scorer = scorer_from_env(settings.checker_model)
+    if scorer is not None:
+        scorer.score([("warm up", "warm up")])                  # load the grounding model now, not on the first answer
+    brain = Brain(settings, connectors, index, store, embedder, generator_from_settings(settings), audit_store, scorer=scorer)
     consumer = OutboxConsumer(store, brain.resolver, brain.pdp, record=audit_store.append)
     consumer.last_seq = max([e.seq or 0 for e in store.events_after(0, 100_000)] or [0])   # history is A's, not news
     runtime = Runtime(settings, brain, AuditService(audit_store, brain), audit_store, consumer)

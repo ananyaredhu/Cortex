@@ -21,7 +21,8 @@ from brain import packet as packetlib
 from brain.audit.chain import sha256_text
 from brain.audit.store import AuditStore
 from brain.auth import Principal
-from brain.checker import CheckResult, check
+from brain.checker import CheckResult, GroundingScorer, Layer2Result, check, check_layer2
+from brain.checker.layer2 import rebuild_answer
 from brain.config import POLICY_VERSION, REFUSAL, SOURCES, STAGES, Settings
 from brain.gateway.models import Generated, Generator
 from brain.policy.identity import AskerIdentity, IdentityResolver
@@ -78,6 +79,7 @@ class State(TypedDict, total=False):
     packet: dict
     generated: Generated
     checked: CheckResult
+    grounded: Layer2Result
     flags: list[str]
     response: dict
     on_stage: Any
@@ -90,7 +92,8 @@ def utc_now() -> str:
 class Brain:
     def __init__(self, settings: Settings, connectors: Mapping[str, Connector], index: IndexReader, store: Store | None,
                  embedder: Embedder | None, generator: Generator, audit: AuditStore, *,
-                 resolver: IdentityResolver | None = None, pdp: PDP | None = None) -> None:
+                 resolver: IdentityResolver | None = None, pdp: PDP | None = None,
+                 scorer: GroundingScorer | None = None) -> None:
         self.settings = settings
         self.connectors = dict(connectors)
         self.index = index
@@ -98,6 +101,7 @@ class Brain:
         self.embedder = embedder
         self.generator = generator
         self.audit = audit
+        self.scorer = scorer
         self.resolver = resolver or IdentityResolver(self.connectors, ttl_s=settings.identity_ttl_s)
         self.pdp = pdp or PDP(self.connectors, policy_version=POLICY_VERSION, ttl_s=settings.decision_ttl_s)
         self.answers: dict[str, Answered] = {}
@@ -233,7 +237,14 @@ class Brain:
 
     def _check(self, state: State) -> dict:
         allowed_ids = {e["doc_id"] for e in state["packet"]["evidence"]}
-        return {"checked": check(state["generated"], allowed_ids, state["denied_docs"])}
+        checked = check(state["generated"], allowed_ids, state["denied_docs"])
+        evidence_text = {e.doc_id: f"{e.title}. {e.raw}" for e in state["evidence"]}
+        grounded = check_layer2(checked.claims, evidence_text, self.scorer, threshold=self.settings.grounding_threshold)
+        if grounded.removed_claims:
+            checked = CheckResult(rebuild_answer(checked.answer, grounded.claims, grounded.removed_claims), grounded.claims,
+                                  checked.removed_claims + grounded.removed_claims, checked.leak_hits,
+                                  abstained=checked.abstained or not grounded.claims)
+        return {"checked": checked, "grounded": grounded}
 
     def _finalize(self, state: State) -> dict:
         req, checked, pkt = state["request"], state["checked"], state["packet"]
@@ -297,8 +308,10 @@ class Brain:
             "decisions": [d.audit_view(salt) for d in state["decisions"]],
             "answer": {"text": resp["answer"], "sha256": sha256_text(resp["answer"]), "citations": cited,
                        "refused": resp["refused"], "abstained": resp["abstained"], "acl_label": label},
-            "checks": {**checked.status, "leak_hits": [hash_denied(d, salt) for d in checked.leak_hits]},
-            "models": {"generator": self.generator.model, "checker": "layer1-deterministic",
+            "checks": {**checked.status, "grounding_model": state["grounded"].status,
+                       "grounding_scores": state["grounded"].scores,
+                       "leak_hits": [hash_denied(d, salt) for d in checked.leak_hits]},
+            "models": {"generator": self.generator.model, "checker": state["grounded"].model,
                        "embedding": f"{self.embedder.model}@{self.embedder.version}" if self.embedder else "none"},
             "flags": state["flags"],
             "latency_ms": int((time.monotonic() - state["started"]) * 1000),
