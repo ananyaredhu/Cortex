@@ -1,4 +1,6 @@
 """Hybrid retrieval over both index readers. Postgres runs when the database is up."""
+import threading
+
 import pytest
 
 from brain.retrieval import MemoryIndex, PostgresIndex, hybrid_search, query_terms
@@ -67,3 +69,23 @@ def test_document_rows_and_visible_listing(index):
     assert index.document("jira:NOPE") is None
     visible = {d.doc_id for d in index.documents_visible(TOKENS["sam"])}
     assert visible == {d["doc_id"] for d in DATA["documents"] if set(d["acl"]["tokens"]) & set(TOKENS["sam"])}
+
+
+def test_concurrent_searches_share_one_connection_safely(index):
+    """Request threads share one index connection (the split-screen asks as three people at once). Two vector
+    legs entering a transaction block together was OutOfOrderTransactionNesting on Postgres."""
+    q = FakeEmbedder().embed([Q1])[0]
+    errors: list[Exception] = []
+
+    def search() -> None:
+        try:
+            hybrid_search(index, Q1, TOKENS["priya"], SOURCES, vector=q, model="fake", max_distance=2.0)
+        except Exception as exc:  # noqa: BLE001 - the test reports whatever a thread raised
+            errors.append(exc)
+
+    threads = [threading.Thread(target=search) for _ in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert errors == []
