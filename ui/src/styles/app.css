@@ -57,7 +57,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .sidebar__nav a { display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 8px; color: var(--text-body); text-decoration: none; }
 .sidebar__nav a.active { background: var(--surface-card); box-shadow: var(--shadow-1); color: var(--text-strong); font-weight: var(--fw-bold); }
 .nav-badge { margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px; border-radius: var(--radius-pill); background: var(--accent); color: var(--text-on-accent); font: 700 11px/20px var(--font-mono); text-align: center; }
-.sidebar__recent { display: flex; flex-direction: column; gap: 2px; min-height: 0; overflow: auto; }
+.sidebar__recent { display: flex; flex-direction: column; gap: 2px; min-height: 0; overflow: auto; scrollbar-width: none; }
+.sidebar__recent::-webkit-scrollbar { display: none; }   /* scrolls by wheel, touch and keyboard; no bar */
 .sidebar__recent .eyebrow { padding: 0 10px 6px; }
 .sidebar__recent-item, .sidebar__recent-empty { padding: 8px 10px; font-size: var(--fs-13); color: var(--text-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* flex: none, or the column squashes the items once there are more than fit (overflow: hidden lets them shrink) */
