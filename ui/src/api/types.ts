@@ -66,6 +66,24 @@ export interface Conversation {
   last_asked_at: string;
 }
 
+/** One turn of a reopened conversation (GET /v1/conversations/{id}): what the audit log holds, no claims or
+ *  freshness. `withheld` means a cited document is no longer visible to the asker: the answer is not shown again. */
+export interface ConversationTurn {
+  request_id: string;
+  asked_at: string;
+  question: string;
+  skill?: string | null;
+  answer: string | null;
+  withheld: boolean;
+  citations: Citation[];
+  refused: boolean;
+  abstained: boolean;
+}
+
+export interface ConversationDetail extends Conversation {
+  turns: ConversationTurn[];
+}
+
 export interface StaleAlert {
   request_id: string;
   changed_doc: string;

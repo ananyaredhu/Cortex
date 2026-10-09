@@ -12,6 +12,7 @@ The log must be **tamper-evident**, **complete** (who, what, retrieved IDs, fina
   "ts": "2026-10-10T14:05:11.482Z",
   "request_id": "req_9f2c",
   "event_type": "ask",
+  "conversation_id": "c_1",
   "actor": {"user_id": "priya@companya.com", "roles": ["engineer"], "client": "ui"},
   "query": {"text": "What's the status of the DB migration ...", "skill": "status-and-blockers"},
   "decisions": [
@@ -66,5 +67,9 @@ Each decision stores `acl_snapshot_hash`, `policy_version` and `doc_version` so 
 ## Querying
 Audit queries (natural language or structured) are read-only and run **under RBAC**: only the compliance role can query other users' history. Querying the audit log is itself logged (`audit_query`). Sensitive lookups may require a two-person approval (stretch).
 
+## Conversations
+`ask` events carry `conversation_id` (the one returned by `/ask`). The Brain keeps no other record of conversations: `/v1/conversations` and `/v1/conversations/{id}` are rebuilt from these events, under the same ownership rule (only the asker's own events), so history survives a restart.
+
 ## Changelog
+- 0.1, 9 Oct: `conversation_id` on `ask` events; conversations are rebuilt from the log.
 - 0.1: first draft.

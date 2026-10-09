@@ -6,6 +6,7 @@ import type {
   AuditEvent,
   AuditFilter,
   Conversation,
+  ConversationDetail,
   ExplainAccess,
   FreshnessReport,
   LeakCiReport,
@@ -48,6 +49,7 @@ export function api(persona: PersonaId) {
     askStream: (req: AskRequest, onStage: (stage: Stage, status: "start" | "done") => void) =>
       askStream(persona, req, onStage),
     conversations: () => call<{ conversations: Conversation[] }>(persona, "/v1/conversations"),
+    conversation: (id: string) => call<ConversationDetail>(persona, `/v1/conversations/${encodeURIComponent(id)}`),
     mywork: () => call<MyWork>(persona, "/v1/mywork"),
     alerts: () => call<{ alerts: StaleAlert[] }>(persona, "/v1/alerts"),
     explainAccess: (docId: string) =>

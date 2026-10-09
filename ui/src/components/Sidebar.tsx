@@ -93,9 +93,14 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
         <div className="eyebrow">Recent</div>
         {history.data?.conversations.length ? (
           history.data.conversations.map((c) => (
-            <div key={c.conversation_id} className="sidebar__recent-item" title={c.title}>
+            <NavLink
+              key={c.conversation_id}
+              to={`/ask/${encodeURIComponent(c.conversation_id)}`}
+              className="sidebar__recent-item"
+              title={c.title}
+            >
               {c.title}
-            </div>
+            </NavLink>
           ))
         ) : (
           <div className="sidebar__recent-empty">No questions yet</div>

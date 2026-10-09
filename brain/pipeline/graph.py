@@ -26,7 +26,7 @@ from brain.checker.layer2 import rebuild_answer
 from brain.config import POLICY_VERSION, REFUSAL, SOURCES, STAGES, Settings
 from brain.gateway.models import Generated, Generator
 from brain.policy.identity import AskerIdentity, IdentityResolver
-from brain.policy.labels import acl_label
+from brain.policy.labels import acl_label, may_serve
 from brain.policy.leakscan import DeniedDoc
 from brain.policy.pdp import PDP, Decision, hash_denied
 from brain.retrieval import Candidate, IndexReader, hybrid_search, query_terms
@@ -302,7 +302,7 @@ class Brain:
         cited = [c["doc_id"] for c in resp["citations"]]
         label = acl_label(e["acl_label"] for e in state["packet"]["evidence"] if e["doc_id"] in cited)
         event = {
-            "request_id": state["request_id"], "event_type": "ask",
+            "request_id": state["request_id"], "event_type": "ask", "conversation_id": resp["conversation_id"],
             "actor": {"user_id": p.email, "roles": list(p.roles), "client": p.client},
             "query": {"text": req.question, "skill": req.skill_hint},
             "decisions": [d.audit_view(salt) for d in state["decisions"]],
@@ -368,14 +368,50 @@ class Brain:
                             "summary": f"{row.title} changed after your answer"})
         return out
 
+    # -- conversations: rebuilt from the audit log, so they survive a restart (api.md 0.2) -----------
+    def _asks(self, email: str) -> list[dict]:
+        """The person's own `ask` events, oldest first. An event logged before conversations were recorded
+        (no `conversation_id`) counts as a conversation of its own."""
+        return [e for e in self.audit.events(user=email) if e.get("event_type") == "ask"]
+
+    @staticmethod
+    def _conversation_of(event: dict) -> str:
+        return event.get("conversation_id") or event["request_id"]
+
     def conversations(self, principal: Principal) -> list[dict]:
-        with self._lock:
-            mine = [a for a in self.answers.values() if a.email == principal.email]
         convs: dict[str, dict] = {}
-        for a in sorted(mine, key=lambda a: a.asked_at):
-            c = convs.setdefault(a.conversation_id, {"conversation_id": a.conversation_id, "title": a.question})
-            c["last_asked_at"] = a.asked_at
+        for e in self._asks(principal.email):
+            cid = self._conversation_of(e)
+            c = convs.setdefault(cid, {"conversation_id": cid, "title": e["query"]["text"]})
+            c["last_asked_at"] = e["ts"]
         return sorted(convs.values(), key=lambda c: c["last_asked_at"], reverse=True)
+
+    def conversation(self, principal: Principal, conversation_id: str) -> dict | None:
+        """One of the caller's conversations with every turn, or None: someone else's and a nonexistent one look alike.
+        An answer is shown again only if the asker may still open every document it cited (its label and a live
+        check); otherwise the turn keeps its question and `withheld` is set."""
+        asks = [e for e in self._asks(principal.email) if self._conversation_of(e) == conversation_id]
+        if not asks:
+            return None
+        asker = self.resolver.resolve(principal.email)
+        return {"conversation_id": conversation_id, "title": asks[0]["query"]["text"], "last_asked_at": asks[-1]["ts"],
+                "turns": [self._turn(e, asker) for e in asks]}
+
+    def _turn(self, event: dict, asker: AskerIdentity) -> dict:
+        answer = event.get("answer") or {}
+        cited = list(answer.get("citations", []))
+        decisions = self.pdp.check_many(asker, [(d, self._indexed_version(d)) for d in cited])
+        ok = may_serve(asker.tokens, answer.get("acl_label", [])) and all(d.allowed for d in decisions)
+        proof = {d["doc_id"]: list(d.get("proof_path", [])) for d in event.get("decisions", []) if d.get("allowed")}
+        citations = []
+        for doc_id in cited if ok else []:
+            row = self.index.document(doc_id)
+            citations.append({"doc_id": doc_id, "title": row.title if row else doc_id, "url": row.url if row else "",
+                              "source": row.source if row else doc_id.split(":", 1)[0],
+                              "as_of": row.updated_at if row else None, "why_visible": proof.get(doc_id, [])})
+        return {"request_id": event["request_id"], "asked_at": event.get("ts"), "question": event["query"]["text"],
+                "skill": event["query"].get("skill"), "answer": answer.get("text") if ok else None, "withheld": not ok,
+                "citations": citations, "refused": bool(answer.get("refused")), "abstained": bool(answer.get("abstained"))}
 
     def stages(self) -> tuple[str, ...]:
         return STAGES

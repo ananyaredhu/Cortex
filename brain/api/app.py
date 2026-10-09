@@ -108,6 +108,13 @@ def create_app(runtime: Runtime) -> FastAPI:
     def conversations(p: Current):
         return {"conversations": runtime.brain.conversations(p)}
 
+    @app.get("/v1/conversations/{conversation_id}")
+    def conversation(conversation_id: str, p: Current):
+        out = runtime.brain.conversation(p, conversation_id)
+        if out is None:                                    # someone else's or nonexistent: the same answer
+            raise HTTPException(404, "no such conversation")
+        return out
+
     # -- my work, access, alerts --------------------------------------------------------------
     @app.get("/v1/mywork")
     def mywork(p: Current):
