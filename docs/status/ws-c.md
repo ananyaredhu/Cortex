@@ -2,6 +2,13 @@
 
 Update at the end of each day. Newest first. Keep it short: done, next, blockers.
 
+## Thu 9 Oct (Day 8)
+- **Done (Praew, for C):** the Playwright suite runs against the real Brain (`API_TARGET=http://localhost:8000 npm run e2e`, port 8000 serving Postgres, the simulators, real Slack and Drive, ADP generating). Changes in `ui/e2e/`: real Slack and Drive citation ids are mapped back to fixture ids through A's seed manifests (what `evals/ids.py` does for the golden runner); `/sim/reset` answering 404 means "no scripted events", and the four tests that need them skip (scenarios 2 and 4, the stale-answer alert, the audit tamper, which would alter the real log for good); the audit tests look for the rows they created instead of counting a reset log; a connector with no edits in the window is healthy ("No changes yet"); timeouts fit 5 to 20 s answers. Nothing in `ui/src/` needed to change: the real API's shapes matched the stub's.
+- **Result:** 22 of 28 pass on the real Brain, 4 skip, 2 fail, both in the Brain, not the UI. (1) Split-screen: three concurrent asks made two streams end with `pipeline_error`; cause `OutOfOrderTransactionNesting` on the shared index connection, fixed in `ws-b/concurrent-vector-search` (needs the API restarted). (2) Scenario 1 cites the Slack thread in 2 of 5 asks: checker layer 2 scores the Slack claim 18 to 30 permille and drops it; recorded in B's status for B. Scenarios 1 (when the claim survives), 3 and 5, the officer-withheld-text check, the uniform refusal, Admin, role gating, all 14 axe checks, keyboard and phone paths pass on real data.
+- **Day 8 milestone:** scenarios 1 and 3 verified in the UI on real data by the suite; scenario 4 on real data still needs the Slack hand step (Priya leaves `#auth-private`) and a by-hand run.
+- **Next (C):** restart the API with the B fix and rerun to see the split-screen pass; Leak-CI runner and scoreboard file (agree the format with B; `/v1/leakci/latest` is empty); `deploy/` is still empty; mock IdP JWTs (`src/auth/token.ts`).
+- **Blockers:** none.
+
 ## Wed 7 Oct (Day 6)
 - **Head start from Workstream A (Praew), for Guanyue to review and take over:** branch `ws-c/ui-phase0`.
 - **Done:** UI direction chosen: the **Cortex** design system from the Claude Design mockup; the mockup and design system are in `ui/design-reference/`.

@@ -1,8 +1,9 @@
 import { expect, test } from "@playwright/test";
-import { ask, citedIds, openAs } from "./helpers";
+import { ask, citedIds, NEEDS_SCRIPTED_EVENTS, openAs } from "./helpers";
 
 // The demo scenarios (docs/04-scenarios.md) through the UI. Expectations mirror the golden cases in
-// fixtures/company_a.json; the API-level versions are in evals/tests/.
+// fixtures/company_a.json; the API-level versions are in evals/tests/. Scenarios 2 and 4 and the stale-answer
+// alert need the scripted events, so they skip on the real Brain (there the change is made in the real source).
 
 const REFUSAL = "I couldn't find anything you have access to about that.";
 
@@ -23,7 +24,7 @@ test("scenario 1: one cited answer across Jira and Slack, nothing from the priva
 });
 
 test("scenario 2: the runbook edit shows up on the next question", async ({ page }) => {
-  await openAs(page, "priya");
+  test.skip(!(await openAs(page, "priya")), NEEDS_SCRIPTED_EVENTS);
   const question = "What's the latest runbook for payment-service incident failover?";
   const before = await ask(page, question);
   await expect(before).not.toContainText("failover step");
@@ -49,7 +50,7 @@ test("scenario 3: Sam gets the uniform refusal for the breach report", async ({ 
 });
 
 test("scenario 4: after Priya leaves #auth-private, its thread is gone on the next question", async ({ page }) => {
-  await openAs(page, "priya");
+  test.skip(!(await openAs(page, "priya")), NEEDS_SCRIPTED_EVENTS);
   const question = "What are the open concerns in the auth service threat model?";
   const before = await ask(page, question);
   expect(await citedIds(before)).toContain("C_AUTHPRIV/thread-1");
@@ -81,7 +82,7 @@ test("split-screen: Priya, Sam and Dana ask the same question and get different,
 });
 
 test("stale-answer alert: My Work flags the changed runbook and asks again", async ({ page }) => {
-  await openAs(page, "priya");
+  test.skip(!(await openAs(page, "priya")), NEEDS_SCRIPTED_EVENTS);
   const question = "What's the latest runbook for payment-service incident failover?";
   await ask(page, question);
   await page.request.post("/sim/advance", { data: { event_id: "e1" } });
