@@ -133,7 +133,10 @@ def reply_text(events: list[tuple[str, dict | str]]) -> str:
             raise AdpError(int(code) if isinstance(code, (int, str)) and str(code).isdigit() else None, str(err.get("Message", "")))
     for name, data in events:
         if name == "response.completed" and isinstance(data, dict):
-            return reply_text_from_json(data)
+            final = reply_text_from_json(data)
+            if final.strip():
+                return final
+            break                                     # an empty final message: fall back to what was streamed
     pieces: dict[tuple[str, int], str] = {}
     for name, data in events:
         if not isinstance(data, dict):

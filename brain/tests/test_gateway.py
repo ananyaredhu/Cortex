@@ -58,6 +58,14 @@ def test_adp_reads_the_reply_from_deltas_when_the_final_event_is_missing():
     assert out.claims == REPLY["claims"]
 
 
+def test_adp_falls_back_to_deltas_when_the_final_message_is_empty():
+    events = [("text.delta", {"MessageId": "m1", "ContentIndex": 0, "Text": json.dumps(REPLY)}),
+              ("response.completed", {"Type": "response.completed", "Response": {
+                  "Status": "success", "Messages": [{"Type": "reply", "Contents": [{"Type": "text", "Text": ""}]}]}}),
+              ("done", "[DONE]")]
+    assert _adp(_sse(events)).generate(PACKET).claims == REPLY["claims"]
+
+
 def test_adp_strips_markdown_fences_and_prose_around_the_json():
     text = "Sure! Here it is:\n```json\n" + json.dumps(REPLY) + "\n```"
     out = _adp(_sse([_completed(text), ("done", "[DONE]")])).generate(PACKET)
