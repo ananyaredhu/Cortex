@@ -168,14 +168,14 @@ def _answer(me: dict, body: AskBody) -> dict:
                   "doc_version": d["version"], "jit_checked": True} for d, c in zip(allowed, citations, strict=True)]
     decisions += [{"doc_id_hash": _hash([SALT, d["doc_id"]]), "allowed": False, "reason": "no_access",
                    "acl_snapshot_hash": d["acl"]["snapshot_hash"], "policy_version": "stub-0.1"} for d in denied]
-    _append_audit({"request_id": request_id, "event_type": "ask",
+    conversation_id = body.conversation_id or f"c_{sum(len(c) for c in CONVERSATIONS.values()) + 1}"
+    _append_audit({"request_id": request_id, "event_type": "ask", "conversation_id": conversation_id,
                    "actor": {"user_id": me["email"], "roles": me["roles"], "client": "ui"},
                    "query": {"text": body.question, "skill": body.skill_hint},
                    "decisions": decisions,
                    "answer": {"text": answer, "sha256": _hash(answer), "citations": [c["doc_id"] for c in citations],
                               "refused": refused},
                    "flags": sorted(set(flags))})
-    conversation_id = body.conversation_id or f"c_{sum(len(c) for c in CONVERSATIONS.values()) + 1}"
     conv = CONVERSATIONS.setdefault(me["id"], {}).setdefault(conversation_id, {"title": body.question})
     conv["last_asked_at"] = STATE.data["now"]
     return {"request_id": request_id, "conversation_id": conversation_id, "answer": answer,
@@ -197,6 +197,31 @@ def conversations(authorization: str | None = Header(None)):
     me = _persona(authorization)
     mine = CONVERSATIONS.get(me["id"], {})
     return {"conversations": [{"conversation_id": cid, **c} for cid, c in reversed(mine.items())]}
+
+
+@app.get("/v1/conversations/{conversation_id}")
+def conversation(conversation_id: str, authorization: str | None = Header(None)):
+    """Reopen one of the caller's conversations from the audit log (api.md 0.2). Someone else's and a nonexistent
+    one get the same 404. An answer is shown again only if the caller can still open every document it cited."""
+    me = _persona(authorization)
+    toks = STATE.persona_tokens[me["id"]]
+    asks = [e for e in AUDIT if e["event_type"] == "ask" and e["actor"]["user_id"] == me["email"]
+            and e.get("conversation_id") == conversation_id]
+    if not asks:
+        raise HTTPException(404, "no such conversation")
+    turns = []
+    for e in asks:
+        cited = [STATE.docs.get(d) for d in e["answer"]["citations"]]
+        ok = all(d is not None and can_see(toks, d) for d in cited)
+        proof = {d["doc_id"]: d["proof_path"] for d in e["decisions"] if d.get("allowed")}
+        turns.append({"request_id": e["request_id"], "asked_at": e["ts"], "question": e["query"]["text"],
+                      "skill": e["query"]["skill"], "answer": e["answer"]["text"] if ok else None, "withheld": not ok,
+                      "citations": [{"doc_id": d["doc_id"], "title": d["title"], "url": d["url"], "source": d["source"],
+                                     "as_of": d["updated_at"], "why_visible": proof.get(d["doc_id"], [])}
+                                    for d in cited] if ok else [],
+                      "refused": e["answer"]["refused"], "abstained": False})
+    return {"conversation_id": conversation_id, "title": asks[0]["query"]["text"], "last_asked_at": asks[-1]["ts"],
+            "turns": turns}
 
 
 @app.get("/v1/mywork")

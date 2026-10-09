@@ -40,6 +40,7 @@ export function App() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/ask" element={<AskPage />} />
+          <Route path="/ask/:conversationId" element={<AskPage />} />
           <Route path="/compare" element={<ComparePage />} />
           <Route path="/audit" element={canAudit(persona) ? <AuditPage /> : <Navigate to="/" replace />} />
           <Route path="/admin" element={canAdmin(persona) ? <AdminPage /> : <Navigate to="/" replace />} />

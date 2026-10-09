@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 from brain.api.app import create_app
 from brain.auth import DevTokens
 from brain.config import Settings
+from brain.pipeline.graph import Brain
 from brain.runtime import fixture_runtime
 from brain.tests.conftest import headers as H
 from evals.golden import run_case
@@ -215,10 +216,38 @@ def test_replay_shows_revocation_and_hides_titles_the_officer_cannot_see(client,
     assert client.get("/v1/audit/replay", params={"request_id": rid}, headers=H("priya")).status_code == 403
 
 
-def test_conversations_are_per_persona(client):
-    _ask(client, "priya", Q1)
-    assert client.get("/v1/conversations", headers=H("priya")).json()["conversations"]
+def test_conversations_are_per_persona_and_survive_a_restart(client, runtime):
+    first = _ask(client, "priya", Q1)
+    _ask(client, "priya", RUNBOOK, conversation_id=first["conversation_id"])
+    _ask(client, "priya", THREAT)
+    convs = client.get("/v1/conversations", headers=H("priya")).json()["conversations"]
+    assert sorted(c["title"] for c in convs) == sorted([Q1, THREAT])
     assert client.get("/v1/conversations", headers=H("sam")).json()["conversations"] == []
+    b = runtime.brain                                      # a restart: a fresh Brain over the same audit log
+    runtime.brain = Brain(b.settings, b.connectors, b.index, b.store, b.embedder, b.generator, runtime.audit_store)
+    assert client.get("/v1/conversations", headers=H("priya")).json()["conversations"] == convs
+
+
+def test_reopening_a_conversation_replays_its_turns_only_to_its_owner(client):
+    first = _ask(client, "priya", Q1)
+    cid = first["conversation_id"]
+    _ask(client, "priya", RUNBOOK, conversation_id=cid)
+    c = client.get(f"/v1/conversations/{cid}", headers=H("priya")).json()
+    assert c["title"] == Q1 and [t["question"] for t in c["turns"]] == [Q1, RUNBOOK]
+    assert c["turns"][0]["answer"] == first["answer"] and not c["turns"][0]["withheld"]
+    assert [x["doc_id"] for x in c["turns"][0]["citations"]] == [x["doc_id"] for x in first["citations"]]
+    assert all(x["title"] and x["why_visible"] for x in c["turns"][0]["citations"])
+    other = client.get(f"/v1/conversations/{cid}", headers=H("sam"))
+    missing = client.get("/v1/conversations/c_nope", headers=H("sam"))
+    assert other.status_code == missing.status_code == 404 and other.json() == missing.json()
+
+
+def test_reopened_answer_is_withheld_once_a_cited_document_is_revoked(client, runtime):
+    cid = _ask(client, "priya", THREAT)["conversation_id"]
+    runtime.advance("e2")
+    t = client.get(f"/v1/conversations/{cid}", headers=H("priya")).json()["turns"][0]
+    assert t["withheld"] and t["answer"] is None and t["citations"] == [] and t["question"] == THREAT
+    assert "C_AUTHPRIV" not in json.dumps(t)
 
 
 def test_mywork_differs_per_persona_and_hides_restricted(client):

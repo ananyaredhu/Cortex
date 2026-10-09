@@ -1,9 +1,9 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { PanelRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useLocation } from "react-router-dom";
-import { api } from "../api/client";
-import type { AskResponse, Source } from "../api/types";
+import { useLocation, useParams } from "react-router-dom";
+import { api, ApiError } from "../api/client";
+import type { AskResponse, ConversationTurn, Source } from "../api/types";
 import { usePersona } from "../auth/PersonaContext";
 import { Avatar } from "../components/Avatar";
 import { AnswerCard } from "./AnswerCard";
@@ -19,7 +19,12 @@ interface Turn {
   times: StageTimes;
   answer?: AskResponse;
   error?: string;
+  /** A reopened answer the asker may no longer see: a cited document was revoked since (api.md, conversations). */
+  withheld?: boolean;
 }
+
+/** "idle": a live chat. "loading": fetching a reopened conversation. "missing": not the caller's, or gone. */
+type Load = "idle" | "loading" | "missing";
 
 const TRUST_KEY = "cortex.trustOpen";
 
@@ -33,19 +38,37 @@ function initialTrustOpen(): boolean {
   }
 }
 
+/** A turn from the audit log as the answer card expects it: what the log holds, nothing invented. */
+function restored(t: ConversationTurn, conversationId: string): AskResponse {
+  return {
+    request_id: t.request_id,
+    conversation_id: conversationId,
+    answer: t.answer ?? "",
+    claims: [],
+    citations: t.citations,
+    refused: t.refused,
+    abstained: t.abstained,
+    skill: t.skill ?? null,
+    grounding: null,
+  };
+}
+
 export function AskPage() {
   const { persona } = usePersona();
   const location = useLocation();
+  const { conversationId: routeId } = useParams<{ conversationId: string }>();
   const qc = useQueryClient();
   const [turns, setTurns] = useState<Turn[]>([]);
   const [conversationId, setConversationId] = useState<string | undefined>();
+  const [load, setLoad] = useState<Load>("idle");
   const [selected, setSelected] = useState<number | null>(null);
   const [trustOpen, setTrustOpen] = useState(initialTrustOpen);
   const [whyLit, setWhyLit] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const nextId = useRef(1);
 
-  // A new persona or "Ask Cortex" starts a new conversation: never show one persona's answers to another.
+  // A new persona, "Ask Cortex" or a sidebar entry starts afresh: never show one persona's answers to another.
+  // With a conversation in the URL the thread is reopened from the server, which applies the ownership rule.
   // The refs make each reset and each "ask again" happen once per navigation, even when effects run twice.
   const resetFor = useRef("");
   const askedFor = useRef("");
@@ -54,17 +77,42 @@ export function AskPage() {
     if (resetFor.current === key) return;
     resetFor.current = key;
     setTurns([]);
-    setConversationId(undefined);
+    setConversationId(routeId);
     setSelected(null);
-  }, [persona.id, location.key]);
+    setLoad(routeId ? "loading" : "idle");
+    if (!routeId) return;
+    const asker = persona.id;
+    api(asker)
+      .conversation(routeId)
+      .then((c) => {
+        if (resetFor.current !== key) return; // navigated away meanwhile
+        const loaded: Turn[] = c.turns.map((t) => ({
+          id: nextId.current++,
+          question: t.question,
+          times: {},
+          answer: t.withheld ? undefined : restored(t, c.conversation_id),
+          withheld: t.withheld,
+        }));
+        setTurns(loaded);
+        setSelected([...loaded].reverse().find((t) => t.answer)?.id ?? null);
+        setLoad("idle");
+      })
+      .catch((e) => {
+        if (resetFor.current !== key) return;
+        setLoad(e instanceof ApiError && e.status === 404 ? "missing" : "idle");
+        if (!(e instanceof ApiError && e.status === 404)) {
+          setTurns([{ id: nextId.current++, question: "", times: {}, error: (e as Error).message }]);
+        }
+      });
+  }, [persona.id, location.key, routeId]);
 
   useEffect(() => {
     // Only once there is something to scroll to: scrolling on first render moves the browser's Tab starting
     // point past the skip link.
-    if (turns.length) endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    if (turns.length) endRef.current?.scrollIntoView?.({ behavior: "smooth", block: "end" });
   }, [turns]);
 
-  const busy = turns.some((t) => !t.answer && !t.error);
+  const busy = load === "loading" || turns.some((t) => !t.answer && !t.error && !t.withheld);
   const update = (id: number, f: (t: Turn) => Turn) => setTurns((ts) => ts.map((t) => (t.id === id ? f(t) : t)));
 
   const ask = async (question: string, sources: Source[] = []) => {
@@ -116,7 +164,7 @@ export function AskPage() {
     <div className={`ask${trustOpen ? " ask--trust" : ""}`}>
       <div className="ask__main">
         <header className="ask__head">
-          <span className="ask__title">{turns[0]?.question ?? "New question"}</span>
+          <span className="ask__title">{turns[0]?.question || "New question"}</span>
           {persona.guest && <span className="guest-badge">{persona.guest}</span>}
           {!trustOpen && (
             <button type="button" className="ghost" aria-expanded={false} onClick={() => openTrust(true)}>
@@ -126,8 +174,19 @@ export function AskPage() {
         </header>
 
         <div className="ask__thread">
-          {turns.length === 0 ? (
-            <EmptyState onAsk={(q) => ask(q)} />
+          {load === "loading" ? (
+            <p className="footnote" role="status">
+              Opening the conversation…
+            </p>
+          ) : turns.length === 0 ? (
+            <>
+              {load === "missing" && (
+                <p role="alert" className="banner banner--stale">
+                  That conversation isn’t available. Start a new question below.
+                </p>
+              )}
+              <EmptyState onAsk={(q) => ask(q)} />
+            </>
           ) : (
             turns.map((t) => (
               <section
@@ -135,10 +194,12 @@ export function AskPage() {
                 className={`turn${t.id === selected ? " turn--selected" : ""}`}
                 onClick={() => t.answer && setSelected(t.id)}
               >
-                <div className="turn__q">
-                  <Avatar src={persona.avatar} name={persona.name} size={28} />
-                  <p>{t.question}</p>
-                </div>
+                {t.question && (
+                  <div className="turn__q">
+                    <Avatar src={persona.avatar} name={persona.name} size={28} />
+                    <p>{t.question}</p>
+                  </div>
+                )}
                 {t.answer ? (
                   <AnswerCard
                     asker={persona.id}
@@ -154,6 +215,11 @@ export function AskPage() {
                       setWhyLit(true);
                     }}
                   />
+                ) : t.withheld ? (
+                  <p className="banner banner--stale">
+                    This answer isn’t shown again: something it relied on is no longer available to you. Ask again
+                    for a fresh answer.
+                  </p>
                 ) : t.error ? (
                   <p role="alert" className="banner banner--error">
                     Cortex couldn’t answer right now ({t.error}). Try again in a moment.
@@ -177,4 +243,3 @@ export function AskPage() {
     </div>
   );
 }
-

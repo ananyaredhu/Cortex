@@ -57,7 +57,25 @@ Same request as `/v1/ask`. Server-sent events, so the UI can show real pipeline 
 All five stages are always sent, in that order, for every request (refusals included), so the stream does not reveal what exists.
 
 ## `GET /v1/conversations` *(0.2, optional)*
-The caller's own conversations, newest first: `{ "conversations": [{"conversation_id": "c_1", "title": "<first question>", "last_asked_at": "..."}] }`. Titles are the caller's own question text.
+The caller's own conversations, newest first: `{ "conversations": [{"conversation_id": "c_1", "title": "<first question>", "last_asked_at": "..."}] }`. Titles are the caller's own question text. The list is rebuilt from the audit log (`ask` events carry `conversation_id`), so it survives a restart of the Brain.
+
+## `GET /v1/conversations/{conversation_id}` *(0.2, optional)*
+Reopens one of the caller's own conversations with every turn, oldest first, so the UI can show it again and continue it (pass the same `conversation_id` to `/ask`).
+```json
+{
+  "conversation_id": "c_1", "title": "<first question>", "last_asked_at": "...",
+  "turns": [
+    {"request_id": "req_9f2c", "asked_at": "...", "question": "...", "skill": null,
+     "answer": "...", "withheld": false,
+     "citations": [{"doc_id": "jira:DBMIG-142", "title": "...", "url": "...", "source": "jira", "as_of": "...", "why_visible": ["user:priya@companya.com", "role:DBMIG:developer"]}],
+     "refused": false, "abstained": false}
+  ]
+}
+```
+Rules:
+- Someone else's conversation and a nonexistent one both answer `404 {"detail": "no such conversation"}`.
+- An answer is a derived artifact ([acl-model](acl-model.md), labels): it is shown again only if the caller may still open **every** document it cited, by its stored label and a live check. Otherwise `answer` is `null`, `citations` is `[]` and `withheld` is `true`; the question stays. Nothing in a withheld turn names the document that was revoked.
+- Turns carry what the log holds: no `claims`, `freshness`, `coverage` or `grounding`. The UI renders a reopened answer as plain text with its citations.
 
 ## `GET /v1/mywork`
 Personalized home for the logged-in user: assigned issues, projects, recent pages, channels, suggested questions, pending stale-answer alerts. Everything is fetched through the PDP: nothing the user cannot see.
@@ -99,5 +117,6 @@ Stale-answer alerts: answers the user received whose sources changed afterwards 
 Simulator admin endpoints (owned by A) to revoke a permission, restrict a page, edit a document, and add or remove hidden documents (for Leak-CI). Documented in `simulators/README.md`. The stub API has its own: `/sim/advance`, `/sim/reset`, `/sim/tamper`.
 
 ## Changelog
+- 0.2, 9 Oct: `/conversations/{conversation_id}` reopens a conversation (answers withheld when a cited document is no longer visible); `/conversations` is rebuilt from the audit log.
 - 0.2 (proposed): optional UI fields on `/ask` (`excerpt`, `freshness.per_source`, `coverage`, `grounding`, `policy_version`, `unavailable_sources`, `clarify`) and its `sources` and `time_range` filters; `/ask/stream`; `/conversations`; `/audit/replay`; `/policy/versions` and `/policy/evaluate`; audit answer text withheld from officers who may not see its sources; `question` and `changed_title` on alerts, which only cover documents still visible; `/mywork` and `/freshness` shapes written down; roles for the admin endpoints. Explicit rule: no candidate or denied counts in any asker-facing response.
 - 0.1: first draft.

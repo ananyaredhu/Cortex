@@ -60,6 +60,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .sidebar__recent { display: flex; flex-direction: column; gap: 2px; min-height: 0; overflow: auto; }
 .sidebar__recent .eyebrow { padding: 0 10px 6px; }
 .sidebar__recent-item, .sidebar__recent-empty { padding: 8px 10px; font-size: var(--fs-13); color: var(--text-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sidebar__recent-item { display: block; border-radius: 8px; text-decoration: none; }
+.sidebar__recent-item:hover { background: var(--surface-card); }
+.sidebar__recent-item.active { background: var(--surface-card); box-shadow: var(--shadow-1); color: var(--text-strong); font-weight: var(--fw-bold); }
 .sidebar__recent-empty { color: var(--text-muted); }
 .sidebar__spacer { flex: 1; }
 
