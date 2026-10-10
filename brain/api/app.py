@@ -8,6 +8,7 @@ import queue
 import threading
 from collections.abc import Iterator
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
@@ -19,6 +20,8 @@ from brain.config import ADMIN_ROLES, COMPLIANCE_ROLE, POLICY_VERSION
 from brain.pipeline.graph import AskRequest
 from brain.runtime import Runtime
 from fixtures.loader import load
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 class AskBody(BaseModel):
@@ -209,8 +212,16 @@ def create_app(runtime: Runtime) -> FastAPI:
 
     @app.get("/v1/leakci/latest")
     def leakci(p: Current):
+        """The scoreboard Leak-CI wrote last (`python -m evals.leakci`, Workstream C), or an empty one."""
         require(p, ADMIN_ROLES)
-        return {"as_of": _now(), "cases": 0, "leaks": 0, "suites": [], "note": "no Leak-CI run recorded yet"}
+        path = Path(settings.leakci_scoreboard)
+        if not path.is_absolute():
+            path = REPO_ROOT / path
+        try:
+            board = json.loads(path.read_text(encoding="utf8"))
+        except (OSError, ValueError):
+            return {"as_of": _now(), "cases": 0, "leaks": 0, "suites": [], "note": "no Leak-CI run recorded yet"}
+        return {k: board.get(k) for k in ("as_of", "cases", "leaks", "suites", "target")}
 
     @app.get("/v1/policy/versions")
     def policy_versions(p: Current):

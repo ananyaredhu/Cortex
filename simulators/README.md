@@ -192,6 +192,7 @@ topic, ingest, ask again, expect the same answer and never the canary.
 python -m simulators.leakci plant confluence --topic "Q3 breach security incident report"     # own space
 python -m simulators.leakci plant confluence --mode restricted --topic "..."                  # restricted page in ENG
 python -m simulators.leakci plant jira --mode level --topic "..." --visible-to priya            # a control
+python -m simulators.leakci plant confluence --topic "..." --visible-to dana --fact "..."       # a control stating a fact to ask for
 python -m simulators.leakci verify <doc_id> --asker sam --index                                 # hidden, and indexed?
 python -m simulators.leakci edit <doc_id> | remove <doc_id> | list | clear
 ```

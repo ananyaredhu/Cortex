@@ -166,6 +166,7 @@ export interface LeakCiReport {
   cases: number;
   leaks: number;
   suites?: { name: string; category: string; passed: number; failed: number; last_run_at: string }[]; // 0.2
+  target?: string | null; // 0.2: "fixture" or the URL of the Brain the run asked
 }
 
 export interface AuditFilter {

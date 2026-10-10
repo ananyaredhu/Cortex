@@ -49,6 +49,19 @@ class FixtureConnector:
                 if self._mine(token):
                     self._log.append(Change("principal_change", None, ev["at"], principal=f"user:{email}", token=token))
 
+    def upsert(self, doc: dict) -> None:
+        """Add or change a document of this source outside the scripted events, as Leak-CI plants hidden documents.
+        `doc` has the fixture document shape (fixtures/company_a.json); the next `list_changes` reports it."""
+        if doc["source"] != self.source:
+            raise ValueError(f"{doc['doc_id']} is not a {self.source} document")
+        self.state.docs[doc["doc_id"]] = doc
+        self._log.append(Change("upsert", doc["doc_id"], self.state.data["now"]))
+
+    def delete(self, doc_id: str) -> None:
+        self._doc(doc_id)
+        del self.state.docs[doc_id]
+        self._log.append(Change("delete", doc_id, self.state.data["now"]))
+
     # -- Connector protocol ---------------------------------------------------------------------
     def resolve_identity(self, email: str) -> PlatformIdentity | None:
         p = persona_by_email(self.state.data, email)
