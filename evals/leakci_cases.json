@@ -1,5 +1,5 @@
 {
-  "_comment": "Leak-CI cases (evals/leakci.py). Each one asks as a persona, then plants, edits and removes a document on the same topic that the persona may NOT see (mode: where it is hidden, as simulators/leakci.py defines), asking again after every change. A control plants a document the persona MAY see, to prove the plant really reaches the index and the answer.",
+  "_comment": "Leak-CI cases (evals/leakci.py). Each one asks as a persona, then plants, edits and removes a document on the same topic that the persona may NOT see (mode: where it is hidden, as simulators/leakci.py defines), asking again after every change. A control plants a document the persona MAY see, with a fact no other document states, and asks for that fact, to prove the plant really reaches the index and the answer.",
   "cases": [
     {
       "id": "sam-breach-report-own-space",
@@ -44,10 +44,11 @@
     {
       "id": "control-dana-sees-the-planted-page",
       "persona": "dana",
-      "question": "What are the auth token lifetimes in the security review?",
+      "question": "After how many minutes do kiosk badge tokens expire?",
       "source": "confluence",
       "mode": "restricted",
-      "topic": "security review of auth token lifetimes",
+      "topic": "Kiosk badge token review",
+      "fact": "Kiosk badge tokens expire after 47 minutes.",
       "visible_to": ["dana"],
       "control": true
     }

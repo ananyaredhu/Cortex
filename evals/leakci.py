@@ -14,8 +14,10 @@ asks again. Every later answer is compared with the first:
   The baseline is the second ask, so a cold start does not widen the band;
 - **non-vacuity**: before comparing, the runner checks that the document is really hidden from the asker and
   really in the index carrying its canary (A's `verify`), so a run cannot pass because nothing was planted;
-- a **control** case plants a document the persona may see and expects it cited after the plant and gone after
-  the removal, proving the plant reaches the index and the answer.
+- a **control** case plants a document the persona may see, carrying a `fact` no other document states, and asks
+  for that fact: the planted document must be cited after the plant and the edit and gone after the removal. That
+  proves the plant reaches the index and the answer, without depending on which of several documents a model
+  prefers to cite.
 
 Targets: `--target fixture` runs the real pipeline over the fixture corpus in this process (no database, no model;
 what CI runs, see evals/tests/test_leakci.py). `--target http://host:port` runs against a served Brain whose
@@ -73,8 +75,8 @@ class Planted:
 class Planter(Protocol):
     """Where hidden documents go. Both implementations mirror simulators/leakci.py's verbs."""
 
-    def plant(self, source: str, topic: str, *, mode: str, visible_to: tuple[str, ...]) -> Planted: ...
-    def edit(self, doc_id: str, *, topic: str) -> Planted: ...
+    def plant(self, source: str, topic: str, *, mode: str, visible_to: tuple[str, ...], fact: str | None = None) -> Planted: ...
+    def edit(self, doc_id: str, *, topic: str, fact: str | None = None) -> Planted: ...
     def remove(self, doc_id: str) -> None: ...
     def ingest(self) -> None: ...
     def verify(self, doc_id: str, asker: str) -> dict: ...   # {"hidden_from_asker", "indexed", "index_has_canary", "ok"}
@@ -181,11 +183,12 @@ def run_case(client, case: dict, planter: Planter) -> CaseResult:
     noise = instabilities(before=warmup, after=baseline)   # the answer already varies with nothing planted
     doc_id = None
     try:
-        first = planter.plant(case["source"], case["topic"], mode=case["mode"], visible_to=tuple(case.get("visible_to", ())))
+        first = planter.plant(case["source"], case["topic"], mode=case["mode"], visible_to=tuple(case.get("visible_to", ())),
+                              fact=case.get("fact"))
         doc_id, planted = first.doc_id, [first]
         for step in STEPS:
             if step == "edited":
-                planted.append(planter.edit(doc_id, topic=case["topic"]))
+                planted.append(planter.edit(doc_id, topic=case["topic"], fact=case.get("fact")))
             elif step == "removed":
                 planter.remove(doc_id)
             planter.ingest()
@@ -261,9 +264,9 @@ def _canary() -> str:
     return f"LEAKCI-CANARY-{secrets.token_hex(8)}"
 
 
-def _body(topic: str, canary: str) -> str:
-    return (f"{topic}. Reference {canary}. Summary of {topic}: the owner's notes, the decisions taken and the "
-            f"figures behind them. Reference {canary}.")
+def _body(topic: str, canary: str, fact: str | None = None) -> str:
+    return (f"{topic}. Reference {canary}. {fact + ' ' if fact else ''}Summary of {topic}: the owner's notes, the "
+            f"decisions taken and the figures behind them. Reference {canary}.")
 
 
 class FixturePlanter:
@@ -282,7 +285,7 @@ class FixturePlanter:
     def _email(self, persona: str) -> str:
         return persona_by_id(self._data, persona)["email"]
 
-    def plant(self, source: str, topic: str, *, mode: str, visible_to: tuple[str, ...]) -> Planted:
+    def plant(self, source: str, topic: str, *, mode: str, visible_to: tuple[str, ...], fact: str | None = None) -> Planted:
         suffix = secrets.token_hex(4)
         canary = _canary()
         if source == "confluence":
@@ -297,7 +300,7 @@ class FixturePlanter:
         now = self._data["now"]
         doc = {
             "doc_id": doc_id, "source": source, "kind": kind, "title": f"{topic} ({canary[-6:]})",
-            "url": f"https://fixtures.invalid/{source}/leakci-{suffix}", "body": _body(topic, canary), "parent_id": parent,
+            "url": f"https://fixtures.invalid/{source}/leakci-{suffix}", "body": _body(topic, canary, fact), "parent_id": parent,
             "links": [], "author": "leakci@companya.com", "created_at": now, "updated_at": now, "version": f"{now}#1",
             "tags": ["leakci"],
             "acl": {"tokens": tokens, "native": {"holders": f"leakci-{suffix}", "mode": mode},
@@ -306,13 +309,13 @@ class FixturePlanter:
         self._runtime.brain.connectors[source].upsert(doc)
         return Planted(doc_id, canary)
 
-    def edit(self, doc_id: str, *, topic: str) -> Planted:
+    def edit(self, doc_id: str, *, topic: str, fact: str | None = None) -> Planted:
         source = doc_id.split(":", 1)[0]
         connector = self._runtime.brain.connectors[source]
         doc = dict(connector.state.docs[doc_id])
         canary = _canary()
         n = int(doc["version"].rsplit("#", 1)[1]) + 1
-        doc.update(title=f"{topic} ({canary[-6:]})", body=_body(topic, canary), version=f"{doc['version'].rsplit('#', 1)[0]}#{n}")
+        doc.update(title=f"{topic} ({canary[-6:]})", body=_body(topic, canary, fact), version=f"{doc['version'].rsplit('#', 1)[0]}#{n}")
         doc["acl"] = {**doc["acl"], "snapshot_hash": f"{doc['acl']['snapshot_hash'].rsplit('-', 1)[0]}-{n}"}
         connector.upsert(doc)
         return Planted(doc_id, canary)
@@ -347,6 +350,10 @@ class SimulatorPlanter:
         self._leakci = leakci
         self._store = store
         self._ingestor = Ingestor(connectors, store, embedder)
+        # Catch up before anything is planted. After a simulator restart the stored cursor has expired and the next
+        # pass is a full crawl, which lists documents but no membership changes: a control's holder would then keep
+        # the identity the Brain cached before the plant (identity_ttl_s) and not find the planted document.
+        self._ingestor.run_once()
 
     @classmethod
     def from_env(cls) -> SimulatorPlanter:
@@ -363,12 +370,12 @@ class SimulatorPlanter:
                       JiraConnector.from_url(os.environ.get("JIRA_SIM_URL") or "http://localhost:8102")]
         return cls(LeakCI.from_env(), store, embedder_from_env(), connectors)
 
-    def plant(self, source: str, topic: str, *, mode: str, visible_to: tuple[str, ...]) -> Planted:
-        p = self._leakci.plant(source, topic, mode=mode, visible_to=visible_to)
+    def plant(self, source: str, topic: str, *, mode: str, visible_to: tuple[str, ...], fact: str | None = None) -> Planted:
+        p = self._leakci.plant(source, topic, mode=mode, visible_to=visible_to, fact=fact)
         return Planted(p.doc_id, p.canary)
 
-    def edit(self, doc_id: str, *, topic: str) -> Planted:
-        p = self._leakci.edit(doc_id, topic=topic)
+    def edit(self, doc_id: str, *, topic: str, fact: str | None = None) -> Planted:
+        p = self._leakci.edit(doc_id, topic=topic, fact=fact)
         return Planted(p.doc_id, p.canary)
 
     def remove(self, doc_id: str) -> None:

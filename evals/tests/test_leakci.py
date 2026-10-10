@@ -10,6 +10,7 @@ from brain.api.app import create_app
 from brain.config import Settings
 from brain.runtime import fixture_runtime
 from evals.leakci import CANARY, FixturePlanter, load_cases, run_all, run_case, write_scoreboard
+from fixtures.loader import load
 
 H = lambda p: {"Authorization": f"Bearer dev:{p}"}
 CASES = load_cases()
@@ -55,6 +56,20 @@ def test_a_control_document_is_cited_only_while_it_exists():
     assert [c.ok for c in seen] == [True, True, True], [c.note for c in seen]
 
 
+def test_the_control_asks_for_a_fact_only_the_planted_page_states():
+    """Otherwise a model may answer from another document and the control fails without anything being wrong."""
+    client, planter, runtime = _target()
+    case = next(c for c in CASES if c.get("control"))
+    assert not any("kiosk" in (d["title"] + d["body"]).lower() for d in load()["documents"])
+    planted = planter.plant(case["source"], case["topic"], mode=case["mode"], visible_to=("dana",), fact=case["fact"])
+    planter.ingest()
+    assert any(case["fact"] in c.text for c in runtime.brain.store.chunks_of(planted.doc_id))
+    edited = planter.edit(planted.doc_id, topic=case["topic"], fact=case["fact"])
+    planter.ingest()
+    texts = [c.text for c in runtime.brain.store.chunks_of(planted.doc_id)]
+    assert any(case["fact"] in t and edited.canary in t for t in texts) and not any(planted.canary in t for t in texts)
+
+
 def test_a_leak_would_be_counted(monkeypatch):
     """If the pipeline served a hidden document, the runner must say so: fake a response carrying the canary."""
     from evals import leakci
@@ -63,8 +78,8 @@ def test_a_leak_would_be_counted(monkeypatch):
     real_ask = leakci.ask
     canary = {"value": None}
 
-    def plant_and_remember(source, topic, *, mode, visible_to):
-        p = planter.plant(source, topic, mode=mode, visible_to=visible_to)
+    def plant_and_remember(source, topic, *, mode, visible_to, fact=None):
+        p = planter.plant(source, topic, mode=mode, visible_to=visible_to, fact=fact)
         canary["value"] = p.canary
         return p
 
