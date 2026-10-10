@@ -105,7 +105,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .status--bad { color: var(--danger-text); }
 .banner { display: flex; align-items: flex-start; gap: var(--space-2); padding: 10px 12px; border-radius: var(--radius-sm); font-size: var(--fs-13); color: var(--text-strong); }
 .banner--stale { background: var(--warning-soft); }
-.banner--error { background: var(--danger-soft); }
+.banner--error, .banner--unavailable { background: var(--danger-soft); }
 .spin { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }

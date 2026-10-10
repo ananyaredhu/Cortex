@@ -48,6 +48,7 @@ function restored(t: ConversationTurn, conversationId: string): AskResponse {
     citations: t.citations,
     refused: t.refused,
     abstained: t.abstained,
+    generator_unavailable: t.unavailable ?? false,
     skill: t.skill ?? null,
     grounding: null,
   };

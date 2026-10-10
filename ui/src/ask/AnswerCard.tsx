@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, Check, Copy, ExternalLink, ShieldCheck, ShieldQuestion, Sparkles, WifiOff } from "lucide-react";
+import { AlertTriangle, Check, CloudOff, Copy, ExternalLink, ShieldCheck, ShieldQuestion, Sparkles, WifiOff } from "lucide-react";
 import { useId, useState } from "react";
 import { api } from "../api/client";
 import type { AskResponse, Citation } from "../api/types";
@@ -46,7 +46,13 @@ export function AnswerCard({
     <article className="card answer" aria-label="Answer" onMouseLeave={() => setActive(null)}>
       {banners(answer).map((b) => (
         <div key={b.kind} role="status" className={`banner banner--${b.kind}`}>
-          {b.kind === "error" ? <WifiOff size={16} aria-hidden /> : <AlertTriangle size={16} aria-hidden />}
+          {b.kind === "error" ? (
+            <WifiOff size={16} aria-hidden />
+          ) : b.kind === "unavailable" ? (
+            <CloudOff size={16} aria-hidden />
+          ) : (
+            <AlertTriangle size={16} aria-hidden />
+          )}
           <span>{b.text}</span>
         </div>
       ))}
