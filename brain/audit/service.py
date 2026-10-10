@@ -23,8 +23,13 @@ class AuditService:
 
     # -- verify ---------------------------------------------------------------------------------
     def verify(self) -> dict:
-        key = getattr(self._store, "public_key_hex", None)
-        return chain.verify(self._store.all(), public_key_hex=key).as_json()
+        """Integrity of the whole chain. With a configured `AUDIT_SIGNING_KEY` every checkpoint must verify against that
+        key (`signer_pinned`: true). Without one each checkpoint is checked against the key it carries, which proves the
+        chain was not edited but not who signed it, so a restart no longer looks like tampering (fix F3)."""
+        pinned = getattr(self._store, "pinned_public_key_hex", None)
+        out = chain.verify(self._store.all(), public_key_hex=pinned).as_json()
+        out["signer_pinned"] = pinned is not None
+        return out
 
     # -- query ----------------------------------------------------------------------------------
     def query(self, officer: Principal, body: dict) -> dict:

@@ -23,7 +23,7 @@ from brain.audit.store import AuditStore
 from brain.auth import Principal
 from brain.checker import CheckResult, GroundingScorer, Layer2Result, check, check_layer2
 from brain.checker.layer2 import rebuild_answer
-from brain.config import POLICY_VERSION, REFUSAL, SOURCES, STAGES, Settings
+from brain.config import ABSTAIN, POLICY_VERSION, REFUSAL, SOURCES, STAGES, UNAVAILABLE, Settings
 from brain.gateway.models import Generated, Generator
 from brain.policy.identity import AskerIdentity, IdentityResolver
 from brain.policy.labels import acl_label, may_serve
@@ -250,8 +250,11 @@ class Brain:
         req, checked, pkt = state["request"], state["checked"], state["packet"]
         proof = {d.doc_id: list(d.proof_path) for d in state["decisions"] if d.allowed}
         refused = not pkt["evidence"]
-        abstained = (not refused) and checked.abstained
-        shown_ids = {d for c in checked.claims for d in c["citations"]} if not (refused or abstained) else set()
+        # Fix F11: a model failure is not "no source supports an answer". It needs evidence to have been sent, so a
+        # forbidden and a nonexistent document (no evidence, generator never called) still look identical.
+        unavailable = (not refused) and state["generated"].unavailable
+        abstained = (not refused) and (not unavailable) and checked.abstained
+        shown_ids = {d for c in checked.claims for d in c["citations"]} if not (refused or abstained or unavailable) else set()
         by_id = {e["doc_id"]: e for e in pkt["evidence"]}
         excerpts = {e.doc_id: e.raw for e in state["evidence"]}
         citations = [{"doc_id": d, "title": by_id[d]["title"], "url": by_id[d]["url"], "source": by_id[d]["source"],
@@ -259,20 +262,22 @@ class Brain:
                      for d in by_id if d in shown_ids]
         if refused:
             answer, claims = REFUSAL, []
+        elif unavailable:
+            answer, claims = UNAVAILABLE, []
         elif abstained:
-            answer, claims = "I found sources you can see, but none of them supports an answer to that.", []
+            answer, claims = ABSTAIN, []
         else:
             answer, claims = checked.answer, checked.claims
         conversation_id = req.conversation_id or f"c_{uuid.uuid4().hex[:6]}"
         response = {
             "request_id": state["request_id"], "conversation_id": conversation_id, "answer": answer, "claims": claims,
-            "citations": citations, "refused": refused, "abstained": abstained,
+            "citations": citations, "refused": refused, "abstained": abstained, "generator_unavailable": unavailable,
             "freshness": {"oldest_source_as_of": min((c["as_of"] for c in citations if c["as_of"]), default=None),
                           "stale_refetched": state["stale_refetched"], "per_source": self._per_source(state["unavailable"])},
             "skill": req.skill_hint,
             "coverage": {s: {"searched": s in state["searched"], "shown": sum(c["source"] == s for c in citations)}
                          for s in SOURCES},
-            "grounding": None if (refused or abstained) else checked.grounding,
+            "grounding": None if (refused or abstained or unavailable) else checked.grounding,
             "policy_version": self.pdp.policy_version, "unavailable_sources": state["unavailable"], "clarify": None,
         }
         return {"response": response}
@@ -307,8 +312,10 @@ class Brain:
             "query": {"text": req.question, "skill": req.skill_hint},
             "decisions": [d.audit_view(salt) for d in state["decisions"]],
             "answer": {"text": resp["answer"], "sha256": sha256_text(resp["answer"]), "citations": cited,
-                       "refused": resp["refused"], "abstained": resp["abstained"], "acl_label": label},
-            "checks": {**checked.status, "grounding_model": state["grounded"].status,
+                       "refused": resp["refused"], "abstained": resp["abstained"],
+                       "unavailable": resp["generator_unavailable"], "acl_label": label},
+            "checks": {**checked.status, "generator": "unavailable" if resp["generator_unavailable"] else "ok",
+                       "grounding_model": state["grounded"].status,
                        "grounding_scores": state["grounded"].scores,
                        "leak_hits": [hash_denied(d, salt) for d in checked.leak_hits]},
             "models": {"generator": self.generator.model, "checker": state["grounded"].model,
@@ -411,7 +418,8 @@ class Brain:
                               "as_of": row.updated_at if row else None, "why_visible": proof.get(doc_id, [])})
         return {"request_id": event["request_id"], "asked_at": event.get("ts"), "question": event["query"]["text"],
                 "skill": event["query"].get("skill"), "answer": answer.get("text") if ok else None, "withheld": not ok,
-                "citations": citations, "refused": bool(answer.get("refused")), "abstained": bool(answer.get("abstained"))}
+                "citations": citations, "refused": bool(answer.get("refused")), "abstained": bool(answer.get("abstained")),
+                "unavailable": bool(answer.get("unavailable"))}
 
     def stages(self) -> tuple[str, ...]:
         return STAGES

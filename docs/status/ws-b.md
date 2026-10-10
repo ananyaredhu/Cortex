@@ -2,6 +2,13 @@
 
 Update at the end of each day. Newest first. Keep it short: done, next, blockers.
 
+## Sat 10 Oct (Day 9)
+- **Ananya is back on B.** Pulled PRs #35 and #36, ran the backend locally in fixture mode (456 tests passing, scenarios 1 to 5 by hand), and wrote a backlog of what is left and what to fix (`docs/backlog.md`, not yet merged). Branch `ws-b/security-fixes`.
+- **Done (fixes from the review, five commits):** F1 development login is now opt-in (`BRAIN_DEV_AUTH=1`) and `BRAIN_ENV=production` makes the API refuse to start with dev login on, a missing or short JWT key, no audit signing key, the default audit salt or no checker model (`brain/startup.py`, `Settings.production_problems`); F3 `/verify` no longer reports tampering after a restart, and reports `signer_pinned`; F2 mock IdP `POST /idp/token` (opt-in with `BRAIN_MOCK_IDP=1`) and a 32-byte minimum JWT key; F10 the API's `answer` is rebuilt from the verified claims, never the model's prose; F11 `generator_unavailable` separates a model failure from "no source supports an answer".
+- **Heads-up for A and C:** `BRAIN_DEV_AUTH` is now off by default. Anyone running `make brain-api` with the UI or the Playwright suite must set `BRAIN_DEV_AUTH=1` in `.env` (`.env.example` has it). Fixture mode (`make brain-api-fixture`) is unchanged. Contract additions for review: `POST /idp/token` and `generator_unavailable` in api.md, `answer.unavailable` and `checks.generator` in audit-event-schema.md.
+- **Next:** UI sign-in through the mock IdP and a banner for `generator_unavailable` (needs Node), then the MCP server, link-edge expansion, skills, router and memory.
+- **Blockers:** none.
+
 ## Thu 9 Oct (Day 8)
 - **Done:** the LLM generator, through Tencent Cloud ADP (`brain/gateway/adp.py`). The organizer's guide gives an ADP agent an Experience URL and an AppKey, not an OpenAI-compatible endpoint, so the gateway got an adapter for ADP's Chat API: the context packet is the one message, our JSON-claims instruction goes in `SystemRole` (overriding the agent's prompt for the turn), online search is disabled per turn, the reply is read from `response.completed` (or the streamed deltas), fenced or wrapped JSON is tolerated, and any error, throttling (one retry) or reply without claims is an abstain with the error code logged, never content. `GENERATOR_BACKEND` selects adp, openai or template; `auto` takes the first configured. The agent runs GPT-5.6 Terra (the picker's name, used as the audit label) with no knowledge base and search off.
 - **Probed** (`python -m brain.gateway.probe`, check #1, ADR-001): reachable, 3 of 3 replies as JSON claims citing only packet documents, 2.9 to 13.9 s per call.

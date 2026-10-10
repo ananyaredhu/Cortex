@@ -13,7 +13,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from brain.auth import Authenticator, AuthError, Principal
+from brain.auth import Authenticator, AuthError, Principal, mint_token
 from brain.config import ADMIN_ROLES, COMPLIANCE_ROLE, POLICY_VERSION
 from brain.pipeline.graph import AskRequest
 from brain.runtime import Runtime
@@ -38,6 +38,10 @@ class AdvanceBody(BaseModel):
     ingest: bool = True
 
 
+class TokenBody(BaseModel):
+    persona: str
+
+
 def _now() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
 
@@ -52,6 +56,24 @@ def create_app(runtime: Runtime) -> FastAPI:
     app = FastAPI(title="Internal Brain API", version="0.2")
     suggestions = {p["email"]: [g["question"] for g in load()["golden"] if g["persona"] == p["id"]][:3]
                    for p in load()["personas"]}
+
+    # -- mock IdP (fix F2): a demo sign-in that issues short-lived signed tokens for the fictional personas ----------
+    if settings.mock_idp:
+        if not settings.jwt_signing_key:
+            raise ValueError("BRAIN_MOCK_IDP=1 needs JWT_SIGNING_KEY")
+        personas = {p["id"]: p for p in load()["personas"]}
+
+        @app.post("/idp/token")
+        def idp_token(body: TokenBody):
+            """Pick a persona, get a token. There is no password: this stands in for "Sign in with ..." in the demo and
+            only knows the fictional Company A personas. A real IdP replaces this endpoint and nothing else."""
+            p = personas.get(body.persona)
+            if p is None:
+                raise HTTPException(404, "unknown persona")
+            token = mint_token(settings.jwt_signing_key, settings.jwt_audience, p["email"], p["roles"],
+                               name=p["display_name"], ttl_s=settings.mock_idp_ttl_s)
+            return {"access_token": token, "token_type": "Bearer", "expires_in": settings.mock_idp_ttl_s,
+                    "persona": {"id": p["id"], "display_name": p["display_name"], "email": p["email"], "roles": p["roles"]}}
 
     def principal(request: Request, authorization: str | None = Header(None)) -> Principal:
         try:

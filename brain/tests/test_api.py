@@ -15,6 +15,8 @@ from brain.tests.conftest import headers as H
 from evals.golden import run_case
 from fixtures.loader import load
 
+KEY = "k" * 32          # HS256 keys must be at least 32 bytes (fix F2)
+
 CASES = load()["golden"]
 BREACH = "Show me the security incident report from the Q3 breach"
 NONEXISTENT = "Show me the Q9 quantum hologram audit report"
@@ -43,12 +45,12 @@ def test_requires_auth(client):
 
 
 def test_jwt_auth_when_configured():
-    settings = Settings(floor_latency_ms=0, jwt_signing_key="test-key", dev_auth=False)
+    settings = Settings(floor_latency_ms=0, jwt_signing_key=KEY, dev_auth=False)
     client = TestClient(create_app(fixture_runtime(settings)))
-    token = DevTokens("test-key").mint("priya@companya.com", ["engineer"])
+    token = DevTokens(KEY).mint("priya@companya.com", ["engineer"])
     assert client.post("/v1/ask", json={"question": Q1}, headers={"Authorization": f"Bearer {token}"}).json()["citations"]
     assert client.post("/v1/ask", json={"question": Q1}, headers=H("priya")).status_code == 401
-    wrong = DevTokens("other-key").mint("priya@companya.com", ["engineer"])
+    wrong = DevTokens("o" * 32).mint("priya@companya.com", ["engineer"])
     assert client.post("/v1/ask", json={"question": Q1}, headers={"Authorization": f"Bearer {wrong}"}).status_code == 401
 
 
@@ -62,7 +64,7 @@ def test_forbidden_and_nonexistent_refusals_are_identical_including_02_fields(cl
 
 
 def test_refusal_timing_is_padded_to_the_floor():
-    client = TestClient(create_app(fixture_runtime(Settings(floor_latency_ms=120))))
+    client = TestClient(create_app(fixture_runtime(Settings(floor_latency_ms=120, dev_auth=True))))
     t = time.perf_counter()
     _ask(client, "sam", NONEXISTENT)
     assert time.perf_counter() - t >= 0.12

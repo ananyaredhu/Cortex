@@ -70,21 +70,21 @@ class AdpGenerator:
                 if exc.code in TRANSIENT and attempt == 1:
                     time.sleep(self._retry_after)
                     continue
-                return Generated("", [], abstained=True, model=self.model)
+                return Generated("", [], abstained=True, model=self.model, unavailable=True)
             except httpx.HTTPError as exc:
                 log.warning("ADP request failed on attempt %d: %s", attempt, type(exc).__name__)
                 if attempt == 1 and isinstance(exc, (httpx.TimeoutException, httpx.TransportError)):
                     time.sleep(self._retry_after)
                     continue
-                return Generated("", [], abstained=True, model=self.model)
+                return Generated("", [], abstained=True, model=self.model, unavailable=True)
             except (ValueError, KeyError, TypeError) as exc:
                 log.warning("ADP reply unreadable: %s", type(exc).__name__)
-                return Generated("", [], abstained=True, model=self.model)
+                return Generated("", [], abstained=True, model=self.model, unavailable=True)
             out = parse_claims(text, self.model)
             if out.abstained:
                 log.warning("ADP reply had no parseable claims (%d chars)", len(text))
             return out
-        return Generated("", [], abstained=True, model=self.model)
+        return Generated("", [], abstained=True, model=self.model, unavailable=True)
 
     def _call(self, packet: dict) -> str:
         with self._client.stream("POST", self._url, json=self.request_body(packet),
@@ -168,9 +168,9 @@ def parse_claims(text: str, model: str) -> Generated:
     try:
         data = json.loads(body)
     except ValueError:
-        return Generated("", [], abstained=True, model=model)
+        return Generated("", [], abstained=True, model=model, unavailable=True)     # an unreadable reply is a failure
     if not isinstance(data, dict):
-        return Generated("", [], abstained=True, model=model)
+        return Generated("", [], abstained=True, model=model, unavailable=True)
     claims = [{"text": str(c.get("text", "")).strip(), "citations": [str(d) for d in c.get("citations", [])]}
               for c in data.get("claims", []) if isinstance(c, dict) and str(c.get("text", "")).strip()]
     if not claims:                                   # no supported claims: no text either, never unverified prose

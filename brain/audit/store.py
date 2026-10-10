@@ -40,6 +40,12 @@ class MemoryAuditStore:
     def public_key_hex(self) -> str:
         return self._signer.public_key_hex
 
+    @property
+    def pinned_public_key_hex(self) -> str | None:
+        """The key every checkpoint must verify against: only a configured (persistent) key can be pinned.
+        With a key made for this run, an earlier run's checkpoints legitimately carry another key (fix F3)."""
+        return self._signer.public_key_hex if self._signer.persistent else None
+
     def append(self, event: dict) -> dict:
         with self._lock:
             event = dict(event)
@@ -91,6 +97,12 @@ class PostgresAuditStore:
     @property
     def public_key_hex(self) -> str:
         return self._signer.public_key_hex
+
+    @property
+    def pinned_public_key_hex(self) -> str | None:
+        """The key every checkpoint must verify against: only a configured (persistent) key can be pinned.
+        With a key made for this run, an earlier run's checkpoints legitimately carry another key (fix F3)."""
+        return self._signer.public_key_hex if self._signer.persistent else None
 
     def append(self, event: dict) -> dict:
         with self._lock, self._conn.transaction():

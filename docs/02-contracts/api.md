@@ -11,6 +11,11 @@ Errors: `{ "error": {"code": "...", "message": "..."} }`. Refusals are **not err
 
 **Roles.** `compliance` for the audit endpoints. `admin` endpoints accept `security-lead` or `compliance` in the Company A personas (there is no separate admin persona).
 
+## `POST /idp/token` *(0.2, optional, demo only)*
+The mock IdP. Served only when the Brain runs with `BRAIN_MOCK_IDP=1` and a `JWT_SIGNING_KEY` of at least 32 bytes; otherwise the route does not exist (404). Request: `{ "persona": "priya" }`. Response: `{ "access_token": "<JWT>", "token_type": "Bearer", "expires_in": 900, "persona": { "id", "display_name", "email", "roles" } }`. The token is HS256 with `sub`, `email`, `roles`, `name`, `aud`, `iss: "mock-idp"`, `iat`, `exp`. Unknown persona: 404. There is no password: this stands in for "Sign in with ..." and knows only the fictional Company A personas. A real IdP replaces this endpoint and nothing else.
+
+**Development login.** `Bearer dev:<persona>` and the `/sim/*` helpers are served only when `BRAIN_DEV_AUTH=1` (off by default). With `BRAIN_ENV=production` the Brain refuses to start with dev login on.
+
 ## `POST /v1/ask`
 Request: `{ "question": "...", "conversation_id": "optional", "skill_hint": "optional", "sources": ["jira", "slack"], "time_range": "any" }`
 - `sources` *(0.2, optional)*: limit the search to these sources (`confluence`, `jira`, `slack`, `gdrive`). Absent or empty means all.
@@ -27,6 +32,7 @@ Response:
                  "why_visible": ["role:DBMIG:developer"], "excerpt": "Database migration cutover is blocked ..."}],
   "refused": false,
   "abstained": false,
+  "generator_unavailable": false,
   "freshness": {"oldest_source_as_of": "...", "stale_refetched": 0,
                 "per_source": {"jira": {"last_sync": "2026-10-10T14:03:00Z", "status": "ok"}}},
   "skill": "status-and-blockers",
@@ -48,6 +54,10 @@ Fields added in 0.2 (all optional):
 - `clarify`: `{"question": "...", "options": ["...", "..."]}` when the question is ambiguous between things the asker may see; then `answer` is empty and `refused` is false. Options are built only from allowed documents.
 
 Refusal: `{ "refused": true, "answer": "I couldn't find anything you have access to about that.", "claims": [], "citations": [] }`, with every 0.2 field present in the same shape (`coverage` shows `shown: 0` for each searched source). Same shape and similar timing for forbidden and nonexistent content. No counts, no titles.
+
+`generator_unavailable` *(0.2, optional)*: `true` only when sources the asker may see were found but the answer service failed (unreachable, throttled, or an unreadable reply). Then `answer` is the fixed message "The answer service is temporarily unavailable ...", `claims` and `citations` are empty, `refused` and `abstained` are `false`, and `grounding` is `null`. It is `false` in every other case, refusals included, so the field is always present. It can never be `true` for a refusal, because with no evidence the generator is not asked: a forbidden and a nonexistent document stay identical. `abstained` keeps its meaning: the model answered and nothing it could cite supports an answer.
+
+`answer` is the verified claims rendered as text (`"Here is what I found:\n- ..."`), never the model's free-text prose.
 
 ## `POST /v1/ask/stream` *(0.2, optional)*
 Same request as `/v1/ask`. Server-sent events, so the UI can show real pipeline progress instead of a timed animation:
