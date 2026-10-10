@@ -23,3 +23,25 @@ jobs:
         run: |
           python fixtures/generate.py
           git diff --exit-code fixtures/company_a.json
+
+  # The UI (ui/): type-check, unit tests and a production build. The Playwright suite (npm run e2e) needs a 700 MB browser
+  # and runs by hand for now. Node 22 is the version the team's setup guide (docs/setup-ui-laptop.md) installs.
+  ui:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - run: npm ci
+      - name: Type-check
+        run: npm run typecheck
+      - name: Unit tests
+        run: npm test
+      - name: Production build
+        run: npm run build

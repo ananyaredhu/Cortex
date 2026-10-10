@@ -48,6 +48,8 @@ export interface AskResponse {
   citations: Citation[];
   refused: boolean;
   abstained: boolean;
+  /** true only when sources the asker may see were found but the answer service failed (0.2). Never true for a refusal. */
+  generator_unavailable?: boolean;
   freshness?: Freshness;
   skill?: string | null;
   coverage?: Coverage; // 0.2
@@ -78,6 +80,7 @@ export interface ConversationTurn {
   citations: Citation[];
   refused: boolean;
   abstained: boolean;
+  unavailable?: boolean; // the answer service failed for this turn
 }
 
 export interface ConversationDetail extends Conversation {

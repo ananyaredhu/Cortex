@@ -75,3 +75,15 @@ export function refusal(requestId: string): AskResponse {
     clarify: null,
   };
 }
+
+/** Sources were found but the answer service failed: shaped like the Brain's response (brain/pipeline/graph.py). */
+export function unavailable(requestId: string): AskResponse {
+  return {
+    ...refusal(requestId),
+    answer:
+      "The answer service is temporarily unavailable, so I could not write an answer from the sources you can see. Please try again in a moment.",
+    refused: false,
+    abstained: false,
+    generator_unavailable: true,
+  };
+}

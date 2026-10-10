@@ -28,9 +28,19 @@ export function uncitedClaims(r: AskResponse): string[] {
   return r.claims.filter((c) => !c.citations.some((id) => ids.has(id))).map((c) => c.text);
 }
 
-/** Banners above the answer: sources that could not be read, and searched sources behind their sync target. */
-export function banners(r: AskResponse): { kind: "error" | "stale"; text: string }[] {
-  const out: { kind: "error" | "stale"; text: string }[] = [];
+export type Banner = { kind: "error" | "stale" | "unavailable"; text: string };
+
+/** Banners above the answer: the answer service being down, sources that could not be read, and searched sources
+ *  behind their sync target. "Unavailable" is a failure of the service, not a verdict on the sources, so it is told
+ *  apart from an abstention ("none of your sources supports an answer"). */
+export function banners(r: AskResponse): Banner[] {
+  const out: Banner[] = [];
+  if (r.generator_unavailable) {
+    out.push({
+      kind: "unavailable",
+      text: "The answer service is unavailable right now. Your sources were found, but no answer could be written. Try again in a moment.",
+    });
+  }
   const down = r.unavailable_sources ?? [];
   if (down.length) {
     out.push({

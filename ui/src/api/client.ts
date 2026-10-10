@@ -1,5 +1,5 @@
 import type { PersonaId } from "../auth/personas";
-import { authHeader } from "../auth/token";
+import { authHeader, authMode, forgetToken } from "../auth/token";
 import type {
   AskRequest,
   AskResponse,
@@ -28,12 +28,23 @@ export class ApiError extends Error {
   }
 }
 
+// A token the server no longer accepts (expired, or the Brain restarted with another key) is dropped and fetched once
+// more. Only the mock IdP flow has tokens that can lapse; a 401 with a dev token is a real refusal and is not retried.
+async function authorized(persona: PersonaId, send: (authorization: string) => Promise<Response>): Promise<Response> {
+  const res = await send(await authHeader(persona));
+  if (res.status !== 401 || authMode() !== "idp") return res;
+  forgetToken(persona);
+  return send(await authHeader(persona));
+}
+
 // Same origin: the Vite dev server (and the deployed reverse proxy) forwards /v1 to the Brain API.
 async function call<T>(persona: PersonaId, path: string, init: RequestInit = {}): Promise<T> {
-  const res = await fetch(path, {
-    ...init,
-    headers: { "Content-Type": "application/json", Authorization: authHeader(persona), ...init.headers },
-  });
+  const res = await authorized(persona, (authorization) =>
+    fetch(path, {
+      ...init,
+      headers: { "Content-Type": "application/json", Authorization: authorization, ...init.headers },
+    }),
+  );
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new ApiError(res.status, body?.error?.message ?? body?.detail ?? res.statusText);
@@ -73,11 +84,13 @@ async function askStream(
   req: AskRequest,
   onStage: (stage: Stage, status: "start" | "done") => void,
 ): Promise<AskResponse> {
-  const res = await fetch("/v1/ask/stream", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: authHeader(persona) },
-    body: JSON.stringify(req),
-  });
+  const res = await authorized(persona, (authorization) =>
+    fetch("/v1/ask/stream", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: authorization },
+      body: JSON.stringify(req),
+    }),
+  );
   if (!res.ok || !res.body) throw new ApiError(res.status, res.statusText);
   const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
   let buf = "";
