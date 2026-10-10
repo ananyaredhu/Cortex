@@ -14,7 +14,8 @@ The log must be **tamper-evident**, **complete** (who, what, retrieved IDs, fina
   "event_type": "ask",
   "conversation_id": "c_1",
   "actor": {"user_id": "priya@companya.com", "roles": ["engineer"], "client": "ui"},
-  "query": {"text": "What's the status of the DB migration ...", "skill": "status-and-blockers"},
+  "query": {"text": "What's the status of the DB migration ...", "skill": "status-and-blockers", "skill_version": 1,
+            "skill_sha256": "<hash of the skill folder>", "rewritten": null},
   "decisions": [
     {
       "doc_id": "jira:DBMIG-142",
@@ -77,6 +78,7 @@ Audit queries (natural language or structured) are read-only and run **under RBA
 `ask` events carry `conversation_id` (the one returned by `/ask`). The Brain keeps no other record of conversations: `/v1/conversations` and `/v1/conversations/{id}` are rebuilt from these events, under the same ownership rule (only the asker's own events), so history survives a restart.
 
 ## Changelog
+- 0.1, 11 Oct: `query.skill_version`, `query.skill_sha256` (the skill file pinned by hash) and `query.rewritten` (the standalone search text, set only when a follow-up was rewritten; `query.text` stays what the person typed).
 - 0.1, 10 Oct: `identity_snapshot` events (time-travel queries).
 - 0.1, 10 Oct: `links_followed` on `ask` events (documents added through stored links, each with the allowed document that linked to it). Denied link targets appear only as hashed entries in `decisions`.
 - 0.1, 9 Oct: `conversation_id` on `ask` events; conversations are rebuilt from the log.

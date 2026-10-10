@@ -19,8 +19,10 @@ Context engineering is an explicit pipeline stage: select, compress, order and b
   "task": {
     "question": "What's the status of the DB migration ...?",
     "skill": "status-and-blockers",
+    "procedure": "# Procedure\n1. ...",
     "output_schema": "claims_with_citations_v1"
   },
+  "history": [{"question": "...", "query": "...", "answer": "..."}],
   "evidence": [
     {
       "chunk_id": "jira:DBMIG-142#0",
@@ -60,5 +62,6 @@ Conversation memory entries are labeled with the intersection of their sources' 
 Context precision and recall on the golden set, citation precision, abstention correctness, and token cost per answer.
 
 ## Changelog
+- 0.1, 11 Oct: `task.procedure` (the selected skill's procedure, from a reviewed file, or `null`) and `history` (the person's own earlier turns of this conversation, at most `memory_turns`, each re-checked against the person's current access: a turn whose cited documents they may no longer open is left out; `query` is the standalone search text the turn was run with). `history` says what a follow-up refers to and is never evidence: every claim still cites `evidence`.
 - 0.1, 10 Oct: `evidence[].via_link_from` (set when the document was reached through a stored link from an allowed hit; the link target passed the same permission check, ranks below direct hits).
 - 0.1: first draft.
