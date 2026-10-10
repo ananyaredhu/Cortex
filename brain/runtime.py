@@ -40,6 +40,7 @@ class Runtime:
     advance: Callable[[str, bool], None] | None = None     # (event_id, ingest) - fixture mode only
     reset: Callable[[], None] | None = None
     tamper: Callable[[int], None] | None = None
+    ingest: Callable[[], None] | None = None             # one ingestion pass over the corpus, then sync - fixture mode only
 
     def sync(self) -> int:
         """Apply what ingestion's outbox says before serving: dropped caches, `acl_change_observed` events."""
@@ -86,12 +87,16 @@ def fixture_runtime(settings: Settings | None = None, *, sources=("confluence", 
     def reset() -> None:
         fresh = fixture_runtime(settings, sources=sources)
         runtime.brain, runtime.audit, runtime.audit_store, runtime.consumer = fresh.brain, fresh.audit, fresh.audit_store, fresh.consumer
-        runtime.advance, runtime.reset, runtime.tamper = fresh.advance, fresh.reset, fresh.tamper
+        runtime.advance, runtime.reset, runtime.tamper, runtime.ingest = fresh.advance, fresh.reset, fresh.tamper, fresh.ingest
 
     def tamper(seq: int) -> None:
         runtime.audit_store.tamper(seq, lambda e: e.setdefault("query", {}).__setitem__("text", "TAMPERED"))
 
-    runtime.advance, runtime.reset, runtime.tamper = advance, reset, tamper
+    def ingest() -> None:
+        ingestor.run_once()
+        runtime.sync()
+
+    runtime.advance, runtime.reset, runtime.tamper, runtime.ingest = advance, reset, tamper, ingest
     return runtime
 
 

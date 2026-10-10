@@ -27,6 +27,7 @@ Nobody has to wait for anyone else's code. Everything below works from a fresh c
 | A Brain API to call (C) | `brain/stub_api/`: stub of the [HTTP API](docs/02-contracts/api.md); auth header `Authorization: Bearer dev:priya` | `make stub-api` |
 | A database (A, B) | Postgres + pgvector with the draft schema in `db/init.sql` | `make db-up` |
 | Tests that keep us honest | `connectors/tests/contract/` (every connector must pass), `evals/` (golden cases, security properties) | `make test` |
+| Leak-CI (C) | `evals/leakci.py`: plants, edits and removes documents an asker may not see and checks the answer does not change; writes the scoreboard the Admin page shows | `make leakci` |
 
 First time: `make setup` (creates `.venv`, installs dependencies, enables the secret-scan hook), then `make test`. CI runs lint and the same tests on every pull request. Needs Python 3.10 or newer (3.12 recommended).
 

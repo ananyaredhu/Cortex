@@ -49,7 +49,7 @@ Mock IdP and JWT claims; UI; `evals/` suites and the scoreboard; `deploy/`; the 
 ### Days 9 to 10 (Sat 10 to Sun 11 Oct)
 - [ ] Audit explorer with `/verify` and a "tamper then re-verify" demo
 - [ ] Freshness dashboard (p50/p95); permission-graph viewer
-- [ ] **Leak-CI:** metamorphic tests (add/remove/edit hidden documents, same user re-asks, compare answers, refusal wording and latency bands)
+- [x] **Leak-CI:** metamorphic tests (add/remove/edit hidden documents, same user re-asks, compare answers, refusal wording and latency bands) (10 Oct, `python -m evals.leakci`: 6 cases, 0 leaks on the fixture corpus in CI; the scoreboard feeds `/v1/leakci/latest` and the Admin page. On the real Brain, 9 Oct: 0 leaks, 3 checks failed that are not leaks, see the status file; rerun pending)
 - [ ] WorkBuddy as MCP client: Jordan's audit question; scheduled weekly digest
 
 ### Days 11 to 12 (Mon 12 to Tue 13 Oct)

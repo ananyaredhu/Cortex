@@ -1,4 +1,4 @@
-.PHONY: setup test lint fixtures stub-api ui sim-confluence sim-jira db-up db-down
+.PHONY: setup test lint fixtures leakci stub-api ui sim-confluence sim-jira db-up db-down
 
 setup:            ## create a venv, install dev dependencies, enable the secret-scan hook
 	python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt && .venv/bin/pre-commit install
@@ -11,6 +11,9 @@ lint:
 
 fixtures:         ## regenerate fixtures/company_a.json from fixtures/generate.py
 	.venv/bin/python fixtures/generate.py
+
+leakci:           ## Leak-CI on the fixture corpus (no database, no model); writes evals/scoreboard/leakci-latest.json
+	.venv/bin/python -m evals.leakci --target fixture
 
 stub-api:         ## run the stub Brain API on :8000 (auth: Authorization: Bearer dev:priya)
 	.venv/bin/uvicorn brain.stub_api.app:app --reload --port 8000

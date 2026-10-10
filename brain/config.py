@@ -53,6 +53,7 @@ class Settings:
     checker_model: str = "none"              # layer 2 grounding model (brain/checker/layer2.py); none disables it
     grounding_threshold: float = 0.05         # for nli-deberta-v3-xsmall (ADR-003); MiniCheck models sit around 0.5
     adp_chat_url: str = "https://wss.lke.tencentcloud.com/adp/v2/chat"
+    leakci_scoreboard: str = "evals/scoreboard/leakci-latest.json"   # what Leak-CI wrote last (evals/leakci.py); relative to the repo
     extra: dict[str, str] = field(default_factory=dict)
 
     @classmethod
@@ -83,6 +84,7 @@ class Settings:
             checker_model=env("CHECKER_MODEL") or cls.checker_model,
             grounding_threshold=float(env("GROUNDING_THRESHOLD") or cls.grounding_threshold),
             adp_chat_url=env("ADP_CHAT_URL") or cls.adp_chat_url,
+            leakci_scoreboard=env("LEAKCI_SCOREBOARD") or cls.leakci_scoreboard,
         )
 
     @property
