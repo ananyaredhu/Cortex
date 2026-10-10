@@ -33,6 +33,9 @@ class Settings:
     jwt_audience: str = "internal-brain"
     mock_idp: bool = False                    # serve POST /idp/token: signs in as a fictional persona (BRAIN_MOCK_IDP=1); a demo IdP
     mock_idp_ttl_s: int = 900
+    mcp: bool = False                         # serve the MCP server at /mcp (BRAIN_MCP=1); off unless asked for
+    public_url: str = "http://localhost:8000"  # the Brain's own address, advertised in the MCP auth metadata (BRAIN_PUBLIC_URL)
+    mcp_allowed_hosts: tuple[str, ...] = ("localhost:*", "127.0.0.1:*")   # Host headers accepted by /mcp (DNS-rebinding guard)
     environment: str = "dev"                 # dev | production (BRAIN_ENV): production refuses unsafe settings at start-up
     dev_auth: bool = False                    # accept `Bearer dev:<persona>` and serve /sim/*; opt in with BRAIN_DEV_AUTH=1
     denied_id_salt: str = DEFAULT_DENIED_SALT  # salts the hash of denied doc_ids in the audit log
@@ -70,6 +73,10 @@ class Settings:
             jwt_audience=env("JWT_AUDIENCE") or cls.jwt_audience,
             mock_idp=(env("BRAIN_MOCK_IDP") or "0").strip() == "1",
             mock_idp_ttl_s=int(env("BRAIN_MOCK_IDP_TTL_S") or cls.mock_idp_ttl_s),
+            mcp=(env("BRAIN_MCP") or "0").strip() == "1",
+            public_url=(env("BRAIN_PUBLIC_URL") or cls.public_url).strip().rstrip("/"),
+            mcp_allowed_hosts=tuple(h.strip() for h in (env("BRAIN_MCP_ALLOWED_HOSTS") or ",".join(cls.mcp_allowed_hosts)).split(",")
+                                    if h.strip()),
             environment=(env("BRAIN_ENV") or cls.environment).strip().lower(),
             dev_auth=(env("BRAIN_DEV_AUTH") or "0").strip() == "1",
             denied_id_salt=env("AUDIT_DENIED_SALT") or cls.denied_id_salt,
@@ -101,6 +108,8 @@ class Settings:
             problems.append(f"JWT_SIGNING_KEY is shorter than {MIN_JWT_KEY_BYTES} bytes")
         if not self.audit_signing_key:
             problems.append("AUDIT_SIGNING_KEY is not set: each restart would sign audit checkpoints with a new key")
+        if self.mcp and not self.public_url.startswith("https://"):
+            problems.append("BRAIN_MCP=1 with a BRAIN_PUBLIC_URL that is not https: MCP clients would send tokens in clear text")
         if self.denied_id_salt == DEFAULT_DENIED_SALT:
             problems.append("AUDIT_DENIED_SALT is the published default: hashes of denied document IDs could be guessed")
         if self.checker_model.strip().lower() in NO_CHECKER:
@@ -115,6 +124,9 @@ class Settings:
         if self.mock_idp:
             warnings.append("the mock IdP is ON (BRAIN_MOCK_IDP=1): anyone who can reach POST /idp/token can sign in as any "
                             "fictional persona. Fine for the judged demo, never with real users")
+        if self.mcp and self.public_url.startswith("http://localhost"):
+            warnings.append("the MCP server is ON with the default BRAIN_PUBLIC_URL (http://localhost:8000): set it to the real address "
+                            "and add that host to BRAIN_MCP_ALLOWED_HOSTS before connecting clients from elsewhere")
         if not self.audit_signing_key:
             warnings.append("AUDIT_SIGNING_KEY is not set: audit checkpoints are signed with a key made for this run only")
         if self.checker_model.strip().lower() in NO_CHECKER:

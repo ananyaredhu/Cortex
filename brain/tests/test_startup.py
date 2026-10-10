@@ -66,3 +66,28 @@ def test_development_only_warns():
 
 def test_fixture_mode_does_not_warn_about_missing_production_settings():
     assert check_startup(Settings(dev_auth=True), fixture=True) == []
+
+
+def test_mcp_is_off_by_default_and_read_from_the_environment(monkeypatch):
+    monkeypatch.setattr("brain.config.load_dotenv", lambda: None)
+    for name in ("BRAIN_MCP", "BRAIN_PUBLIC_URL", "BRAIN_MCP_ALLOWED_HOSTS"):
+        monkeypatch.delenv(name, raising=False)
+    s = Settings.from_env()
+    assert s.mcp is False and s.public_url == "http://localhost:8000" and s.mcp_allowed_hosts == ("localhost:*", "127.0.0.1:*")
+    monkeypatch.setenv("BRAIN_MCP", "1")
+    monkeypatch.setenv("BRAIN_PUBLIC_URL", "https://brain.example.sg/")
+    monkeypatch.setenv("BRAIN_MCP_ALLOWED_HOSTS", "brain.example.sg, localhost:*")
+    s = Settings.from_env()
+    assert s.mcp is True and s.public_url == "https://brain.example.sg"           # trailing slash dropped
+    assert s.mcp_allowed_hosts == ("brain.example.sg", "localhost:*")
+
+
+def test_production_refuses_mcp_over_plain_http():
+    with pytest.raises(UnsafeConfiguration, match="not https"):
+        check_startup(Settings(**{**GOOD, "mcp": True, "public_url": "http://brain.example.sg"}))
+    assert check_startup(Settings(**{**GOOD, "mcp": True, "public_url": "https://brain.example.sg"})) == []
+
+
+def test_development_warns_when_mcp_keeps_the_localhost_address():
+    assert "BRAIN_PUBLIC_URL" in " ".join(check_startup(Settings(mcp=True)))
+    assert not any("BRAIN_PUBLIC_URL" in w for w in check_startup(Settings(mcp=True, public_url="https://brain.example.sg")))
