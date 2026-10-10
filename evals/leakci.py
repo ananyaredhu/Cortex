@@ -22,9 +22,13 @@ asks again. Every later answer is compared with the first:
 Targets: `--target fixture` runs the real pipeline over the fixture corpus in this process (no database, no model;
 what CI runs, see evals/tests/test_leakci.py). `--target http://host:port` runs against a served Brain whose
 Confluence and Jira are the simulators: documents are planted through `simulators/leakci.py` and ingested with one
-pass of the ingestion pipeline into the Brain's Postgres (`DATABASE_URL`; `EMBEDDING_BACKEND=none` keeps bge-m3 out
-of this process on a small machine, the keyword leg still finds the planted documents). Planted documents are
-removed again at the end, whatever happens. The runner signs in through the target's mock IdP (BRAIN_MOCK_IDP=1) and
+pass of the ingestion pipeline into the Brain's Postgres (`DATABASE_URL`). Stop the ingestion process first: the
+runner ingests too, and the index has one writer. Use the index's own `EMBEDDING_BACKEND`. `none` keeps bge-m3 out
+of this process on a small machine and the keyword leg still finds the planted documents, but every Confluence and
+Jira document the runner re-ingests (all of them after a simulator restart) is then written without a vector:
+re-ingest afterwards (`python -m connectors.ingestion --once --recrawl --sources confluence,jira`) and run
+`python -m connectors.ingestion.check_index`. Planted documents are removed again at the end, whatever happens.
+The runner signs in through the target's mock IdP (BRAIN_MOCK_IDP=1) and
 falls back to the development login (BRAIN_DEV_AUTH=1); the target needs one of the two.
 
 The result goes to evals/scoreboard/leakci-latest.json (`--out`), which `GET /v1/leakci/latest` serves to the Admin

@@ -39,7 +39,7 @@ Mock IdP and JWT claims; UI; `evals/` suites and the scoreboard; `deploy/`; the 
 - [x] Persona switcher and split-screen view
 - [ ] Golden test harness skeleton with the seven scenarios and expected allowed and denied sets
 - [ ] WorkBuddy MCP client check against a local MCP server (check #7); sandbox check (check #9)
-- [ ] Deployment pipeline to Singapore
+- [ ] Deployment pipeline to Singapore (10 Oct: `deploy/` holds a Docker Compose stack and a runbook, checked on a laptop; no host yet, see check #10, and deployment is by hand)
 
 ### Days 6 to 8 (Wed 7 to Fri 9 Oct)
 - [x] **My Work** home (assigned tickets, projects, channels, recent pages, suggested questions)
