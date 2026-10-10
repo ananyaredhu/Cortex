@@ -39,7 +39,7 @@ Mock IdP and JWT claims; UI; `evals/` suites and the scoreboard; `deploy/`; the 
 - [x] Persona switcher and split-screen view
 - [ ] Golden test harness skeleton with the seven scenarios and expected allowed and denied sets
 - [ ] WorkBuddy MCP client check against a local MCP server (check #7); sandbox check (check #9)
-- [ ] Deployment pipeline to Singapore
+- [ ] Deployment pipeline to Singapore (10 Oct: `deploy/` holds a Docker Compose stack and a runbook, checked on a laptop; no host yet, see check #10, and deployment is by hand)
 
 ### Days 6 to 8 (Wed 7 to Fri 9 Oct)
 - [x] **My Work** home (assigned tickets, projects, channels, recent pages, suggested questions)
@@ -49,7 +49,7 @@ Mock IdP and JWT claims; UI; `evals/` suites and the scoreboard; `deploy/`; the 
 ### Days 9 to 10 (Sat 10 to Sun 11 Oct)
 - [ ] Audit explorer with `/verify` and a "tamper then re-verify" demo
 - [ ] Freshness dashboard (p50/p95); permission-graph viewer
-- [ ] **Leak-CI:** metamorphic tests (add/remove/edit hidden documents, same user re-asks, compare answers, refusal wording and latency bands)
+- [x] **Leak-CI:** metamorphic tests (add/remove/edit hidden documents, same user re-asks, compare answers, refusal wording and latency bands) (10 Oct, `python -m evals.leakci`: 6 cases, 0 leaks on the fixture corpus in CI; the scoreboard feeds `/v1/leakci/latest` and the Admin page. On the real Brain, 10 Oct: 0 leaks, 0 failed checks in 6 cases; the control now asks for a fact only the planted page states, see the status file)
 - [ ] WorkBuddy as MCP client: Jordan's audit question; scheduled weekly digest
 
 ### Days 11 to 12 (Mon 12 to Tue 13 Oct)

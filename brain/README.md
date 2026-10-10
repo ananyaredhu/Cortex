@@ -54,5 +54,7 @@ The pipeline is the same object in both; tests run on the first, the demo on the
 
 ## Not yet (slice 2 and 3)
 Router and query rewrite, an LLM generator in use, checker layers 2 and 3, the four skills, the MCP server,
-link-edge expansion, conversation memory under ACL labels, the audit agent. `/v1/leakci/latest`
-returns an empty scoreboard until C's Leak-CI writes one.
+conversation memory under ACL labels, the audit agent.
+
+`/v1/leakci/latest` serves the summary of the scoreboard C's Leak-CI wrote last (`python -m evals.leakci`,
+`LEAKCI_SCOREBOARD`), and an empty one until a run exists.

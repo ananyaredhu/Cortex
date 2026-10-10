@@ -49,6 +49,11 @@ class Settings:
     max_vector_distance: float = 0.45         # bge-m3 cosine distance; see brain/retrieval/hybrid.py
     max_evidence: int = 5
     per_source_quota: int = 3
+    link_expansion: bool = True               # follow stored links one hop from allowed hits (brain/pipeline/graph.py)
+    link_checks: int = 24                     # link targets run through the PDP per question, denied ones counted too
+    link_per_source: int = 2                  # allowed link targets kept per source
+    link_total: int = 4                       # allowed link targets kept in all
+    link_discount: float = 0.5                # a link target ranks at this fraction of the hit that linked to it
     generator_backend: str = "auto"           # auto | adp | openai | template
     generator_base_url: str | None = None
     generator_api_key: str | None = None
@@ -60,6 +65,7 @@ class Settings:
     audit_planner_api_key: str | None = None
     audit_planner_model: str | None = None
     adp_chat_url: str = "https://wss.lke.tencentcloud.com/adp/v2/chat"
+    leakci_scoreboard: str = "evals/scoreboard/leakci-latest.json"   # what Leak-CI wrote last (evals/leakci.py); relative to the repo
     extra: dict[str, str] = field(default_factory=dict)
 
     @classmethod
@@ -98,6 +104,7 @@ class Settings:
             checker_model=env("CHECKER_MODEL") or cls.checker_model,
             grounding_threshold=float(env("GROUNDING_THRESHOLD") or cls.grounding_threshold),
             adp_chat_url=env("ADP_CHAT_URL") or cls.adp_chat_url,
+            leakci_scoreboard=env("LEAKCI_SCOREBOARD") or cls.leakci_scoreboard,
         )
 
     @property

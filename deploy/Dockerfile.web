@@ -1,0 +1,14 @@
+# The web image: the built UI served by Caddy, which also terminates HTTPS and forwards the API paths to the Brain.
+# Build context: the repo root.   docker build -f deploy/Dockerfile.web -t internal-brain-web .
+FROM node:22-alpine AS ui
+WORKDIR /ui
+COPY ui/package.json ui/package-lock.json ./
+RUN npm ci
+COPY ui/ ./
+# Sign in through POST /idp/token (ui/src/auth/token.ts); the demo controls drawer stays off (VITE_DEMO_CONTROLS unset).
+ENV VITE_AUTH_MODE=idp
+RUN npm run build
+
+FROM caddy:2-alpine
+COPY deploy/Caddyfile /etc/caddy/Caddyfile
+COPY --from=ui /ui/dist /srv

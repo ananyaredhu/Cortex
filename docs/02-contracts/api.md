@@ -45,6 +45,7 @@ Response:
 }
 ```
 Fields added in 0.2 (all optional):
+- `citations[].via_link_from`: the `doc_id` of the cited document whose stored link led to this one, or `null` for a direct search hit. A link never grants access: the target passed the same live permission check as any hit. A target the asker may not open, or that does not exist, is absent with no trace.
 - `citations[].excerpt`: up to 280 characters of the cited document, sanitized like the context packet. Shown as a quoted excerpt, never as the assistant's words.
 - `freshness.per_source`: per source, the connector's `last_sync` and `status` (`ok` within the SLA, `stale` beyond it, `unavailable` if the source could not be read for this request).
 - `coverage`: per source, whether it was searched and how many cited documents came from it. **Only what the asker may see is counted. No count of candidates, denied or filtered documents appears anywhere in this response** (a denied count is an existence signal: see [acl-model](acl-model.md)).
@@ -130,7 +131,7 @@ Stale-answer alerts: answers the user received whose sources changed afterwards 
 
 ## Admin and ops (admin role)
 - `GET /v1/freshness` returns the freshness report Workstream A produces (`connectors/ingestion/freshness.py`, `summarize`): `{as_of, window_hours, sources: {<source>: {last_run_at, last_ok_at, last_error, freshness_lag_seconds: {count, p50, p95, max}, pipeline_lag_seconds: {...}, by_trigger: {...}}}}`.
-- `GET /v1/leakci/latest` returns the latest Leak-CI and red-team scoreboard: `{as_of, cases, leaks}` and *(0.2, optional)* `suites: [{"name", "category", "passed", "failed", "last_run_at"}]`.
+- `GET /v1/leakci/latest` returns the latest Leak-CI and red-team scoreboard: `{as_of, cases, leaks}` and *(0.2, optional)* `suites: [{"name", "category", "passed", "failed", "last_run_at"}]` and `target` (what the run asked: `fixture` or the URL of a served Brain). The Brain reads the file C's runner wrote last (`python -m evals.leakci`, default `evals/scoreboard/leakci-latest.json`, `LEAKCI_SCOREBOARD` to change it) and serves these summary fields only: the per-check notes, which name planted document ids and canaries, stay in the file. With no run recorded: `cases: 0, leaks: 0, suites: []`.
 - `GET /v1/policy/versions` *(0.2, optional)*: `{versions: [{"policy_version", "author", "created_at", "pr_url"}], "active": "..."}`.
 - `POST /v1/policy/evaluate` *(0.2, optional)* with `{"user": "<email>", "doc_id": "..."}`: `{"allowed": bool, "rule": "...", "proof_path": [...], "policy_version": "..."}`. Admin only, logged as `admin_view`, never available to other roles (it would otherwise reveal which documents exist).
 - `GET /v1/health`.
@@ -140,6 +141,8 @@ Simulator admin endpoints (owned by A) to revoke a permission, restrict a page, 
 
 ## Changelog
 - 0.2, 10 Oct: `/audit/time-travel` implemented (response above).
+- 0.2, 10 Oct: `citations[].via_link_from` (link-edge expansion).
+- 0.2, 10 Oct: `/leakci/latest` serves the scoreboard file Leak-CI writes, with an optional `target`; summary fields only.
 - 0.2, 9 Oct: `/conversations/{conversation_id}` reopens a conversation (answers withheld when a cited document is no longer visible); `/conversations` is rebuilt from the audit log.
 - 0.2 (proposed): optional UI fields on `/ask` (`excerpt`, `freshness.per_source`, `coverage`, `grounding`, `policy_version`, `unavailable_sources`, `clarify`) and its `sources` and `time_range` filters; `/ask/stream`; `/conversations`; `/audit/replay`; `/policy/versions` and `/policy/evaluate`; audit answer text withheld from officers who may not see its sources; `question` and `changed_title` on alerts, which only cover documents still visible; `/mywork` and `/freshness` shapes written down; roles for the admin endpoints. Explicit rule: no candidate or denied counts in any asker-facing response.
 - 0.1: first draft.

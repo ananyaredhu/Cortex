@@ -1,0 +1,133 @@
+# The whole system on one host (a Tencent Cloud Lighthouse or CVM instance in Singapore). Read deploy/README.md first.
+#
+#   cd deploy && cp .env.example .env    (fill it in)
+#   docker compose up -d --build
+#
+# Only `web` publishes ports. Everything else talks on the private network `internal`.
+name: internal-brain-deploy   # not the development stack's project (the repo root's docker-compose.yml)
+
+x-app: &app
+  image: internal-brain-app
+  build:
+    context: ..
+    dockerfile: deploy/Dockerfile
+    args:
+      WITH_MODELS: ${WITH_MODELS:-1}
+  restart: unless-stopped
+  networks: [internal]
+
+# What the Brain and ingestion share. Values come from deploy/.env; the lines below override it where the
+# deployment, not the operator, decides (addresses inside the network, where files are mounted).
+x-brain-env: &brain-env
+  DATABASE_URL: postgresql://brain:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}@db:5432/brain
+  CONFLUENCE_SIM_URL: http://sim-confluence:8101
+  JIRA_SIM_URL: http://sim-jira:8102
+  HF_HOME: /models
+  IDENTITY_MAP_PATH: /run/brain-secrets/identity-map.local.json
+  SLACK_SEED_MANIFEST_PATH: /run/brain-secrets/slack-seed-manifest.local.json
+  GDRIVE_CONFIG_PATH: /run/brain-secrets/gdrive.local.json
+  GDRIVE_SEED_MANIFEST_PATH: /run/brain-secrets/gdrive-seed-manifest.local.json
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    networks: [internal]
+    environment:
+      POSTGRES_USER: brain
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}
+      POSTGRES_DB: brain
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+      - ../db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U brain"]
+      interval: 5s
+      retries: 10
+
+  # The simulators keep their data in memory: a restart puts back the seeded Company A story, and ingestion
+  # notices (expired cursor) and crawls again. Their admin endpoints edit permissions, so they need the token.
+  sim-confluence:
+    <<: *app
+    command: ["sim-confluence"]
+    environment:
+      SIM_ADMIN_TOKEN: ${SIM_ADMIN_TOKEN:?set SIM_ADMIN_TOKEN in deploy/.env}
+
+  sim-jira:
+    <<: *app
+    command: ["sim-jira"]
+    environment:
+      SIM_ADMIN_TOKEN: ${SIM_ADMIN_TOKEN:?set SIM_ADMIN_TOKEN in deploy/.env}
+
+  # One ingestion process only: it is the single writer to the index and the outbox (connectors/DEPLOY.md).
+  ingestion:
+    <<: *app
+    command: ["ingestion"]
+    env_file: .env
+    environment:
+      <<: *brain-env
+      DRIVE_WEBHOOK_HOST: 0.0.0.0        # reachable by `web` on the private network; never published
+    volumes:
+      - models:/models
+      - state:/state
+      - ./secrets:/run/brain-secrets:ro
+    depends_on:
+      db: {condition: service_healthy}
+      sim-confluence: {condition: service_started}
+      sim-jira: {condition: service_started}
+
+  brain:
+    <<: *app
+    command: ["brain"]
+    env_file: .env
+    environment:
+      <<: *brain-env
+      BRAIN_ENV: ${BRAIN_ENV:-production}  # production refuses to start with unsafe settings (brain/startup.py)
+      BRAIN_DEV_AUTH: "0"
+      BRAIN_RUNTIME: ""
+      BRAIN_PUBLIC_URL: https://${SITE_HOST:?set SITE_HOST in deploy/.env}
+      BRAIN_MCP_ALLOWED_HOSTS: ${SITE_HOST}
+    volumes:
+      - models:/models
+      - state:/state
+      - scoreboard:/app/evals/scoreboard
+      - ./secrets:/run/brain-secrets:ro
+    depends_on:
+      db: {condition: service_healthy}
+      sim-confluence: {condition: service_started}
+      sim-jira: {condition: service_started}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/v1/health', timeout=4)"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 15m                   # the first start downloads bge-m3 (about 2.3 GB) and the checker
+
+  web:
+    image: internal-brain-web
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.web
+    restart: unless-stopped
+    networks: [internal]
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-${SITE_HOST}}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - caddy-data:/data                  # certificates: keep them, Let's Encrypt limits how often they are issued
+      - caddy-config:/config
+    depends_on:
+      brain: {condition: service_started}
+
+networks:
+  internal:
+
+volumes:
+  dbdata:
+  models:
+  state:
+  scoreboard:
+  caddy-data:
+  caddy-config:

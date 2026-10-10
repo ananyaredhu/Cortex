@@ -35,7 +35,8 @@ from connectors.ingestion.embedding import Embedder
 from connectors.ingestion.store import Store
 
 StageCallback = Callable[[str, str], None]        # (stage, "start" | "done")
-NODE_STAGE = {"identity": "retrieve", "retrieve": "retrieve", "authorize": "authorize", "freshness": "verify_live",
+NODE_STAGE = {"identity": "retrieve", "retrieve": "retrieve", "authorize": "authorize", "expand": "authorize",
+              "freshness": "verify_live",
               "generate": "generate", "check": "check", "finalize": "check", "audit": "check"}
 STALE_AFTER_S = 300          # a source whose last successful pass is older than this is reported "stale"
 
@@ -74,6 +75,7 @@ class State(TypedDict, total=False):
     decisions: list[Decision]
     allowed: list[Candidate]
     denied_docs: list[DeniedDoc]
+    linked: dict[str, str]          # link target doc_id -> the allowed document that links to it
     evidence: list[packetlib.Evidence]
     stale_refetched: int
     packet: dict
@@ -93,7 +95,7 @@ class Brain:
     def __init__(self, settings: Settings, connectors: Mapping[str, Connector], index: IndexReader, store: Store | None,
                  embedder: Embedder | None, generator: Generator, audit: AuditStore, *,
                  resolver: IdentityResolver | None = None, pdp: PDP | None = None,
-                 scorer: GroundingScorer | None = None) -> None:
+                 scorer: GroundingScorer | None = None, link_resolver: Callable[[str], str] | None = None) -> None:
         self.settings = settings
         self.connectors = dict(connectors)
         self.index = index
@@ -102,6 +104,7 @@ class Brain:
         self.generator = generator
         self.audit = audit
         self.scorer = scorer
+        self.link_resolver = link_resolver or (lambda doc_id: doc_id)   # stored link -> the ID the index and connectors use
         self.resolver = resolver or IdentityResolver(self.connectors, ttl_s=settings.identity_ttl_s)
         self.pdp = pdp or PDP(self.connectors, policy_version=POLICY_VERSION, ttl_s=settings.decision_ttl_s)
         self.answers: dict[str, Answered] = {}
@@ -144,7 +147,7 @@ class Brain:
     def _build(self):
         g = StateGraph(State)
         nodes = [("identity", self._identity), ("retrieve", self._retrieve), ("authorize", self._authorize),
-                 ("freshness", self._freshness), ("generate", self._generate), ("check", self._check),
+                 ("expand", self._expand), ("freshness", self._freshness), ("generate", self._generate), ("check", self._check),
                  ("finalize", self._finalize), ("audit", self._audit)]
         for name, fn in nodes:
             g.add_node(name, self._staged(name, fn))
@@ -216,6 +219,52 @@ class Brain:
             denied_docs.append(DeniedDoc(c.doc_id, row.title if row else "", text))
         return {"decisions": decisions, "allowed": allowed, "denied_docs": denied_docs}
 
+    def _expand(self, state: State) -> dict:
+        """Follow the stored links of the allowed hits, one hop (backlog T4).
+
+        A link grants nothing: every target goes through the same live PDP check as a search hit, with the asker's own
+        identity. A target that is denied, missing, deleted or in a source the asker is not searching is dropped with no
+        trace in the response; a denied one joins the local leak-scan set. The check budget counts every target alike,
+        so what the asker sees does not depend on how many denied documents a link list holds.
+        """
+        s, asker = self.settings, state["asker"]
+        if not s.link_expansion or not state["allowed"]:
+            return {"linked": {}}
+        seen = {c.doc_id for c in state["candidates"]}
+        targets: list[tuple[str, Candidate]] = []
+        for parent in state["allowed"]:
+            row = self.index.document(parent.doc_id)
+            for raw in (row.links if row else ()):
+                target = self.link_resolver(raw)
+                if target in seen or source_of(target) not in state["searched"]:
+                    continue
+                seen.add(target)
+                doc = self.index.document(target)
+                if doc is None or doc.deleted or not self.index.chunks_of(target):
+                    continue
+                targets.append((target, parent))
+        targets = targets[: s.link_checks]
+        decisions = self.pdp.check_many(asker, [(t, self._indexed_version(t)) for t, _ in targets])
+        linked: dict[str, str] = {}
+        extra: list[Candidate] = []
+        per_source: dict[str, int] = {}
+        denied = list(state["denied_docs"])
+        for (target, parent), decision in zip(targets, decisions, strict=True):
+            if not decision.allowed:
+                row = self.index.document(target)
+                text = " ".join(ch.text for ch in self.index.chunks_of(target))
+                denied.append(DeniedDoc(target, row.title if row else "", text))
+                continue
+            source = source_of(target)
+            if len(extra) >= s.link_total or per_source.get(source, 0) >= s.link_per_source:
+                continue
+            per_source[source] = per_source.get(source, 0) + 1
+            chunks = [c.chunk_id for c in self.index.chunks_of(target)][:2]
+            extra.append(Candidate(target, source, parent.score * s.link_discount, chunks))
+            linked[target] = parent.doc_id
+        return {"linked": linked, "allowed": state["allowed"] + extra, "decisions": state["decisions"] + list(decisions),
+                "denied_docs": denied}
+
     def _indexed_version(self, doc_id: str) -> str | None:
         chunks = self.index.chunks_of(doc_id)
         return chunks[0].source_version if chunks else None
@@ -248,7 +297,8 @@ class Brain:
                 pass
             best = [cid for cid in cand.chunk_ids if cid in text_by_chunk] or [chunks[0].chunk_id]
             text = " ".join(text_by_chunk[cid] for cid in best[:2])
-            ev = packetlib.make_evidence(best[0], cand.doc_id, cand.source, title, url, text, as_of, tokens, terms, cand.score)
+            ev = packetlib.make_evidence(best[0], cand.doc_id, cand.source, title, url, text, as_of, tokens, terms, cand.score,
+                                         state.get("linked", {}).get(cand.doc_id))
             return ev, refetched
 
         for ev, refetched in self._pool.map(one, state["allowed"]):
@@ -289,7 +339,8 @@ class Brain:
         by_id = {e["doc_id"]: e for e in pkt["evidence"]}
         excerpts = {e.doc_id: e.raw for e in state["evidence"]}
         citations = [{"doc_id": d, "title": by_id[d]["title"], "url": by_id[d]["url"], "source": by_id[d]["source"],
-                      "as_of": by_id[d]["as_of"], "why_visible": proof.get(d, []), "excerpt": excerpts.get(d, "")[:280]}
+                      "as_of": by_id[d]["as_of"], "why_visible": proof.get(d, []), "excerpt": excerpts.get(d, "")[:280],
+                      "via_link_from": by_id[d]["via_link_from"]}
                      for d in by_id if d in shown_ids]
         if refused:
             answer, claims = REFUSAL, []
@@ -352,6 +403,7 @@ class Brain:
             "models": {"generator": self.generator.model, "checker": state["grounded"].model,
                        "embedding": f"{self.embedder.model}@{self.embedder.version}" if self.embedder else "none"},
             "flags": state["flags"],
+            "links_followed": [{"doc_id": t, "via_link_from": f} for t, f in sorted(state.get("linked", {}).items())],
             "latency_ms": int((time.monotonic() - state["started"]) * 1000),
         }
         self.audit.append(event)

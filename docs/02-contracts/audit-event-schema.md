@@ -42,6 +42,7 @@ The log must be **tamper-evident**, **complete** (who, what, retrieved IDs, fina
     "unavailable": false,
     "acl_label": ["user:priya@companya.com"]
   },
+  "links_followed": [{"doc_id": "slack:C_DBMIG/thread-1", "via_link_from": "jira:DBMIG-142"}],
   "checks": {"deterministic": "pass", "generator": "ok", "grounding_model": "pass", "leak_scan": "clean"},
   "models": {"generator": "deepseek-v3", "checker": "minicheck-...", "embedding": "bge-m3@1"},
   "latency_ms": 2310,
@@ -77,5 +78,6 @@ Audit queries (natural language or structured) are read-only and run **under RBA
 
 ## Changelog
 - 0.1, 10 Oct: `identity_snapshot` events (time-travel queries).
+- 0.1, 10 Oct: `links_followed` on `ask` events (documents added through stored links, each with the allowed document that linked to it). Denied link targets appear only as hashed entries in `decisions`.
 - 0.1, 9 Oct: `conversation_id` on `ask` events; conversations are rebuilt from the log.
 - 0.1: first draft.

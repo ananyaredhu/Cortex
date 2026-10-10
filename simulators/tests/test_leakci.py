@@ -72,6 +72,19 @@ def test_edit_gives_a_new_canary_and_remove_takes_it_away(world):
     assert leakci.clear() == 2 and leakci.planted() == []
 
 
+@pytest.mark.parametrize("source", ["confluence", "jira"])
+def test_a_fact_is_stated_in_the_document_and_kept_through_an_edit_only_when_passed_again(world, source):
+    confluence, jira, leakci = world
+    connector, fact = (confluence if source == "confluence" else jira), "Kiosk badge tokens expire after 47 minutes."
+    planted = leakci.plant(source, "Kiosk badge token review", visible_to=("dana",), fact=fact)
+    assert fact in connector.fetch(planted.doc_id).body
+    kept = leakci.edit(planted.doc_id, fact=fact)
+    body = connector.fetch(planted.doc_id).body
+    assert fact in body and kept.canary in body and planted.canary not in body
+    leakci.edit(planted.doc_id)
+    assert fact not in connector.fetch(planted.doc_id).body
+
+
 def test_verify_checks_live_access_and_the_index(world):
     confluence, jira, leakci = world
     planted = leakci.plant("confluence", "Q3 breach security incident report", mode="restricted")
