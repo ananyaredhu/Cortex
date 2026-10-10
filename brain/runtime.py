@@ -60,7 +60,8 @@ def fixture_settings_from_env() -> Settings:
     env = Settings.from_env()
     return Settings(floor_latency_ms=0, dev_auth=os.environ.get("BRAIN_DEV_AUTH", "1").strip() != "0",
                     jwt_signing_key=env.jwt_signing_key, jwt_audience=env.jwt_audience,
-                    mock_idp=env.mock_idp, mock_idp_ttl_s=env.mock_idp_ttl_s)
+                    mock_idp=env.mock_idp, mock_idp_ttl_s=env.mock_idp_ttl_s,
+                    mcp=env.mcp, public_url=env.public_url, mcp_allowed_hosts=env.mcp_allowed_hosts)
 
 
 def fixture_runtime(settings: Settings | None = None, *, sources=("confluence", "jira", "slack", "gdrive")) -> Runtime:

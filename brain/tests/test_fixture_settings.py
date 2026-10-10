@@ -13,7 +13,8 @@ Q = "What's the status of the database migration, and were there blockers raised
 @pytest.fixture(autouse=True)
 def clean_env(monkeypatch):
     monkeypatch.setattr("brain.config.load_dotenv", lambda: None)          # never read a developer's real .env
-    for name in ("BRAIN_MOCK_IDP", "BRAIN_MOCK_IDP_TTL_S", "BRAIN_DEV_AUTH", "JWT_SIGNING_KEY", "JWT_AUDIENCE"):
+    for name in ("BRAIN_MOCK_IDP", "BRAIN_MOCK_IDP_TTL_S", "BRAIN_DEV_AUTH", "JWT_SIGNING_KEY", "JWT_AUDIENCE",
+                 "BRAIN_MCP", "BRAIN_PUBLIC_URL", "BRAIN_MCP_ALLOWED_HOSTS"):
         monkeypatch.delenv(name, raising=False)
 
 
@@ -68,3 +69,12 @@ def test_the_mock_idp_without_a_key_is_refused_at_start(monkeypatch):
     monkeypatch.setenv("BRAIN_MOCK_IDP", "1")
     with pytest.raises(ValueError, match="JWT_SIGNING_KEY"):
         create_app(fixture_runtime(fixture_settings_from_env()))
+
+
+def test_mcp_settings_are_read_from_the_environment_too(monkeypatch):
+    assert fixture_settings_from_env().mcp is False
+    monkeypatch.setenv("BRAIN_MCP", "1")
+    monkeypatch.setenv("BRAIN_PUBLIC_URL", "https://demo.example.sg")
+    monkeypatch.setenv("BRAIN_MCP_ALLOWED_HOSTS", "demo.example.sg")
+    s = fixture_settings_from_env()
+    assert s.mcp is True and s.public_url == "https://demo.example.sg" and s.mcp_allowed_hosts == ("demo.example.sg",)
