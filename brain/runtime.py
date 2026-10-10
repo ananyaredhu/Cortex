@@ -8,6 +8,7 @@ what the tests and C's Playwright runs use. Its `advance` and `reset` apply the 
 vector, the generator the settings name. What `uvicorn brain.api.main:app` runs.
 """
 import logging
+import os
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -47,6 +48,19 @@ class Runtime:
         except Exception:                                  # noqa: BLE001 - never block a request on the outbox
             log.exception("outbox drain failed")
             return 0
+
+
+def fixture_settings_from_env() -> Settings:
+    """Settings for `BRAIN_RUNTIME=fixture` (what `brain.api.main` serves): the fixture defaults plus the sign-in settings
+    from the environment, so the mock IdP can be tried without a database or any real account.
+
+    Dev login and the /sim/* demo controls stay ON unless `BRAIN_DEV_AUTH=0` is set explicitly; with 0 only real tokens
+    work, which proves the sign-in path end to end. Plain `fixture_runtime()` ignores the environment, so tests do not
+    depend on whose `.env` they run with."""
+    env = Settings.from_env()
+    return Settings(floor_latency_ms=0, dev_auth=os.environ.get("BRAIN_DEV_AUTH", "1").strip() != "0",
+                    jwt_signing_key=env.jwt_signing_key, jwt_audience=env.jwt_audience,
+                    mock_idp=env.mock_idp, mock_idp_ttl_s=env.mock_idp_ttl_s)
 
 
 def fixture_runtime(settings: Settings | None = None, *, sources=("confluence", "jira", "slack", "gdrive")) -> Runtime:
