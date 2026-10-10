@@ -62,7 +62,7 @@ def test_forbidden_and_nonexistent_refusals_are_identical_including_02_fields(cl
 
 
 def test_refusal_timing_is_padded_to_the_floor():
-    client = TestClient(create_app(fixture_runtime(Settings(floor_latency_ms=120))))
+    client = TestClient(create_app(fixture_runtime(Settings(floor_latency_ms=120, dev_auth=True))))
     t = time.perf_counter()
     _ask(client, "sam", NONEXISTENT)
     assert time.perf_counter() - t >= 0.12

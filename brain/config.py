@@ -13,6 +13,10 @@ SOURCES = ("confluence", "jira", "slack", "gdrive")
 ADMIN_ROLES = frozenset({"security-lead", "compliance"})
 COMPLIANCE_ROLE = "compliance"
 STAGES = ("retrieve", "authorize", "verify_live", "generate", "check")   # api.md 0.2, /ask/stream
+MIN_JWT_KEY_BYTES = 32          # RFC 7518: an HS256 key shorter than the hash output is weak
+DEFAULT_DENIED_SALT = "dev-salt"
+DEFAULT_GENERATOR_LABEL = "deepseek-v3"
+NO_CHECKER = ("", "none", "off")
 
 
 @dataclass
@@ -24,8 +28,9 @@ class Settings:
     embedding_backend: str = "bge-m3"
     jwt_signing_key: str | None = None
     jwt_audience: str = "internal-brain"
-    dev_auth: bool = True                     # accept `Bearer dev:<persona>`; off in production
-    denied_id_salt: str = "dev-salt"          # salts the hash of denied doc_ids in the audit log
+    environment: str = "dev"                  # dev | production (BRAIN_ENV): production refuses unsafe settings at start-up
+    dev_auth: bool = False                    # accept `Bearer dev:<persona>` and serve /sim/*; opt in with BRAIN_DEV_AUTH=1
+    denied_id_salt: str = DEFAULT_DENIED_SALT  # salts the hash of denied doc_ids in the audit log
     audit_signing_key: str | None = None      # Ed25519 seed, hex; None = ephemeral key for this process
     checkpoint_every: int = 100
     identity_ttl_s: float = 60.0
@@ -38,7 +43,7 @@ class Settings:
     generator_backend: str = "auto"           # auto | adp | openai | template
     generator_base_url: str | None = None
     generator_api_key: str | None = None
-    generator_model: str = "deepseek-v3"      # the model's name: sent to an OpenAI-compatible backend, a label for ADP
+    generator_model: str = DEFAULT_GENERATOR_LABEL   # the model's name: sent to an OpenAI-compatible backend, a label for ADP
     adp_app_key: str | None = None            # ADP Chat API AppKey of the published agent (brain/gateway/adp.py)
     checker_model: str = "none"              # layer 2 grounding model (brain/checker/layer2.py); none disables it
     grounding_threshold: float = 0.05         # for nli-deberta-v3-xsmall (ADR-003); MiniCheck models sit around 0.5
@@ -58,7 +63,8 @@ class Settings:
             embedding_backend=env("EMBEDDING_BACKEND") or cls.embedding_backend,
             jwt_signing_key=env("JWT_SIGNING_KEY") or None,
             jwt_audience=env("JWT_AUDIENCE") or cls.jwt_audience,
-            dev_auth=(env("BRAIN_DEV_AUTH") or "1") != "0",
+            environment=(env("BRAIN_ENV") or cls.environment).strip().lower(),
+            dev_auth=(env("BRAIN_DEV_AUTH") or "0").strip() == "1",
             denied_id_salt=env("AUDIT_DENIED_SALT") or cls.denied_id_salt,
             audit_signing_key=env("AUDIT_SIGNING_KEY") or None,
             floor_latency_ms=int(env("BRAIN_FLOOR_LATENCY_MS") or cls.floor_latency_ms),
@@ -71,3 +77,39 @@ class Settings:
             grounding_threshold=float(env("GROUNDING_THRESHOLD") or cls.grounding_threshold),
             adp_chat_url=env("ADP_CHAT_URL") or cls.adp_chat_url,
         )
+
+    @property
+    def production(self) -> bool:
+        return self.environment == "production"
+
+    def production_problems(self) -> list[str]:
+        """Settings that must not reach a deployed server. `brain.startup.check_startup` refuses to start on any."""
+        problems = []
+        if self.dev_auth:
+            problems.append("BRAIN_DEV_AUTH=1: anyone could send `Bearer dev:jordan` and become the compliance officer, "
+                            "and /sim/* would be served without a login")
+        if not self.jwt_signing_key:
+            problems.append("JWT_SIGNING_KEY is not set: no real token could be accepted")
+        elif len(self.jwt_signing_key.encode()) < MIN_JWT_KEY_BYTES:
+            problems.append(f"JWT_SIGNING_KEY is shorter than {MIN_JWT_KEY_BYTES} bytes")
+        if not self.audit_signing_key:
+            problems.append("AUDIT_SIGNING_KEY is not set: each restart would sign audit checkpoints with a new key")
+        if self.denied_id_salt == DEFAULT_DENIED_SALT:
+            problems.append("AUDIT_DENIED_SALT is the published default: hashes of denied document IDs could be guessed")
+        if self.checker_model.strip().lower() in NO_CHECKER:
+            problems.append("CHECKER_MODEL is not set: checker layer 2 (the local grounding model) would be off")
+        return problems
+
+    def startup_warnings(self) -> list[str]:
+        """Things worth knowing at start-up in any environment."""
+        warnings = []
+        if self.dev_auth:
+            warnings.append("development login is ON (BRAIN_DEV_AUTH=1): local use only")
+        if not self.audit_signing_key:
+            warnings.append("AUDIT_SIGNING_KEY is not set: audit checkpoints are signed with a key made for this run only")
+        if self.checker_model.strip().lower() in NO_CHECKER:
+            warnings.append("CHECKER_MODEL is not set: only checker layer 1 runs")
+        if self.generator_backend in ("adp", "auto") and self.adp_app_key and self.generator_model == DEFAULT_GENERATOR_LABEL:
+            warnings.append("GENERATOR_MODEL is still the default label: set it to the model the ADP agent really uses, "
+                            "because the audit log records this label")
+        return warnings

@@ -9,11 +9,20 @@ import logging
 import os
 
 from brain.api.app import create_app
+from brain.config import Settings
 from brain.runtime import env_runtime, fixture_runtime
+from brain.startup import UnsafeConfiguration, check_startup
 from connectors.env import load_dotenv
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
-app = create_app(fixture_runtime() if os.environ.get("BRAIN_RUNTIME") == "fixture" else env_runtime())
+_settings = Settings.from_env()
+_fixture = os.environ.get("BRAIN_RUNTIME") == "fixture"
+try:
+    check_startup(_settings, fixture=_fixture)          # production refuses unsafe settings; development warns
+except UnsafeConfiguration as exc:
+    raise SystemExit(str(exc)) from exc
+
+app = create_app(fixture_runtime() if _fixture else env_runtime(_settings))
