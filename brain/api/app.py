@@ -195,7 +195,10 @@ def create_app(runtime: Runtime) -> FastAPI:
     @app.get("/v1/audit/time-travel")
     def time_travel(user: str, at: str, p: Current):
         require(p, {COMPLIANCE_ROLE})
-        raise HTTPException(501, "time-travel queries arrive with the bi-temporal ACL snapshots (slice 3)")
+        try:
+            return runtime.audit.time_travel(p, user, at)
+        except ValueError:
+            raise HTTPException(422, "`at` must be an ISO 8601 time, for example 2026-10-12T09:00:00Z") from None
 
     # -- admin and ops --------------------------------------------------------------------------
     @app.get("/v1/freshness")

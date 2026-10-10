@@ -35,6 +35,7 @@ class OutboxConsumer:
                     email = event.principal.removeprefix("user:")
                     self._resolver.invalidate(email)
                     self._pdp.invalidate_user(email)
+                    self._resolver.resolve(email)       # record the person's new token set now, not at their next question
                 elif event.kind == "acl_change" and event.doc_id:
                     self._pdp.invalidate_doc(event.doc_id)
                     if self._on_doc_change:

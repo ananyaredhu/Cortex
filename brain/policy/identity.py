@@ -36,6 +36,7 @@ class IdentityResolver:
         self._clock = clock
         self._cache: dict[str, AskerIdentity] = {}
         self._lock = threading.Lock()
+        self.on_resolved: Callable[[AskerIdentity], None] | None = None   # called after each live resolution (not a cache hit)
 
     def resolve(self, email: str) -> AskerIdentity:
         now = self._clock()
@@ -59,6 +60,8 @@ class IdentityResolver:
         asker = AskerIdentity(email, frozenset(tokens), identities, tuple(unavailable), now)
         with self._lock:
             self._cache[email] = asker
+        if self.on_resolved is not None:
+            self.on_resolved(asker)
         return asker
 
     def invalidate(self, email: str | None = None) -> None:

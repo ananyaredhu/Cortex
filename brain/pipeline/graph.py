@@ -106,8 +106,28 @@ class Brain:
         self.pdp = pdp or PDP(self.connectors, policy_version=POLICY_VERSION, ttl_s=settings.decision_ttl_s)
         self.answers: dict[str, Answered] = {}
         self._lock = threading.Lock()
+        self._identity_seen: dict[str, frozenset[str]] = {}
+        for event in audit.all():                                 # the last snapshot per person survives a restart
+            if event.get("event_type") == "identity_snapshot":
+                self._identity_seen[event["identity"]["user"]] = frozenset(event["identity"]["tokens"])
+        self.resolver.on_resolved = self._note_identity
         self._pool = ThreadPoolExecutor(max_workers=8, thread_name_prefix="brain")
         self._graph = self._build()
+
+    def _note_identity(self, asker: AskerIdentity) -> None:
+        """Write a person's token set to the audit log when it differs from the last one written (time-travel queries).
+
+        Skipped while a connector is failing: that person's tokens from it are missing, not revoked."""
+        if asker.unavailable:
+            return
+        with self._lock:
+            if self._identity_seen.get(asker.email) == asker.tokens:
+                return
+            self._identity_seen[asker.email] = asker.tokens
+        self.audit.append({"request_id": f"id_{uuid.uuid4().hex[:8]}", "event_type": "identity_snapshot",
+                           "actor": {"user_id": "system:identity", "roles": [], "client": "brain"},
+                           "identity": {"user": asker.email, "tokens": sorted(asker.tokens), "sources": list(asker.sources())},
+                           "decisions": [], "flags": []})
 
     # -- graph ----------------------------------------------------------------------------------
     def _build(self):

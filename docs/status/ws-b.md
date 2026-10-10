@@ -2,6 +2,13 @@
 
 Update at the end of each day. Newest first. Keep it short: done, next, blockers.
 
+## Sat 10 Oct (Day 9), night: time-travel queries
+- **Done (branch `ws-b/time-travel`, from `main`):** T8. `GET /v1/audit/time-travel?user=&at=` answers "what could this person open at that time, and what changed since". Documents: ingestion's `acl_snapshots` with validity intervals. People: the Brain now writes an `identity_snapshot` event into the audit log whenever a person's token set changes (at their next question, and eagerly when the outbox reports a `principal_change`); never while a connector fails, and it survives a restart. Before the first record the answer says `known: false`, not a guess. Titles and `via` tokens only for documents the officer may open (the replay rule). The query is itself logged.
+- **Tested:** 12 tests in `brain/tests/test_time_travel.py` on the scripted e2 (Priya removed from the private auth channel): could see before, could not after, `changed_since.lost`, restricted rows, unknown history, no snapshot on connector failure, one snapshot per change, restart, endpoint roles and a bad time. Whole repo 611 passed.
+- **Limits:** a person's history starts when the Brain first resolved them, so a time before that is unknown. The snapshot time is when the Brain saw the change, not when the platform made it (the ingestion lag). Documents deleted since are not listed. Not run on Postgres yet (the memory and Postgres stores share `snapshots_of`).
+- **Merge note:** `ws-b/link-edges` (PR #40) and this branch both touch `brain/pipeline/graph.py`; whichever merges second needs a rebase.
+- **Next:** the audit agent (T9).
+
 ## Sat 10 Oct (Day 9), later: the MCP server
 - **Done (branch `ws-b/mcp-server`):** the MCP server (T3), `mcp_server/server.py`. Five read-only tools (`ask`, `search`, `get_source`, `explain_access`, `audit_query`), stateless JSON at `POST /mcp`, mounted by `create_app` when `BRAIN_MCP=1`. Bearer token checked on every request by the SDK's middleware through `BrainTokenVerifier` (reuses `Authenticator`); no tool takes a user argument; every call is an `mcp_call` audit event besides the Brain's own. New Brain methods `search` and `get_source` (the same PDP rules as `ask`, no model). SDK is mcp 2.x (`MCPServer`, not FastMCP).
 - **Tested:** 17 tests in `brain/tests/test_mcp.py` (tokens, pinned fingerprint, same answers as the HTTP API, identical refusals, compliance-only audit, statelessness, revocation) and 13 for search and get_source. Whole repo: 598 passed. `python -m mcp_server.smoke` runs 11 checks with the SDK's own client over real HTTP against a running server, all pass.

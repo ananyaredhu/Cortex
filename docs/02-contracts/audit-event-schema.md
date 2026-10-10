@@ -60,6 +60,9 @@ Event types: `ask`, `search`, `mcp_call`, `audit_query`, `admin_view`, `acl_chan
 ## Denied documents
 Denied `doc_id`s are stored **salted-hashed**, so an auditor can see that attempts happened without the log becoming a leak. Allowed decisions store the plain `doc_id`.
 
+## Identity snapshots
+When a person's token set (`user:<email>` plus every group, channel and role from the connectors) differs from the last one written, the Brain appends `{"event_type": "identity_snapshot", "actor": {"user_id": "system:identity", "client": "brain"}, "identity": {"user": "<email>", "tokens": [...], "sources": [...]}}`. It happens at the person's next question and, eagerly, when ingestion's outbox reports a `principal_change` for them. Nothing is written while a connector fails (missing tokens are not revoked ones). Time-travel queries read the last snapshot at or before the asked time.
+
 ## Replayability
 Each decision stores `acl_snapshot_hash`, `policy_version` and `doc_version` so an auditor can re-evaluate "was this decision correct at that time?". Together with ACL snapshots stored with validity intervals (bi-temporal), this supports time-travel queries ("what could jdoe see on 12 Oct?").
 
@@ -73,5 +76,6 @@ Audit queries (natural language or structured) are read-only and run **under RBA
 `ask` events carry `conversation_id` (the one returned by `/ask`). The Brain keeps no other record of conversations: `/v1/conversations` and `/v1/conversations/{id}` are rebuilt from these events, under the same ownership rule (only the asker's own events), so history survives a restart.
 
 ## Changelog
+- 0.1, 10 Oct: `identity_snapshot` events (time-travel queries).
 - 0.1, 9 Oct: `conversation_id` on `ask` events; conversations are rebuilt from the log.
 - 0.1: first draft.
