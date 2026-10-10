@@ -28,7 +28,9 @@ class Settings:
     embedding_backend: str = "bge-m3"
     jwt_signing_key: str | None = None
     jwt_audience: str = "internal-brain"
-    environment: str = "dev"                  # dev | production (BRAIN_ENV): production refuses unsafe settings at start-up
+    mock_idp: bool = False                    # serve POST /idp/token: signs in as a fictional persona (BRAIN_MOCK_IDP=1); a demo IdP
+    mock_idp_ttl_s: int = 900
+    environment: str = "dev"                 # dev | production (BRAIN_ENV): production refuses unsafe settings at start-up
     dev_auth: bool = False                    # accept `Bearer dev:<persona>` and serve /sim/*; opt in with BRAIN_DEV_AUTH=1
     denied_id_salt: str = DEFAULT_DENIED_SALT  # salts the hash of denied doc_ids in the audit log
     audit_signing_key: str | None = None      # Ed25519 seed, hex; None = ephemeral key for this process
@@ -63,6 +65,8 @@ class Settings:
             embedding_backend=env("EMBEDDING_BACKEND") or cls.embedding_backend,
             jwt_signing_key=env("JWT_SIGNING_KEY") or None,
             jwt_audience=env("JWT_AUDIENCE") or cls.jwt_audience,
+            mock_idp=(env("BRAIN_MOCK_IDP") or "0").strip() == "1",
+            mock_idp_ttl_s=int(env("BRAIN_MOCK_IDP_TTL_S") or cls.mock_idp_ttl_s),
             environment=(env("BRAIN_ENV") or cls.environment).strip().lower(),
             dev_auth=(env("BRAIN_DEV_AUTH") or "0").strip() == "1",
             denied_id_salt=env("AUDIT_DENIED_SALT") or cls.denied_id_salt,
@@ -105,6 +109,9 @@ class Settings:
         warnings = []
         if self.dev_auth:
             warnings.append("development login is ON (BRAIN_DEV_AUTH=1): local use only")
+        if self.mock_idp:
+            warnings.append("the mock IdP is ON (BRAIN_MOCK_IDP=1): anyone who can reach POST /idp/token can sign in as any "
+                            "fictional persona. Fine for the judged demo, never with real users")
         if not self.audit_signing_key:
             warnings.append("AUDIT_SIGNING_KEY is not set: audit checkpoints are signed with a key made for this run only")
         if self.checker_model.strip().lower() in NO_CHECKER:

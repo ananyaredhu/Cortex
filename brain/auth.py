@@ -3,11 +3,25 @@
 
 Both paths end in a `Principal`. Nothing after this module looks at the header again.
 """
+import time
 from dataclasses import dataclass, field
 
 import jwt
 
+from brain.config import MIN_JWT_KEY_BYTES
 from fixtures.loader import load, persona_by_id
+
+ISSUER = "mock-idp"
+
+
+def mint_token(key: str, audience: str, email: str, roles: list[str], *, name: str = "", ttl_s: int = 900) -> str:
+    """A signed HS256 token in the shape `Authenticator` accepts: `sub`, `email`, `roles`, `aud`, `exp`.
+    The mock IdP (`POST /idp/token`) and the tests both use this; a real IdP replaces the first."""
+    now = int(time.time())
+    claims = {"sub": email, "email": email, "roles": roles, "aud": audience, "iss": ISSUER, "iat": now, "exp": now + ttl_s}
+    if name:
+        claims["name"] = name
+    return jwt.encode(claims, key, algorithm="HS256")
 
 
 class AuthError(Exception):
@@ -27,6 +41,8 @@ class Principal:
 
 class Authenticator:
     def __init__(self, *, signing_key: str | None, audience: str, dev_auth: bool) -> None:
+        if signing_key and len(signing_key.encode()) < MIN_JWT_KEY_BYTES:
+            raise ValueError(f"JWT_SIGNING_KEY must be at least {MIN_JWT_KEY_BYTES} bytes (RFC 7518 for HS256)")
         self._key = signing_key
         self._audience = audience
         self._dev = dev_auth
@@ -64,6 +80,8 @@ class DevTokens:
     extra: dict = field(default_factory=dict)
 
     def mint(self, email: str, roles: list[str], *, exp_delta_s: int = 600) -> str:
-        import time
-        return jwt.encode({"sub": email, "email": email, "roles": roles, "aud": self.audience,
-                           "exp": int(time.time()) + exp_delta_s, **self.extra}, self.key, algorithm="HS256")
+        if not self.extra:
+            return mint_token(self.key, self.audience, email, roles, ttl_s=exp_delta_s)
+        now = int(time.time())
+        return jwt.encode({"sub": email, "email": email, "roles": roles, "aud": self.audience, "iat": now,
+                           "exp": now + exp_delta_s, **self.extra}, self.key, algorithm="HS256")
