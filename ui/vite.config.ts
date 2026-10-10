@@ -9,7 +9,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
-    proxy: { "/v1": target, "/sim": target },
+    proxy: { "/v1": target, "/sim": target, "/idp": target },
   },
   test: {
     environment: "jsdom",

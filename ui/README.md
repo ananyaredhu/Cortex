@@ -9,7 +9,7 @@ Phase 0 (this scaffold) was a head start from Workstream A while Workstream C wa
 make stub-api          # the stub Brain API on :8000 (from the repo root)
 cd ui && npm install && npm run dev    # http://localhost:5173, proxies /v1 and /sim to :8000
 ```
-Point at another API with `API_TARGET=http://host:port npm run dev`. `npm run dev:demo` adds the **demo controls** (bottom left): the scripted changes for scenarios 2 and 4, source health, tampering with an audit entry, and reset. They call the stub's `/sim` endpoints and are never in a production build.
+Point at another API with `API_TARGET=http://host:port npm run dev`. `npm run dev:idp` signs in through the **mock IdP** instead of sending `Bearer dev:<persona>`: it asks `POST /idp/token` for a short-lived signed token per persona (kept in memory, renewed 30 s before it expires, replaced once if the server answers 401) and shows the demo controls too. It needs a Brain started with `BRAIN_MOCK_IDP=1` and a `JWT_SIGNING_KEY` of 32+ bytes, for example `BRAIN_RUNTIME=fixture BRAIN_MOCK_IDP=1 BRAIN_DEV_AUTH=0 JWT_SIGNING_KEY=<64 hex characters> make brain-api-fixture` (with `BRAIN_DEV_AUTH=0` only real tokens work and the demo controls go away). `npm run dev:demo` adds the **demo controls** (bottom left): the scripted changes for scenarios 2 and 4, source health, tampering with an audit entry, and reset. They call the stub's `/sim` endpoints and are never in a production build.
 
 Tests:
 - `npm test`: Vitest, components and helpers.
