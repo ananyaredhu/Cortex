@@ -45,6 +45,7 @@ Response:
 }
 ```
 Fields added in 0.2 (all optional):
+- `citations[].via_link_from`: the `doc_id` of the cited document whose stored link led to this one, or `null` for a direct search hit. A link never grants access: the target passed the same live permission check as any hit. A target the asker may not open, or that does not exist, is absent with no trace.
 - `citations[].excerpt`: up to 280 characters of the cited document, sanitized like the context packet. Shown as a quoted excerpt, never as the assistant's words.
 - `freshness.per_source`: per source, the connector's `last_sync` and `status` (`ok` within the SLA, `stale` beyond it, `unavailable` if the source could not be read for this request).
 - `coverage`: per source, whether it was searched and how many cited documents came from it. **Only what the asker may see is counted. No count of candidates, denied or filtered documents appears anywhere in this response** (a denied count is an existence signal: see [acl-model](acl-model.md)).
@@ -127,6 +128,7 @@ Stale-answer alerts: answers the user received whose sources changed afterwards 
 Simulator admin endpoints (owned by A) to revoke a permission, restrict a page, edit a document, and add or remove hidden documents (for Leak-CI). Documented in `simulators/README.md`. The stub API has its own: `/sim/advance`, `/sim/reset`, `/sim/tamper`.
 
 ## Changelog
+- 0.2, 10 Oct: `citations[].via_link_from` (link-edge expansion).
 - 0.2, 9 Oct: `/conversations/{conversation_id}` reopens a conversation (answers withheld when a cited document is no longer visible); `/conversations` is rebuilt from the audit log.
 - 0.2 (proposed): optional UI fields on `/ask` (`excerpt`, `freshness.per_source`, `coverage`, `grounding`, `policy_version`, `unavailable_sources`, `clarify`) and its `sources` and `time_range` filters; `/ask/stream`; `/conversations`; `/audit/replay`; `/policy/versions` and `/policy/evaluate`; audit answer text withheld from officers who may not see its sources; `question` and `changed_title` on alerts, which only cover documents still visible; `/mywork` and `/freshness` shapes written down; roles for the admin endpoints. Explicit rule: no candidate or denied counts in any asker-facing response.
 - 0.1: first draft.

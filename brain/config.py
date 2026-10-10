@@ -48,6 +48,11 @@ class Settings:
     max_vector_distance: float = 0.45         # bge-m3 cosine distance; see brain/retrieval/hybrid.py
     max_evidence: int = 5
     per_source_quota: int = 3
+    link_expansion: bool = True               # follow stored links one hop from allowed hits (brain/pipeline/graph.py)
+    link_checks: int = 24                     # link targets run through the PDP per question, denied ones counted too
+    link_per_source: int = 2                  # allowed link targets kept per source
+    link_total: int = 4                       # allowed link targets kept in all
+    link_discount: float = 0.5                # a link target ranks at this fraction of the hit that linked to it
     generator_backend: str = "auto"           # auto | adp | openai | template
     generator_base_url: str | None = None
     generator_api_key: str | None = None

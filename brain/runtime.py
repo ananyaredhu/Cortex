@@ -114,7 +114,16 @@ def env_runtime(settings: Settings | None = None) -> Runtime:
     scorer = scorer_from_env(settings.checker_model)
     if scorer is not None:
         scorer.score([("warm up", "warm up")])                  # load the grounding model now, not on the first answer
-    brain = Brain(settings, connectors, index, store, embedder, generator_from_settings(settings), audit_store, scorer=scorer)
+    from connectors.gdrive.manifest import SeedManifest as DriveManifest
+    from connectors.slack.manifest import SeedManifest as SlackManifest
+    manifests = {"slack": SlackManifest.load(), "gdrive": DriveManifest.load()}
+
+    def to_real(doc_id: str) -> str:
+        """Jira and Confluence store fixture IDs in their links; the real Slack and Drive IDs differ (A's seed manifests)."""
+        manifest = manifests.get(doc_id.split(":", 1)[0])
+        return (manifest.real_doc(doc_id) if manifest else None) or doc_id
+    brain = Brain(settings, connectors, index, store, embedder, generator_from_settings(settings), audit_store, scorer=scorer,
+                  link_resolver=to_real)
     consumer = OutboxConsumer(store, brain.resolver, brain.pdp, record=audit_store.append)
     consumer.last_seq = max([e.seq or 0 for e in store.events_after(0, 100_000)] or [0])   # history is A's, not news
     runtime = Runtime(settings, brain, AuditService(audit_store, brain), audit_store, consumer)

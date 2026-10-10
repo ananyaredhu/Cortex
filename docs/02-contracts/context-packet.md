@@ -31,7 +31,8 @@ Context engineering is an explicit pipeline stage: select, compress, order and b
       "text": "<spotlighted, sanitized snippet>",
       "as_of": "2026-10-10T13:58:00Z",
       "acl_label": ["role:DBMIG:developer"],
-      "flags": []
+      "flags": [],
+      "via_link_from": null
     }
   ],
   "constraints": {
@@ -59,4 +60,5 @@ Conversation memory entries are labeled with the intersection of their sources' 
 Context precision and recall on the golden set, citation precision, abstention correctness, and token cost per answer.
 
 ## Changelog
+- 0.1, 10 Oct: `evidence[].via_link_from` (set when the document was reached through a stored link from an allowed hit; the link target passed the same permission check, ranks below direct hits).
 - 0.1: first draft.

@@ -27,6 +27,7 @@ class Evidence:
     flags: list[str] = field(default_factory=list)
     score: float = 0.0
     raw: str = ""                  # the sanitized snippet without delimiters (excerpt for the UI)
+    via_link_from: str | None = None   # the allowed document whose stored link led here (None: a direct hit)
 
 
 def sanitize(text: str) -> tuple[str, list[str]]:
@@ -86,13 +87,14 @@ def build_packet(request_id: str, user_context: dict, question: str, skill: str 
         "user_context": user_context,
         "task": {"question": question, "skill": skill, "output_schema": "claims_with_citations_v1"},
         "evidence": [{"chunk_id": e.chunk_id, "doc_id": e.doc_id, "source": e.source, "title": e.title, "url": e.url,
-                      "text": e.text, "as_of": e.as_of, "acl_label": e.acl_label, "flags": e.flags} for e in final],
+                      "text": e.text, "as_of": e.as_of, "acl_label": e.acl_label, "flags": e.flags,
+                      "via_link_from": e.via_link_from} for e in final],
         "constraints": {"must_cite": True, "abstain_if_unsupported": True, "max_tokens": 6000},
     }
 
 
 def make_evidence(chunk_id: str, doc_id: str, source: str, title: str, url: str, text: str, as_of: str | None,
-                  acl_tokens: list[str], terms: list[str], score: float) -> Evidence:
+                  acl_tokens: list[str], terms: list[str], score: float, via_link_from: str | None = None) -> Evidence:
     clean, flags = sanitize(snippet(text, terms))
     spot = f"{DELIM_OPEN} {doc_id}\n{clean}\n{DELIM_CLOSE}"
-    return Evidence(chunk_id, doc_id, source, title, url, spot, as_of, sorted(acl_tokens), flags, score, clean)
+    return Evidence(chunk_id, doc_id, source, title, url, spot, as_of, sorted(acl_tokens), flags, score, clean, via_link_from)
