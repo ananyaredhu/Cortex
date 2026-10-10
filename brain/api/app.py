@@ -2,6 +2,7 @@
 
 Every handler authenticates, syncs the outbox, then calls the Brain. Refusals are 200s with the uniform shape.
 """
+import contextlib
 import json
 import queue
 import threading
@@ -53,7 +54,19 @@ def _sse(event: str, data: dict) -> str:
 def create_app(runtime: Runtime) -> FastAPI:
     settings = runtime.settings
     auth = Authenticator(signing_key=settings.jwt_signing_key, audience=settings.jwt_audience, dev_auth=settings.dev_auth)
-    app = FastAPI(title="Internal Brain API", version="0.2")
+    # MCP server (ADR-004), only when asked for (BRAIN_MCP=1). Its session manager must start and stop with this app.
+    mcp_app = None
+    lifespan = None
+    if settings.mcp:
+        from mcp_server.server import build_mcp_app  # imported late: the SDK is only needed when MCP is on
+        mcp_app = build_mcp_app(runtime, auth)
+
+        @contextlib.asynccontextmanager
+        async def lifespan(_app: FastAPI):
+            async with mcp_app.router.lifespan_context(mcp_app):
+                yield
+
+    app = FastAPI(title="Internal Brain API", version="0.2", lifespan=lifespan)
     suggestions = {p["email"]: [g["question"] for g in load()["golden"] if g["persona"] == p["id"]][:3]
                    for p in load()["personas"]}
 
@@ -235,5 +248,9 @@ def create_app(runtime: Runtime) -> FastAPI:
                 raise HTTPException(404, "not available")
             runtime.reset()
             return {"ok": True}
+
+    # Last, so every route above wins; the MCP app answers /mcp and its /.well-known metadata only.
+    if mcp_app is not None:
+        app.mount("/", mcp_app)
 
     return app

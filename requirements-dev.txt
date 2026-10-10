@@ -9,3 +9,4 @@ pre-commit>=3.7
 langgraph>=1.0      # the query pipeline (brain/pipeline)
 PyJWT>=2.8          # bearer JWTs from the mock IdP (brain/auth.py)
 cryptography>=42    # Ed25519 checkpoints in the audit chain (brain/audit/chain.py)
+mcp>=2,<3         # the MCP server (mcp_server/); 2.x renamed FastMCP to MCPServer

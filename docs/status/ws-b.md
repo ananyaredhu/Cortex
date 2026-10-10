@@ -2,6 +2,14 @@
 
 Update at the end of each day. Newest first. Keep it short: done, next, blockers.
 
+## Sat 10 Oct (Day 9), later: the MCP server
+- **Done (branch `ws-b/mcp-server`):** the MCP server (T3), `mcp_server/server.py`. Five read-only tools (`ask`, `search`, `get_source`, `explain_access`, `audit_query`), stateless JSON at `POST /mcp`, mounted by `create_app` when `BRAIN_MCP=1`. Bearer token checked on every request by the SDK's middleware through `BrainTokenVerifier` (reuses `Authenticator`); no tool takes a user argument; every call is an `mcp_call` audit event besides the Brain's own. New Brain methods `search` and `get_source` (the same PDP rules as `ask`, no model). SDK is mcp 2.x (`MCPServer`, not FastMCP).
+- **Tested:** 17 tests in `brain/tests/test_mcp.py` (tokens, pinned fingerprint, same answers as the HTTP API, identical refusals, compliance-only audit, statelessness, revocation) and 13 for search and get_source. Whole repo: 598 passed. `python -m mcp_server.smoke` runs 11 checks with the SDK's own client over real HTTP against a running server, all pass.
+- **Findings:** the SDK's Host check answers 421 for any host not in `BRAIN_MCP_ALLOWED_HOSTS`; the SDK advertises OAuth discovery metadata we do not implement, so clients need the token as a static header; `ToolError` is how a message reaches the client (other exceptions are masked).
+- **For C:** `docs/02-contracts/mcp-tools.md` 0.2 and `mcp_server/README.md` say how to get a token and configure CodeBuddy and WorkBuddy. The WorkBuddy connection itself is not tried yet (check #7).
+- **Contract change for review:** mcp-tools.md 0.2 (tool results written down, `audit_query` no longer returns verify status).
+- **Next:** link-edge expansion (T4), skills (T5).
+
 ## Sat 10 Oct (Day 9)
 - **Ananya is back on B.** Pulled PRs #35 and #36, ran the backend locally in fixture mode (456 tests passing, scenarios 1 to 5 by hand), and wrote a backlog of what is left and what to fix (`docs/backlog.md`, not yet merged). Branch `ws-b/security-fixes`.
 - **Done (fixes from the review, five commits):** F1 development login is now opt-in (`BRAIN_DEV_AUTH=1`) and `BRAIN_ENV=production` makes the API refuse to start with dev login on, a missing or short JWT key, no audit signing key, the default audit salt or no checker model (`brain/startup.py`, `Settings.production_problems`); F3 `/verify` no longer reports tampering after a restart, and reports `signer_pinned`; F2 mock IdP `POST /idp/token` (opt-in with `BRAIN_MOCK_IDP=1`) and a 32-byte minimum JWT key; F10 the API's `answer` is rebuilt from the verified claims, never the model's prose; F11 `generator_unavailable` separates a model failure from "no source supports an answer".
