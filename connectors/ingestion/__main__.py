@@ -14,7 +14,8 @@ runs every source on schedule, as the fallback when a notification or event is l
 
 Environment (read from the shell, then from .env): DATABASE_URL, EMBEDDING_BACKEND (bge-m3 | none),
 CONFLUENCE_SIM_URL, JIRA_SIM_URL; for Slack SLACK_BOT_TOKEN, and SLACK_APP_TOKEN for events; for Drive the OAuth client, the token files and
-gdrive.local.json; for both the identity map file.
+gdrive.local.json; for both the identity map file. DRIVE_WEBHOOK_HOST moves the Drive receiver off 127.0.0.1
+(only inside a private network, behind the reverse proxy).
 """
 import argparse
 import json
@@ -108,7 +109,8 @@ def main() -> None:
     server = listener = None
     if args.drive_webhook is not None:
         receiver = webhook.Receiver(watch.webhook_token(), lambda: {c.id for c in watch.load_channels()}, lambda: wake.ring("gdrive"))
-        server = webhook.serve(receiver, args.drive_webhook)
+        # 127.0.0.1 unless the reverse proxy is on another host of a private network (a container: deploy/)
+        server = webhook.serve(receiver, args.drive_webhook, host=os.environ.get("DRIVE_WEBHOOK_HOST") or "127.0.0.1")
     if args.slack_events:
         slack = connectors["slack"]
 

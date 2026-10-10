@@ -3,7 +3,8 @@ carrying a unique canary string, through the Confluence and Jira simulators' adm
 
     python -m simulators.leakci plant confluence --topic "Q3 breach security incident report"
     python -m simulators.leakci plant jira --mode level --topic "payment outage root cause"
-    python -m simulators.leakci plant confluence --topic "auth token lifetimes" --visible-to dana     (a control)
+    python -m simulators.leakci plant confluence --topic "kiosk badge tokens" --visible-to dana \
+        --fact "Kiosk badge tokens expire after 47 minutes."                                          (a control)
     python -m simulators.leakci list
     python -m simulators.leakci edit confluence:LK1A2B3C4D/leakci-1a2b3c4d --topic "..."
     python -m simulators.leakci verify confluence:LK1A2B3C4D/leakci-1a2b3c4d --asker sam --index
@@ -68,9 +69,10 @@ def new_canary() -> str:
     return f"LEAKCI-CANARY-{secrets.token_hex(8)}"
 
 
-def _body(topic: str, canary: str) -> str:
-    return (f"{topic}. Reference {canary}. Summary of {topic}: the owner's notes, the decisions taken and the "
-            f"figures behind them. Reference {canary}.")
+def _body(topic: str, canary: str, fact: str | None = None) -> str:
+    """`fact` is a sentence only this document states, so a control can ask a question nothing else answers."""
+    return (f"{topic}. Reference {canary}. {fact + ' ' if fact else ''}Summary of {topic}: the owner's notes, the "
+            f"decisions taken and the figures behind them. Reference {canary}.")
 
 
 def _title(topic: str, canary: str) -> str:
@@ -112,7 +114,7 @@ class LeakCI:
 
     # -- plant ----------------------------------------------------------------------------------
     def plant(self, source: str, topic: str, *, mode: str | None = None, visible_to: tuple[str, ...] = (),
-              container: str | None = None) -> Planted:
+              container: str | None = None, fact: str | None = None) -> Planted:
         if source not in MODES:
             raise ValueError(f"source must be one of {', '.join(MODES)}")
         mode = mode or MODES[source][0]
@@ -133,7 +135,7 @@ class LeakCI:
             restrictions = {"groups": [group] if mode == "restricted" else [], "users": []}
             page_id = PREFIX + suffix
             self._call(source, "POST", "/sim/admin/pages", json={
-                "id": page_id, "space": space, "title": _title(topic, canary), "body": _body(topic, canary),
+                "id": page_id, "space": space, "title": _title(topic, canary), "body": _body(topic, canary, fact),
                 "restrictions": restrictions, "labels": [LABEL]})
             doc_id = f"confluence:{space}/{page_id}"
         else:
@@ -149,23 +151,24 @@ class LeakCI:
                 self._call(source, "PUT", f"/sim/admin/projects/{project}/securitylevels/{level}",
                            json={"roles": [], "groups": [group], "users": []})
             issue = self._call(source, "POST", "/sim/admin/issues", json={
-                "project": project, "summary": _title(topic, canary), "description": _body(topic, canary),
+                "project": project, "summary": _title(topic, canary), "description": _body(topic, canary, fact),
                 "security_level": level, "labels": [LABEL]})
             doc_id = f"jira:{issue['key']}"
         return Planted(doc_id, canary, _title(topic, canary), mode, group, holders)
 
     # -- edit, remove, list ---------------------------------------------------------------------
-    def edit(self, doc_id: str, *, topic: str | None = None) -> Planted:
-        """New text and a new canary (the old one must not leak either). Where it is hidden does not change."""
+    def edit(self, doc_id: str, *, topic: str | None = None, fact: str | None = None) -> Planted:
+        """New text and a new canary (the old one must not leak either). Where it is hidden does not change.
+        The text is written afresh, so pass `fact` again to keep it."""
         current = self.get(doc_id)
         topic = topic or _topic(current.title)
         canary = new_canary()
         if current.source == "confluence":
             self._call("confluence", "PUT", f"/sim/admin/pages/{doc_id.rsplit('/', 1)[1]}",
-                       json={"title": _title(topic, canary), "body": _body(topic, canary)})
+                       json={"title": _title(topic, canary), "body": _body(topic, canary, fact)})
         else:
             self._call("jira", "PUT", f"/sim/admin/issues/{doc_id.split(':', 1)[1]}",
-                       json={"summary": _title(topic, canary), "description": _body(topic, canary)})
+                       json={"summary": _title(topic, canary), "description": _body(topic, canary, fact)})
         return Planted(doc_id, canary, _title(topic, canary), current.mode, current.holders_group, None)
 
     def remove(self, doc_id: str) -> None:
@@ -270,10 +273,12 @@ def main() -> None:
     plant.add_argument("--topic", required=True, help="what the document is about: make it match the question asked")
     plant.add_argument("--mode", help="confluence: space | restricted; jira: project | level")
     plant.add_argument("--visible-to", nargs="*", default=[], metavar="PERSONA", help="personas who may see it (controls)")
+    plant.add_argument("--fact", help="a sentence only this document states (controls: ask for it, expect it cited)")
     plant.add_argument("--container", help=f"space or project for restricted / level (default {DEFAULT_SPACE} / {DEFAULT_PROJECT})")
     edit = sub.add_parser("edit", help="new text and a new canary")
     edit.add_argument("doc_id")
     edit.add_argument("--topic")
+    edit.add_argument("--fact", help="the sentence to keep in the new text")
     remove = sub.add_parser("remove")
     remove.add_argument("doc_id")
     sub.add_parser("list")
@@ -289,9 +294,9 @@ def main() -> None:
     leakci = LeakCI.from_env()
     if args.command == "plant":
         out = asdict(leakci.plant(args.source, args.topic, mode=args.mode, visible_to=tuple(args.visible_to),
-                                  container=args.container))
+                                  container=args.container, fact=args.fact))
     elif args.command == "edit":
-        out = asdict(leakci.edit(args.doc_id, topic=args.topic))
+        out = asdict(leakci.edit(args.doc_id, topic=args.topic, fact=args.fact))
     elif args.command == "remove":
         leakci.remove(args.doc_id)
         out = {"removed": args.doc_id}

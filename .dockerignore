@@ -1,0 +1,36 @@
+# What never goes into an image (deploy/). The build context is the repo root, and `connectors/` holds local
+# account files next to the code, so the secret patterns of .gitignore are repeated here.
+.git
+.github
+.claude
+**/.env
+**/.env.*
+!**/.env.example
+**/*.pem
+**/*.key
+**/secrets/
+**/credentials*.json
+**/token*.json
+**/identity-map*.json
+!**/identity-map.example.json
+**/seed-manifest*.json
+!**/seed-manifest.example.json
+**/gdrive.local.json
+**/watch-channels*.json
+**/*.local.json
+
+# not needed to build, or rebuilt inside the image
+.venv
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.ruff_cache
+**/node_modules
+ui/dist
+ui/test-results
+ui/playwright-report
+ui/design-reference
+evals/scoreboard
+docs
+handoff-*.md
+screenshots-raw

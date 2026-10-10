@@ -47,3 +47,6 @@ screenshots-raw/
 # playwright
 test-results/
 playwright-report/
+
+# Leak-CI scoreboards (derived; rerun python -m evals.leakci)
+evals/scoreboard/
