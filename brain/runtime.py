@@ -9,6 +9,8 @@ vector, the generator the settings name. What `uvicorn brain.api.main:app` runs.
 """
 import logging
 import os
+import threading
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -26,6 +28,7 @@ from connectors.ingestion.embedding import from_env as embedder_from_env
 from connectors.ingestion.pg_store import PostgresStore
 from connectors.stub.fixture_connector import FixtureConnector
 from fixtures.loader import State
+from fixtures.loader import load as fixture_data
 
 log = logging.getLogger(__name__)
 
@@ -41,6 +44,23 @@ class Runtime:
     reset: Callable[[], None] | None = None
     tamper: Callable[[int], None] | None = None
     ingest: Callable[[], None] | None = None             # one ingestion pass over the corpus, then sync - fixture mode only
+    people: Callable[[], list[str]] = lambda: []          # everyone the Brain knows of: the identity map, or the fixture personas
+
+    def baseline(self) -> int:
+        """Record every known person's token set now, plus anyone who has asked before (see Brain.baseline)."""
+        known = set(self.people()) | set(self.brain._identity_seen)
+        return self.brain.baseline(known)
+
+    def start_baseline_loop(self) -> None:
+        """Record everyone now and then every `baseline_interval_s`: the safety net under the outbox's own events."""
+        def loop() -> None:
+            while True:
+                try:
+                    self.baseline()
+                except Exception:                              # noqa: BLE001 - history is best effort, never stop the loop
+                    log.exception("baseline snapshot failed")
+                time.sleep(self.settings.baseline_interval_s)
+        threading.Thread(target=loop, name="identity-baseline", daemon=True).start()
 
     def sync(self) -> int:
         """Apply what ingestion's outbox says before serving: dropped caches, `acl_change_observed` events."""
@@ -77,6 +97,8 @@ def fixture_runtime(settings: Settings | None = None, *, sources=("confluence", 
     brain = Brain(settings, connectors, MemoryIndex(store), store, embedder, TemplateGenerator(), audit_store)
     consumer = OutboxConsumer(store, brain.resolver, brain.pdp, record=audit_store.append)
     runtime = Runtime(settings, brain, AuditService(audit_store, brain), audit_store, consumer)
+    runtime.people = lambda: [p["email"] for p in fixture_data()["personas"]]
+    runtime.baseline()
 
     def advance(event_id: str, ingest: bool = True) -> None:
         for c in connectors.values():
@@ -132,6 +154,10 @@ def env_runtime(settings: Settings | None = None) -> Runtime:
     consumer = OutboxConsumer(store, brain.resolver, brain.pdp, record=audit_store.append)
     consumer.last_seq = max([e.seq or 0 for e in store.events_after(0, 100_000)] or [0])   # history is A's, not news
     runtime = Runtime(settings, brain, AuditService(audit_store, brain), audit_store, consumer)
+    from connectors.identity_map import IdentityMap
+    identity_map = IdentityMap.load()
+    runtime.people = lambda: sorted({e for s in settings.sources for e in identity_map.canonical_emails(s)})
+    runtime.start_baseline_loop()
     if settings.dev_auth:
         runtime.tamper = lambda seq: audit_store.tamper(seq, lambda e: e.setdefault("query", {}).__setitem__("text", "TAMPERED"))
     return runtime

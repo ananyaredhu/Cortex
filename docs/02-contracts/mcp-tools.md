@@ -23,7 +23,7 @@ The MCP server is **another front door into the same pipeline as the UI**. It co
 | `search` | `query`, optional `sources` (list of `confluence`, `jira`, `slack`, `gdrive`), optional `limit` (default 5, at most 10) | `{"results": [{doc_id, title, url, source, as_of, snippet, why_visible, flags}]}`. Authorized hits only; `[]` means nothing the caller can open matches |
 | `get_source` | `doc_id` | `{"found": false}`, or `{"found": true, doc_id, title, url, source, as_of, text, truncated, why_visible, flags}`. Text is read live from the source, cleaned of instruction-like sentences, and cut at 8,000 characters |
 | `explain_access` | `doc_id` | `{"found": false}` or `{"found": true, "proof_path": [...]}` |
-| `audit_query` | optional `question`, optional `filter` (`user`, `space`, `from`, `to`, `decision`) | Compliance role only: `{"events": [...], "count": n}` as `POST /v1/audit/query`. Anyone else gets a tool error: "the compliance role is required". Chain verification stays at `GET /v1/audit/verify` |
+| `audit_query` | optional `question`, optional `filter` (`user`, `space`, `from`, `to`, `decision`) | Compliance role only. With `filter`: `{"events": [...], "count": n}` as `POST /v1/audit/query`. With only `question` (0.2, 10 Oct): the audit agent's answer as `POST /v1/audit/ask` (`plan`, `summary`, `result`, or `clarify`). Anyone else gets a tool error: "the compliance role is required". Chain verification stays at `GET /v1/audit/verify` |
 
 ## Client configuration
 Get a token (demo IdP; it lives `BRAIN_MOCK_IDP_TTL_S` seconds, default 900, so raise it for a long demo):

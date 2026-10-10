@@ -219,3 +219,13 @@ def test_the_web_api_keeps_working_beside_mcp(rt_client):
     assert client.get("/v1/health").status_code == 200
     assert client.get("/v1/mywork", headers={"Authorization": f"Bearer {jwt}"}).status_code == 200
     assert client.post("/sim/reset").status_code == 404                  # dev login is off, so no /sim, MCP or not
+
+
+def test_audit_query_with_a_question_goes_through_the_audit_agent(rt_client):
+    _, client = rt_client
+    call(client, "priya", "ask", question=Q1)
+    out, is_error = call(client, "jordan", "audit_query", question="What did Priya do in the last 30 days?")
+    assert not is_error and out["plan"]["filter"]["user"] == "priya@companya.com" and out["result"]["count"] >= 1
+    assert out["summary"]
+    _, is_error = call(client, "sam", "audit_query", question="What did Priya do in the last 30 days?")
+    assert is_error                                                              # the role check comes first

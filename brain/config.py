@@ -42,6 +42,7 @@ class Settings:
     audit_signing_key: str | None = None      # Ed25519 seed, hex; None = ephemeral key for this process
     checkpoint_every: int = 100
     identity_ttl_s: float = 60.0
+    baseline_interval_s: float = 1800.0       # how often every known person's token set is re-recorded (time-travel history)
     decision_ttl_s: float = 15.0
     floor_latency_ms: int = 300               # every /ask takes at least this long: uniform timing
     candidates: int = 8                       # documents retrieved before the just-in-time check
@@ -60,6 +61,9 @@ class Settings:
     adp_app_key: str | None = None            # ADP Chat API AppKey of the published agent (brain/gateway/adp.py)
     checker_model: str = "none"              # layer 2 grounding model (brain/checker/layer2.py); none disables it
     grounding_threshold: float = 0.05         # for nli-deberta-v3-xsmall (ADR-003); MiniCheck models sit around 0.5
+    audit_planner_base_url: str | None = None  # optional model for the audit agent's second chance (brain/audit/agent.py)
+    audit_planner_api_key: str | None = None
+    audit_planner_model: str | None = None
     adp_chat_url: str = "https://wss.lke.tencentcloud.com/adp/v2/chat"
     leakci_scoreboard: str = "evals/scoreboard/leakci-latest.json"   # what Leak-CI wrote last (evals/leakci.py); relative to the repo
     extra: dict[str, str] = field(default_factory=dict)
@@ -88,6 +92,10 @@ class Settings:
             denied_id_salt=env("AUDIT_DENIED_SALT") or cls.denied_id_salt,
             audit_signing_key=env("AUDIT_SIGNING_KEY") or None,
             floor_latency_ms=int(env("BRAIN_FLOOR_LATENCY_MS") or cls.floor_latency_ms),
+            baseline_interval_s=float(env("BRAIN_BASELINE_INTERVAL_S") or cls.baseline_interval_s),
+            audit_planner_base_url=env("AUDIT_PLANNER_BASE_URL") or None,
+            audit_planner_api_key=env("AUDIT_PLANNER_API_KEY") or None,
+            audit_planner_model=env("AUDIT_PLANNER_MODEL") or None,
             generator_backend=(env("GENERATOR_BACKEND") or cls.generator_backend).strip().lower(),
             generator_base_url=env("GENERATOR_BASE_URL") or None,
             generator_api_key=env("GENERATOR_API_KEY") or None,
