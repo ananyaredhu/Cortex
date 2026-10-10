@@ -1,0 +1,39 @@
+# The only public door (ports 80 and 443). SITE_ADDRESS is a hostname (Caddy then gets and renews a certificate
+# by itself) or, for a local try-out, something like http://localhost.
+#
+# Forwarded: the API, the mock IdP, the MCP server and Drive's push notifications. Not forwarded, on purpose:
+# /sim/* (the Brain's demo helpers), the simulators and Postgres, which no public path reaches.
+{$SITE_ADDRESS} {
+	encode zstd gzip
+
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy no-referrer
+		-Server
+	}
+
+	@brain path /v1/* /idp/* /mcp /mcp/* /.well-known/oauth-*
+	handle @brain {
+		reverse_proxy brain:8000 {
+			# /v1/ask/stream sends pipeline stages as they happen: do not buffer them
+			flush_interval -1
+		}
+	}
+
+	# Google Drive push notifications (connectors/gdrive/webhook.py); the receiver answers 404 without its channel token
+	handle /drive/notify {
+		reverse_proxy ingestion:8110
+	}
+
+	handle /sim/* {
+		respond 404
+	}
+
+	# everything else is the UI, a single-page app
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}
