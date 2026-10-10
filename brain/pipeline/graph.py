@@ -129,6 +129,17 @@ class Brain:
                            "identity": {"user": asker.email, "tokens": sorted(asker.tokens), "sources": list(asker.sources())},
                            "decisions": [], "flags": []})
 
+    def baseline(self, emails) -> int:
+        """Resolve each person afresh so their token set is on record (time-travel queries), whether or not they ever ask.
+
+        A change since the last record is written; an unchanged set is not. Returns how many people were looked at."""
+        looked = 0
+        for email in sorted({e.strip().lower() for e in emails if e}):
+            self.resolver.invalidate(email)
+            self.resolver.resolve(email)
+            looked += 1
+        return looked
+
     # -- graph ----------------------------------------------------------------------------------
     def _build(self):
         g = StateGraph(State)

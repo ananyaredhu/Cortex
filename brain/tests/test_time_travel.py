@@ -132,3 +132,35 @@ def test_the_endpoint_is_compliance_only_and_rejects_a_bad_time(story):
     assert client.get(url, params={"user": "priya@companya.com", "at": "yesterday"}, headers=H("jordan")).status_code == 422
     ok = client.get(url, params={"user": "priya@companya.com", "at": before}, headers=H("jordan"))
     assert ok.status_code == 200 and PRIVATE in ids(ok.json()["changed_since"]["lost"])
+
+
+# -- everyone is on record from the start, not only the people who ask ------------------------------------------------
+def test_a_person_who_never_asked_already_has_a_history():
+    rt = fixture_runtime(Settings(floor_latency_ms=0))
+    out = rt.audit.time_travel(JORDAN, "maya@companya.com", stamp())
+    assert out["identity"]["known"] and out["identity"]["tokens"]
+
+
+def test_a_removal_is_recorded_for_someone_who_never_asked():
+    rt = fixture_runtime(Settings(floor_latency_ms=0, dev_auth=True))
+    before = stamp()
+    rt.advance("e2")                                              # Priya has not asked anything
+    after = stamp()
+    assert PRIVATE in ids(rt.audit.time_travel(JORDAN, "priya@companya.com", before)["could_see"])
+    assert PRIVATE not in ids(rt.audit.time_travel(JORDAN, "priya@companya.com", after)["could_see"])
+
+
+def test_running_the_baseline_again_writes_nothing_new():
+    rt = fixture_runtime(Settings(floor_latency_ms=0))
+    count = lambda: len([e for e in rt.audit_store.all() if e["event_type"] == "identity_snapshot"])   # noqa: E731
+    first = count()
+    rt.baseline()
+    rt.baseline()
+    assert first == 5 and count() == first
+
+
+def test_people_who_asked_before_are_included_even_if_no_map_lists_them():
+    rt = fixture_runtime(Settings(floor_latency_ms=0))
+    rt.people = lambda: []
+    rt.brain._identity_seen["ghost@companya.com"] = frozenset({"user:ghost@companya.com"})
+    assert rt.baseline() >= 1

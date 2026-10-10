@@ -100,6 +100,7 @@ def test_a_platform_without_an_identity_is_not_searched(client, runtime):
 
     runtime.brain.connectors["slack"] = NoSam(runtime.brain.connectors["slack"])
     runtime.brain.resolver._connectors["slack"] = runtime.brain.connectors["slack"]
+    runtime.brain.resolver.invalidate()          # start-up already resolved everyone
     r = _ask(client, "sam", "contractor onboarding guide")
     assert r["coverage"]["slack"] == {"searched": False, "shown": 0}
     assert r["coverage"]["confluence"]["searched"]

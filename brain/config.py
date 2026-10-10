@@ -42,6 +42,7 @@ class Settings:
     audit_signing_key: str | None = None      # Ed25519 seed, hex; None = ephemeral key for this process
     checkpoint_every: int = 100
     identity_ttl_s: float = 60.0
+    baseline_interval_s: float = 300.0        # how often every known person's token set is re-recorded (time-travel history)
     decision_ttl_s: float = 15.0
     floor_latency_ms: int = 300               # every /ask takes at least this long: uniform timing
     candidates: int = 8                       # documents retrieved before the just-in-time check
