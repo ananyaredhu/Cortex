@@ -136,6 +136,8 @@ def build_mcp(runtime: Runtime, authenticator: Authenticator) -> MCPServer:
         with _call(runtime, "audit_query") as who:
             if COMPLIANCE_ROLE not in who.roles:
                 raise ToolError(f"the {COMPLIANCE_ROLE} role is required")      # shown to the client; says nothing sensitive
+            if question and not filter:                                  # a question in words: the audit agent plans it
+                return runtime.audit.ask(who, question)
             return runtime.audit.query(who, {"question": question, "filter": filter or {}})
 
     return mcp

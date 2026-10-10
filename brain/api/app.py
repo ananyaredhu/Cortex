@@ -192,6 +192,14 @@ def create_app(runtime: Runtime) -> FastAPI:
             raise HTTPException(404, "no such request")
         return out
 
+    @app.post("/v1/audit/ask")
+    def audit_ask(body: dict, p: Current):
+        require(p, {COMPLIANCE_ROLE})
+        question = body.get("question")
+        if not isinstance(question, str):
+            raise HTTPException(422, "`question` is required")
+        return runtime.audit.ask(p, question)
+
     @app.get("/v1/audit/time-travel")
     def time_travel(user: str, at: str, p: Current):
         require(p, {COMPLIANCE_ROLE})
