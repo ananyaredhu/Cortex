@@ -59,6 +59,7 @@ class Signer:
     """Ed25519 for checkpoints. `seed` is 32 bytes as hex (AUDIT_SIGNING_KEY); None makes a key for this process."""
 
     def __init__(self, seed_hex: str | None = None) -> None:
+        self.persistent = bool(seed_hex)     # a configured key survives restarts and can be pinned; a made-up one cannot
         if seed_hex:
             self._private = Ed25519PrivateKey.from_private_bytes(bytes.fromhex(seed_hex))
         else:
