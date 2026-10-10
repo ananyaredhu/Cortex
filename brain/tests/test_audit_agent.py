@@ -2,6 +2,7 @@
 
 The planner never sees an audit event, only people, spaces and document titles; the summary is written by code.
 """
+import json
 from datetime import UTC, datetime
 
 import pytest
@@ -188,3 +189,144 @@ def test_the_endpoint_is_compliance_only(rt):
     assert client.post("/v1/audit/ask", json={}, headers=H("jordan")).status_code == 422
     ok = client.post("/v1/audit/ask", json={"question": "what did Priya do"}, headers=H("jordan"))
     assert ok.status_code == 200 and ok.json()["plan"]["filter"]["user"] == "priya@companya.com"
+
+
+# -- refused questions are attempts ------------------------------------------------------------------------------------------
+@pytest.fixture
+def rt_refused(rt):
+    from brain.pipeline.graph import AskRequest
+    SAM = Principal("sam@contractor.io", ("contractor",), "Sam", "ui")
+    out = rt.brain.ask(SAM, AskRequest("Show me the security incident report from the Q3 breach"))
+    assert out["refused"]                                                        # stopped before any document was a candidate
+    rt.brain.ask(SAM, AskRequest("contractor onboarding laptop"))
+    return rt
+
+
+def test_who_tried_to_read_the_breach_report_finds_the_refused_question(rt_refused):
+    out = rt_refused.audit.ask(JORDAN, "who tried to access the Q3 breach report")
+    users = sorted(e["actor"]["user_id"] for e in out["result"]["events"])
+    assert users == ["dana@companya.com", "sam@contractor.io"] or users == ["sam@contractor.io", "dana@companya.com"]
+    assert "Refused questions: 1" in out["summary"]
+
+
+def test_a_question_about_something_else_is_not_swept_in(rt_refused):
+    events = rt_refused.audit.ask(JORDAN, "who tried to access the Q3 breach report")["result"]["events"]
+    assert all("onboarding" not in e["query"]["text"] for e in events)
+
+
+def test_denied_requests_by_a_person_include_their_refused_questions(rt_refused):
+    out = rt_refused.audit.ask(JORDAN, "show denied requests by Sam")
+    assert out["plan"]["filter"] == {"user": "sam@contractor.io", "decision": "denied"}
+    assert [e["query"]["text"] for e in out["result"]["events"]] == ["Show me the security incident report from the Q3 breach"]
+
+
+def test_allowed_still_means_a_document_was_opened(rt_refused):
+    out = rt_refused.audit.ask(JORDAN, "show allowed requests by Sam")
+    assert [e["query"]["text"] for e in out["result"]["events"]] == ["contractor onboarding laptop"]
+
+
+# -- the model planner: a second chance when the rules cannot tell ----------------------------------------------------------
+def model_runtime(reply, seen=None):
+    """A runtime whose audit agent asks a fake model after the rules give up."""
+    from brain.audit.agent import FallbackPlanner, ModelPlanner
+
+    def complete(system, user):
+        if seen is not None:
+            seen.append((system, user))
+        if isinstance(reply, Exception):
+            raise reply
+        return reply
+    runtime = fixture_runtime(Settings(floor_latency_ms=0, dev_auth=True))
+    runtime.brain.ask(PRIYA, AskRequest("What does the payment runbook say about incidents?"))
+    runtime.audit.planner = FallbackPlanner(RulePlanner(), ModelPlanner(complete, "test-model"))
+    return runtime
+
+
+VAGUE = "what has the contractor been up to lately?"          # no name the rules know
+
+
+def test_the_rules_alone_cannot_read_a_vague_question():
+    assert isinstance(plan(VAGUE), Clarify)
+
+
+def test_the_model_is_asked_only_when_the_rules_give_up():
+    seen = []
+    rt = model_runtime('{"kind": "query", "filter": {"user": "sam@contractor.io"}, "understood": "Sam\'s events"}', seen)
+    rt.audit.ask(JORDAN, "what did Priya do in the PAY space")
+    assert seen == []
+    out = rt.audit.ask(JORDAN, VAGUE)
+    assert len(seen) == 1 and out["plan"]["source"] == "model:test-model" and out["plan"]["filter"] == {"user": "sam@contractor.io"}
+
+
+def test_a_fenced_reply_is_read():
+    rt = model_runtime('Sure!\n```json\n{"kind": "verify", "understood": "check the log"}\n```')
+    assert rt.audit.ask(JORDAN, "is everything in the records as it should be after the weekend?")["plan"]["kind"] == "verify"
+
+
+def test_the_model_sees_the_question_people_and_spaces_but_no_titles_or_events():
+    seen = []
+    rt = model_runtime('{"kind": "query", "filter": {"user": "sam@contractor.io"}}', seen)
+    rt.brain.ask(Principal("sam@contractor.io", ("contractor",), "Sam", "ui"), AskRequest("Show me the Q3 breach security incident report"))
+    rt.audit.ask(JORDAN, VAGUE)
+    prompt = " ".join(seen[0]).lower()
+    assert "sam@contractor.io" in prompt and "confluence:sec" in prompt and VAGUE in prompt
+    for title_word in ("breach", "runbook", "replica", "postmortem", "q3"):
+        assert title_word not in prompt
+    assert "audit_events" not in prompt and "refused" not in prompt
+
+
+def test_a_document_phrase_is_resolved_locally_never_by_the_model():
+    rt = model_runtime('{"kind": "query", "filter": {"doc_phrase": "Q3 breach report"}, "understood": "who touched it"}')
+    out = rt.audit.ask(JORDAN, "which people looked at that quarterly incident write-up?")
+    assert out["plan"]["filter"] == {"doc": "confluence:SEC/q3-breach-report"} and out["plan"]["source"] == "model:test-model"
+
+
+def test_an_unknown_document_phrase_asks_back():
+    rt = model_runtime('{"kind": "query", "filter": {"doc_phrase": "zebra migration playbook"}}')
+    out = rt.audit.ask(JORDAN, "who read the thing about zebras?")
+    assert out["plan"] is None and "zebra migration playbook" in out["clarify"]
+
+
+def test_a_person_the_model_invents_is_refused_by_the_validator():
+    rt = model_runtime('{"kind": "query", "filter": {"user": "stranger@evil.example"}}')
+    out = rt.audit.ask(JORDAN, VAGUE)
+    assert out["plan"] is None and out["result"] is None and "not one the Brain knows" in out["clarify"]
+
+
+def test_a_model_that_is_down_becomes_a_clarifying_question():
+    rt = model_runtime(RuntimeError("down"))
+    out = rt.audit.ask(JORDAN, VAGUE)
+    assert out["plan"] is None and "not available" in out["clarify"]
+    for garbage in ("not json at all", "[1, 2]", '{"filter": {}}'):
+        assert model_runtime(garbage).audit.ask(JORDAN, VAGUE)["plan"] is None
+
+
+def test_the_plan_logged_says_who_planned_it():
+    rt = model_runtime('{"kind": "query", "filter": {"user": "sam@contractor.io"}}')
+    rt.audit.ask(JORDAN, VAGUE)
+    last = [e for e in rt.audit_store.all() if e["event_type"] == "audit_query"][-1]
+    assert last["detail"]["plan"]["source"] == "model:test-model"
+
+
+def test_the_chat_client_posts_to_chat_completions():
+    import httpx
+
+    from brain.audit.agent import OpenAIChat
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        return httpx.Response(200, json={"choices": [{"message": {"content": "{}"}}]})
+    chat = OpenAIChat("https://tokenhub.example/v1", "k", "hy3", transport=httpx.MockTransport(handler))
+    assert chat.complete("sys", "usr") == "{}"
+    body = json.loads(calls[0].content)
+    assert calls[0].url.path == "/v1/chat/completions" and body["model"] == "hy3" and body["temperature"] == 0
+    assert [m["role"] for m in body["messages"]] == ["system", "user"]
+
+
+def test_the_model_is_off_unless_all_three_settings_are_present():
+    from brain.audit.agent import FallbackPlanner, planner_from_settings
+    assert isinstance(planner_from_settings(Settings()), RulePlanner)
+    assert isinstance(planner_from_settings(Settings(audit_planner_base_url="https://x", audit_planner_model="m")), RulePlanner)
+    full = Settings(audit_planner_base_url="https://x/v1", audit_planner_api_key="k", audit_planner_model="m")
+    assert isinstance(planner_from_settings(full), FallbackPlanner)

@@ -4,6 +4,7 @@ Only the compliance role queries; every query is itself logged. An answer's text
 they may see every document it cites (checked live through the PDP); the hash is always shown. Titles in a replay
 follow the same rule.
 """
+import re
 from datetime import UTC, datetime
 
 from brain.auth import Principal
@@ -11,16 +12,18 @@ from brain.pipeline.graph import Brain
 from brain.policy.pdp import hash_denied
 
 from . import chain
-from .agent import AuditPlan, Clarify, Directory, PlanError, Planner, RulePlanner, space_matches, validate_plan
+from .agent import AuditPlan, Clarify, Directory, PlanError, Planner, planner_from_settings, space_matches, validate_plan
 from .store import AuditStore
 
 CLIENT = "ui"
+TITLE_NOISE = frozenset("the and for with from last".split())
 
 
 class AuditService:
     def __init__(self, store: AuditStore, brain: Brain) -> None:
         self._store = store
         self._brain = brain
+        self.planner: Planner = planner_from_settings(brain.settings)
 
     def record(self, event: dict) -> dict:
         return self._store.append(event)
@@ -66,14 +69,20 @@ class AuditService:
             docs |= {d for d in directory.docs if space_matches(d, f["space"])}
         ids, hashes = docs, {hash_denied(d, salt) for d in docs}
         needs_docs = bool(f.get("space") or f.get("doc"))
+        title_terms = _title_terms(directory.docs.get(f["doc"], "")) if f.get("doc") else set()
         decision, since, until = f.get("decision"), f.get("from"), f.get("to")
 
         def match(e: dict) -> bool:
             decisions = e.get("decisions", [])
+            refused = _refused(e)
             if needs_docs and not any(d.get("doc_id") in ids or d.get("doc_id_hash") in hashes
                                       or (f.get("space") and space_matches(d.get("doc_id", ""), f["space"])) for d in decisions):
+                # A refused question never reached the document, so no decision names it; the words of the question do.
+                if not (refused and title_terms and len(title_terms & _words(e.get("query", {}).get("text", ""))) >= 2):
+                    return False
+            if decision == "allowed" and not any(d.get("allowed") for d in decisions):
                 return False
-            if decision in ("allowed", "denied") and not any(d.get("allowed") is (decision == "allowed") for d in decisions):
+            if decision == "denied" and not (refused or any(d.get("allowed") is False for d in decisions)):
                 return False
             if since and e.get("ts", "") < since:
                 return False
@@ -97,7 +106,7 @@ class AuditService:
         The planner sees the question and the directory (people, spaces, titles), never an audit event. The summary is
         written here from the result, not by a model. A question that cannot be planned comes back as `clarify`."""
         directory = self._directory()
-        planned = (planner or RulePlanner()).plan(question, directory, now or datetime.now(UTC))
+        planned = (planner or self.planner).plan(question, directory, now or datetime.now(UTC))
         plan, clarify = None, None
         if isinstance(planned, Clarify):
             clarify = planned.message
@@ -238,6 +247,19 @@ class AuditService:
         return view
 
 
+def _refused(event: dict) -> bool:
+    """An ask the Brain refused: nothing the person may open matched, so it is a denial as far as they are concerned."""
+    return event.get("event_type") == "ask" and bool((event.get("answer") or {}).get("refused"))
+
+
+def _words(text: str) -> set[str]:
+    return set(re.findall(r"[a-z0-9]+", text.lower()))
+
+
+def _title_terms(title: str) -> set[str]:
+    return {w for w in _words(title) if len(w) >= 3 and w not in TITLE_NOISE}
+
+
 def _space_of(doc_id: str) -> str | None:
     """`confluence:PAY` for a page, `jira:DBMIG` for a ticket, `slack:C_DBMIG` for a thread; None for a Drive file."""
     source, _, rest = doc_id.partition(":")
@@ -263,8 +285,10 @@ def _query_summary(events: list[dict], plan: AuditPlan) -> str:
                 docs.add(d["doc_id"])
     parts = ", ".join(f"{n} {k}" for k, n in sorted(kinds.items(), key=lambda kv: -kv[1]))
     first, last = events[0].get("ts", "")[:19], events[-1].get("ts", "")[:19]
+    refused = sum(_refused(e) for e in events)
     return (f"{len(events)} events ({parts}) between {first} and {last}. "
-            f"Documents opened: {len(docs)}. Access decisions: {allowed} allowed, {denied} denied.")
+            f"Documents opened: {len(docs)}. Access decisions: {allowed} allowed, {denied} denied."
+            + (f" Refused questions: {refused} (the person never reached a document)." if refused else ""))
 
 
 def _time_travel_summary(result: dict) -> str:

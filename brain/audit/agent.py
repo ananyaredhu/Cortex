@@ -8,12 +8,19 @@ summary in plain code, so no model sees audit data and nothing here can write SQ
 dict for `validate_plan`, which is the only door into execution: unknown keys, unknown people or spaces and unreadable times
 are rejected, so a wrong guess becomes a question back to the officer, never a wrong query.
 """
+import json
+import logging
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Protocol
 
+import httpx
+
 from brain.retrieval.hybrid import query_terms
+
+log = logging.getLogger(__name__)
 
 KINDS = ("query", "time_travel", "verify")
 FILTER_KEYS = {"user", "space", "from", "to", "decision", "doc"}
@@ -29,6 +36,9 @@ NOISE = frozenset("""show list find get tell give everything anything accessed a
  any every all from last past previous ago since between during within before after about for the and with into only has have
  been being denied refused blocked rejected unauthorized unauthorised allowed day days week weeks month months hour hours today
  yesterday see could view viewed open opened audit log logs events event query question please was can ask asked asking""".split())
+
+
+HINT = "Try naming a person, a space, a document or a time, for example: what did Priya access in the PAY space last week?"
 
 
 class PlanError(ValueError):
@@ -50,9 +60,11 @@ class AuditPlan:
     user: str | None = None                                      # time_travel
     at: str | None = None                                        # time_travel
     understood: str = ""                                         # the plan in words, shown back to the officer
+    source: str = "rules"                                        # who planned it: "rules" or "model:<name>"
 
     def as_json(self) -> dict:
-        return {"kind": self.kind, "filter": self.filter, "user": self.user, "at": self.at, "understood": self.understood}
+        return {"kind": self.kind, "filter": self.filter, "user": self.user, "at": self.at, "understood": self.understood,
+                "source": self.source}
 
 
 @dataclass
@@ -73,7 +85,7 @@ def iso(moment: datetime) -> str:
 def validate_plan(raw: dict, directory: Directory) -> AuditPlan:
     if not isinstance(raw, dict) or raw.get("kind") not in KINDS:
         raise PlanError(f"the plan's kind must be one of {', '.join(KINDS)}")
-    extra = set(raw) - {"kind", "filter", "user", "at", "understood"}
+    extra = set(raw) - {"kind", "filter", "user", "at", "understood", "source"}
     if extra:
         raise PlanError(f"unknown plan field: {sorted(extra)[0]}")
     flt = raw.get("filter") or {}
@@ -108,7 +120,7 @@ def validate_plan(raw: dict, directory: Directory) -> AuditPlan:
         user, at = user.strip().lower(), _utc(at)
     elif user or at:
         raise PlanError("user and at belong to time_travel plans only")
-    return AuditPlan(raw["kind"], clean, user, at, str(raw.get("understood") or ""))
+    return AuditPlan(raw["kind"], clean, user, at, str(raw.get("understood") or ""), str(raw.get("source") or "rules"))
 
 
 def _utc(value: str) -> str:
@@ -260,3 +272,93 @@ class Window:
     start: str | None = None
     end: str | None = None
     at: str | None = None            # one moment, for time travel
+
+
+# -- the model planner (second chance, when the rules cannot tell) ------------------------------------------------------------
+PLANNER_PROMPT = """You turn a compliance officer's audit question into one JSON plan. Reply with JSON only, no prose:
+{"kind": "query" | "time_travel" | "verify",
+ "filter": {"user": "<email from the list>", "space": "<space from the list>", "from": "<ISO 8601 UTC>", "to": "<ISO 8601 UTC>",
+            "decision": "allowed" | "denied", "doc_phrase": "<the document's name in the officer's words>"},
+ "user": "<email, time_travel only>", "at": "<ISO 8601 UTC, time_travel only>", "understood": "<the plan in one sentence>"}
+Leave out every filter key the question does not state. Use only people and spaces from the lists. "kind": "query" lists audit
+events, "time_travel" is for what a person could open at a past time, "verify" is for whether the log was tampered with.
+Resolve relative times from the current time. Never invent a person, space or document."""
+
+
+class OpenAIChat:
+    """`complete(system, user)` over any `/chat/completions` endpoint (TokenHub with a Hunyuan model, for example)."""
+
+    def __init__(self, base_url: str, api_key: str, model: str, *, timeout: float = 30.0,
+                 transport: httpx.BaseTransport | None = None) -> None:
+        self.model = model
+        self._client = httpx.Client(base_url=base_url.rstrip("/"), timeout=timeout, transport=transport,
+                                    headers={"Authorization": f"Bearer {api_key}"})
+
+    def complete(self, system: str, user: str) -> str:
+        r = self._client.post("/chat/completions", json={"model": self.model, "temperature": 0, "messages": [
+            {"role": "system", "content": system}, {"role": "user", "content": user}]})
+        r.raise_for_status()
+        return r.json()["choices"][0]["message"]["content"]
+
+
+class ModelPlanner:
+    """Asks a model for the plan. The model sees the officer's question, the people's emails, the space names and the time,
+    never a document title (a title may be one the officer may not open) and never an audit event. It names a document only
+    as a phrase, which the rule planner resolves here, locally. Whatever it returns still goes through `validate_plan`."""
+
+    def __init__(self, complete: Callable[[str, str], str], model: str) -> None:
+        self._complete = complete
+        self._model = model
+
+    def plan(self, question: str, directory: Directory, now: datetime) -> AuditPlan | Clarify:
+        context = {"now": iso(now), "people": sorted(directory.people), "spaces": sorted(directory.spaces)}
+        try:
+            reply = self._complete(PLANNER_PROMPT, f"Lists: {json.dumps(context)}\nQuestion: {question}")
+            raw = _json_object(reply)
+        except Exception as exc:                                  # noqa: BLE001 - a model failure is a clarifying question, not an error
+            log.warning("audit planner model failed: %s", type(exc).__name__)
+            return Clarify("I could not tell what you meant, and the language model I use for that is not available. " + HINT)
+        flt = dict(raw.get("filter") or {}) if isinstance(raw.get("filter"), dict) else {}
+        phrase = flt.pop("doc_phrase", None)
+        if isinstance(phrase, str) and phrase.strip():
+            found = RulePlanner._docs(phrase, phrase.lower(), directory)
+            if not found:
+                return Clarify(f"I could not find a document called '{phrase.strip()}'.")
+            flt["doc"] = found[0]
+        raw = {**raw, "filter": flt, "source": f"model:{self._model}"}
+        raw.pop("doc_phrase", None)
+        try:
+            return AuditPlan(raw["kind"], flt, raw.get("user"), raw.get("at"), str(raw.get("understood") or ""), raw["source"])
+        except KeyError:
+            return Clarify("I could not tell what you meant. " + HINT)
+
+
+def _json_object(text: str) -> dict:
+    start, end = text.find("{"), text.rfind("}")
+    if start < 0 or end <= start:
+        raise ValueError("no JSON object")
+    value = json.loads(text[start:end + 1])
+    if not isinstance(value, dict):
+        raise ValueError("not an object")
+    return value
+
+
+class FallbackPlanner:
+    """The rules first; the model only when the rules ask the officer to rephrase."""
+
+    def __init__(self, first: Planner, second: Planner) -> None:
+        self._first, self._second = first, second
+
+    def plan(self, question: str, directory: Directory, now: datetime) -> AuditPlan | Clarify:
+        planned = self._first.plan(question, directory, now)
+        if not isinstance(planned, Clarify):
+            return planned
+        return self._second.plan(question, directory, now)       # its message, if it also gives up, says more than the rules' hint
+
+
+def planner_from_settings(settings) -> Planner:
+    """Rules alone, or rules then a model when `AUDIT_PLANNER_BASE_URL`, `_API_KEY` and `_MODEL` are all set."""
+    if settings.audit_planner_base_url and settings.audit_planner_api_key and settings.audit_planner_model:
+        chat = OpenAIChat(settings.audit_planner_base_url, settings.audit_planner_api_key, settings.audit_planner_model)
+        return FallbackPlanner(RulePlanner(), ModelPlanner(chat.complete, settings.audit_planner_model))
+    return RulePlanner()
