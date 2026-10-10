@@ -9,6 +9,9 @@ from connectors.env import load_dotenv
 
 POLICY_VERSION = "pol-0.1"
 REFUSAL = "I couldn't find anything you have access to about that."
+ABSTAIN = "I found sources you can see, but none of them supports an answer to that."
+UNAVAILABLE = ("The answer service is temporarily unavailable, so I could not write an answer from the sources you can see. "
+               "Please try again in a moment.")       # shown only when evidence exists, so it reveals nothing hidden
 SOURCES = ("confluence", "jira", "slack", "gdrive")
 ADMIN_ROLES = frozenset({"security-lead", "compliance"})
 COMPLIANCE_ROLE = "compliance"

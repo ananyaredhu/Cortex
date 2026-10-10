@@ -23,6 +23,7 @@ class Generated:
     claims: list[dict] = field(default_factory=list)   # {"text": str, "citations": [doc_id]}
     abstained: bool = False
     model: str = "template"
+    unavailable: bool = False      # the model could not be reached or its reply was unreadable: a failure, not a judgment
 
 
 class Generator(Protocol):
@@ -68,8 +69,8 @@ class OpenAICompatibleGenerator:
             claims = [{"text": str(c.get("text", "")), "citations": [str(d) for d in c.get("citations", [])]}
                       for c in data.get("claims", []) if isinstance(c, dict)]
             return Generated(str(data.get("answer", "")), claims, abstained=not claims, model=self.model)
-        except (httpx.HTTPError, KeyError, ValueError, TypeError):
-            return Generated("", [], abstained=True, model=self.model)
+        except (httpx.HTTPError, KeyError, ValueError, TypeError, AttributeError):
+            return Generated("", [], abstained=True, model=self.model, unavailable=True)
 
 
 def generator_from_settings(settings) -> Generator:

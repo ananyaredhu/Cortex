@@ -32,6 +32,7 @@ Response:
                  "why_visible": ["role:DBMIG:developer"], "excerpt": "Database migration cutover is blocked ..."}],
   "refused": false,
   "abstained": false,
+  "generator_unavailable": false,
   "freshness": {"oldest_source_as_of": "...", "stale_refetched": 0,
                 "per_source": {"jira": {"last_sync": "2026-10-10T14:03:00Z", "status": "ok"}}},
   "skill": "status-and-blockers",
@@ -53,6 +54,10 @@ Fields added in 0.2 (all optional):
 - `clarify`: `{"question": "...", "options": ["...", "..."]}` when the question is ambiguous between things the asker may see; then `answer` is empty and `refused` is false. Options are built only from allowed documents.
 
 Refusal: `{ "refused": true, "answer": "I couldn't find anything you have access to about that.", "claims": [], "citations": [] }`, with every 0.2 field present in the same shape (`coverage` shows `shown: 0` for each searched source). Same shape and similar timing for forbidden and nonexistent content. No counts, no titles.
+
+`generator_unavailable` *(0.2, optional)*: `true` only when sources the asker may see were found but the answer service failed (unreachable, throttled, or an unreadable reply). Then `answer` is the fixed message "The answer service is temporarily unavailable ...", `claims` and `citations` are empty, `refused` and `abstained` are `false`, and `grounding` is `null`. It is `false` in every other case, refusals included, so the field is always present. It can never be `true` for a refusal, because with no evidence the generator is not asked: a forbidden and a nonexistent document stay identical. `abstained` keeps its meaning: the model answered and nothing it could cite supports an answer.
+
+`answer` is the verified claims rendered as text (`"Here is what I found:\n- ..."`), never the model's free-text prose.
 
 ## `POST /v1/ask/stream` *(0.2, optional)*
 Same request as `/v1/ask`. Server-sent events, so the UI can show real pipeline progress instead of a timed animation:

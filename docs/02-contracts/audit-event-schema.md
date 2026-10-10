@@ -38,9 +38,11 @@ The log must be **tamper-evident**, **complete** (who, what, retrieved IDs, fina
     "sha256": "sha256:...",
     "citations": ["jira:DBMIG-142", "slack:C123/1728..."],
     "refused": false,
+    "abstained": false,
+    "unavailable": false,
     "acl_label": ["user:priya@companya.com"]
   },
-  "checks": {"deterministic": "pass", "grounding_model": "pass", "leak_scan": "clean"},
+  "checks": {"deterministic": "pass", "generator": "ok", "grounding_model": "pass", "leak_scan": "clean"},
   "models": {"generator": "deepseek-v3", "checker": "minicheck-...", "embedding": "bge-m3@1"},
   "latency_ms": 2310,
   "prev_hash": "sha256:...",
