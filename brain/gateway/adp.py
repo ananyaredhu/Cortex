@@ -21,7 +21,7 @@ from collections.abc import Iterable
 
 import httpx
 
-from .models import SYSTEM_PROMPT, Generated
+from .models import Generated, system_prompt
 
 DEFAULT_CHAT_URL = "https://wss.lke.tencentcloud.com/adp/v2/chat"
 TRANSIENT = {460011, 460020, 460031}       # model QPM limit, model timeout, application QPS limit: worth one retry
@@ -52,7 +52,7 @@ class AdpGenerator:
             "AppKey": self._app_key,
             "VisitorId": "internal-brain",
             "Contents": [{"Type": "text", "Text": json.dumps(packet, ensure_ascii=False)}],
-            "SystemRole": SYSTEM_PROMPT,
+            "SystemRole": system_prompt(packet),
             "Stream": "enable",
             "Incremental": True,
             "SearchNetwork": "disable",

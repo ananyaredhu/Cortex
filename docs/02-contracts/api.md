@@ -140,6 +140,7 @@ Stale-answer alerts: answers the user received whose sources changed afterwards 
 Simulator admin endpoints (owned by A) to revoke a permission, restrict a page, edit a document, and add or remove hidden documents (for Leak-CI). Documented in `simulators/README.md`. The stub API has its own: `/sim/advance`, `/sim/reset`, `/sim/tamper`.
 
 ## Changelog
+- 0.2, 11 Oct: `skill` in the `/ask` response is the skill the Brain selected (`null` for the default procedure), not an echo of `skill_hint`. A follow-up in a `conversation_id` of the caller's own is understood from its earlier turns; someone else's or an unknown `conversation_id` behaves as no conversation.
 - 0.2, 10 Oct: `/audit/time-travel` implemented (response above).
 - 0.2, 10 Oct: `citations[].via_link_from` (link-edge expansion).
 - 0.2, 10 Oct: `/leakci/latest` serves the scoreboard file Leak-CI writes, with an optional `target`; summary fields only.
