@@ -28,7 +28,7 @@ from brain.gateway.models import Generated, Generator
 from brain.policy.identity import AskerIdentity, IdentityResolver
 from brain.policy.labels import acl_label, may_serve
 from brain.policy.leakscan import DeniedDoc
-from brain.policy.pdp import PDP, Decision, hash_denied
+from brain.policy.pdp import PDP, Decision, hash_denied, source_of
 from brain.retrieval import Candidate, IndexReader, hybrid_search, query_terms
 from connectors.base import Connector, DocumentNotFound
 from connectors.ingestion.embedding import Embedder
@@ -347,6 +347,83 @@ class Brain:
                                                                 "no_identity": "no identity on that platform",
                                                                 "error": "connector error: fail closed"}.get(d.reason, d.reason)
         return {"allowed": d.allowed, "rule": rule, "proof_path": list(d.proof_path), "policy_version": d.policy_version}
+
+    # -- search and get_source: the same checks as `ask`, with no model in the loop (used by the MCP server) ---------------
+    def _pad(self, started: float) -> None:
+        """Hold a reply back to `floor_latency_ms`, so a forbidden and a nonexistent document take alike (as `ask` does)."""
+        remaining = self.settings.floor_latency_ms / 1000 - (time.monotonic() - started)
+        if remaining > 0:
+            time.sleep(remaining)
+
+    def _log_tool(self, principal: Principal, event_type: str, text: str, decisions: list[Decision], extra: dict, started: float) -> str:
+        request_id = f"{event_type[:4]}_{uuid.uuid4().hex[:8]}"
+        self.audit.append({
+            "request_id": request_id, "event_type": event_type,
+            "actor": {"user_id": principal.email, "roles": list(principal.roles), "client": principal.client},
+            "query": {"text": text, "skill": None},
+            "decisions": [d.audit_view(self.settings.denied_id_salt) for d in decisions], **extra,
+            "flags": [], "latency_ms": int((time.monotonic() - started) * 1000)})
+        return request_id
+
+    def search(self, principal: Principal, query: str, *, sources: list[str] | None = None, limit: int = 5) -> list[dict]:
+        """Documents the person may read that match `query`: the access prefilter, then the live check on every candidate,
+        then a cleaned snippet. Nothing is said about what was filtered out, and an empty list means "nothing you can see"."""
+        started = time.monotonic()
+        limit = max(1, min(int(limit), 10))
+        asker = self.resolver.resolve(principal.email)
+        wanted = [src for src in self.settings.sources
+                  if (not sources or src in sources) and src in asker.identities and src not in asker.unavailable]
+        terms = query_terms(query)
+        vector = model = None
+        if self.embedder is not None and self.embedder.model not in ("none",):
+            try:
+                vector, model = self.embedder.embed([query])[0], self.embedder.model
+            except Exception:                        # noqa: BLE001 - the keyword leg still runs
+                vector = None
+        candidates = hybrid_search(self.index, query, asker.tokens, wanted, vector=vector, model=model, candidates=limit * 2,
+                                   max_distance=self.settings.max_vector_distance)
+        decisions = self.pdp.check_many(asker, [(c.doc_id, self._indexed_version(c.doc_id)) for c in candidates])
+        allowed = {d.doc_id: d for d in decisions if d.allowed}
+        hits: list[dict] = []
+        for c in candidates:
+            row, chunks = self.index.document(c.doc_id), self.index.chunks_of(c.doc_id)
+            if c.doc_id not in allowed or row is None or not chunks:
+                continue
+            text = " ".join(ch.text for ch in chunks if ch.chunk_id in c.chunk_ids) or chunks[0].text
+            clean, flags = packetlib.sanitize(packetlib.snippet(text, terms))
+            hits.append({"doc_id": c.doc_id, "title": row.title, "url": row.url, "source": row.source, "as_of": row.updated_at,
+                         "snippet": clean, "why_visible": list(allowed[c.doc_id].proof_path), "flags": flags})
+            if len(hits) == limit:
+                break
+        self._log_tool(principal, "search", query, decisions, {"result": {"doc_ids": [h["doc_id"] for h in hits]}}, started)
+        return hits
+
+    def get_source(self, principal: Principal, doc_id: str, *, max_chars: int = 8000) -> dict | None:
+        """One document's text, or None. A forbidden and a nonexistent document give the same None after the same delay.
+        The text is read live from the source when it can be (so it is current) and cleaned of instruction-like sentences."""
+        started = time.monotonic()
+        asker = self.resolver.resolve(principal.email)
+        decision = self.pdp.check(asker, doc_id, self._indexed_version(doc_id))
+        result = None
+        if decision.allowed:
+            row, chunks = self.index.document(doc_id), self.index.chunks_of(doc_id)
+            title, url, as_of = (row.title, row.url, row.updated_at) if row else (doc_id, "", None)
+            text = " ".join(ch.text for ch in chunks)
+            connector = self.connectors.get(source_of(doc_id))
+            try:
+                if connector is not None:
+                    live = connector.fetch(doc_id)
+                    title, url, as_of, text = live.title, live.url, live.updated_at, live.body
+            except Exception:                        # noqa: BLE001 - keep the indexed copy, which the PDP allowed
+                pass
+            if text:
+                clean, flags = packetlib.sanitize(" ".join(text.split()))
+                result = {"doc_id": doc_id, "title": title, "url": url, "source": source_of(doc_id), "as_of": as_of,
+                          "text": clean[:max_chars], "truncated": len(clean) > max_chars,
+                          "why_visible": list(decision.proof_path), "flags": flags}
+        self._log_tool(principal, "get_source", f"get_source {'allowed' if result else 'refused'}", [decision], {}, started)
+        self._pad(started)
+        return result
 
     def visible_documents(self, principal: Principal, source: str | None = None, limit: int = 100) -> list:
         """Index rows the person may read right now: prefilter, then the live check on each."""
