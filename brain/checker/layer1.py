@@ -31,12 +31,17 @@ class CheckResult:
         return {"score": round(len(self.claims) / total, 2), "removed_claims": self.removed_claims}
 
 
+def render_answer(claims: list[dict]) -> str:
+    """The answer text a client receives: the verified claims and nothing else. Empty when there are none."""
+    return ("Here is what I found:\n" + "\n".join(f"- {c['text']}" for c in claims)) if claims else ""
+
+
 def check(generated: Generated, allowed_doc_ids: set[str], denied: list[DeniedDoc]) -> CheckResult:
     kept = [c for c in generated.claims if c.get("citations") and set(c["citations"]) <= allowed_doc_ids]
     removed = len(generated.claims) - len(kept)
-    answer = generated.answer
-    if removed or not kept:
-        answer = ("Here is what I found:\n" + "\n".join(f"- {c['text']}" for c in kept)) if kept else ""
+    # Fix F10: the model's own `answer` prose is never passed on. Only claims are checked (citations, leak scan,
+    # grounding), so the text a client such as WorkBuddy shows is rebuilt from the claims that passed.
+    answer = render_answer(kept)
     hits = scan(answer + " " + " ".join(c["text"] for c in kept), denied) if (answer or kept) else []
     if hits:
         return CheckResult("", [], removed + len(kept), hits, abstained=True)

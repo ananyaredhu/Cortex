@@ -16,6 +16,8 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Protocol
 
+from .layer1 import render_answer
+
 SUPPORTED_LABELS = ("entail", "support", "label_1", "1", "consistent")
 
 
@@ -138,9 +140,6 @@ def check_layer2(claims: list[dict], evidence_text: dict[str, str], scorer: Grou
 
 
 def rebuild_answer(answer: str, kept: Iterable[dict], removed: int) -> str:
-    kept = list(kept)
-    if not kept:
-        return ""
-    if not removed:
-        return answer
-    return "Here is what I found:\n" + "\n".join(f"- {c['text']}" for c in kept)
+    """The answer text for the claims that survived. `answer` and `removed` are kept for the callers' signature:
+    since fix F10 the text is always rebuilt from the verified claims, never passed through."""
+    return render_answer(list(kept))

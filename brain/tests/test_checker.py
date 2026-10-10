@@ -37,9 +37,9 @@ def test_a_claim_citing_text_we_do_not_have_is_unsupported():
     assert out.claims == [] and out.removed_claims == 1
 
 
-def test_rebuild_answer_only_when_claims_were_removed():
+def test_rebuild_answer_always_uses_the_verified_claims_never_the_prose():
     kept = [{"text": "one", "citations": ["x"]}]
-    assert rebuild_answer("prose", kept, 0) == "prose"
+    assert rebuild_answer("prose", kept, 0) == "Here is what I found:\n- one"      # fix F10: prose is never passed through
     assert rebuild_answer("prose", kept, 1) == "Here is what I found:\n- one"
     assert rebuild_answer("prose", [], 2) == ""
     assert Layer2Result([], 0, [], "none", skipped=True).status == "skipped"
