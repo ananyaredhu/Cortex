@@ -42,7 +42,7 @@ class Settings:
     audit_signing_key: str | None = None      # Ed25519 seed, hex; None = ephemeral key for this process
     checkpoint_every: int = 100
     identity_ttl_s: float = 60.0
-    baseline_interval_s: float = 300.0        # how often every known person's token set is re-recorded (time-travel history)
+    baseline_interval_s: float = 1800.0       # how often every known person's token set is re-recorded (time-travel history)
     decision_ttl_s: float = 15.0
     floor_latency_ms: int = 300               # every /ask takes at least this long: uniform timing
     candidates: int = 8                       # documents retrieved before the just-in-time check
@@ -83,6 +83,7 @@ class Settings:
             denied_id_salt=env("AUDIT_DENIED_SALT") or cls.denied_id_salt,
             audit_signing_key=env("AUDIT_SIGNING_KEY") or None,
             floor_latency_ms=int(env("BRAIN_FLOOR_LATENCY_MS") or cls.floor_latency_ms),
+            baseline_interval_s=float(env("BRAIN_BASELINE_INTERVAL_S") or cls.baseline_interval_s),
             generator_backend=(env("GENERATOR_BACKEND") or cls.generator_backend).strip().lower(),
             generator_base_url=env("GENERATOR_BASE_URL") or None,
             generator_api_key=env("GENERATOR_API_KEY") or None,
