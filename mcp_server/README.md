@@ -21,6 +21,7 @@ A 64-character key: `.venv/bin/python -c "import secrets; print(secrets.token_he
 ## Connect a client
 1. Get a token: `curl -s -X POST http://localhost:8000/idp/token -H "Content-Type: application/json" -d '{"persona":"jordan"}'`. It lasts `BRAIN_MOCK_IDP_TTL_S` seconds (900 by default; raise it for a long demo).
 2. Put the `access_token` in an environment variable (`BRAIN_TOKEN`), never in a file you commit.
+   CodeBuddy's `codebuddy mcp add-json` expands `${BRAIN_TOKEN}` while saving and writes the real token into `.mcp.json`. Add the server without the variable set, or edit the file afterwards so the header reads `Bearer ${BRAIN_TOKEN}` again (checked: `grep -c eyJ ~/.codebuddy/.mcp.json` must print 0).
 3. Point the client at `http://localhost:8000/mcp` with the header `Authorization: Bearer ${BRAIN_TOKEN}`. CodeBuddy's `.mcp.json` example is in the contract.
 
 ## Settings
