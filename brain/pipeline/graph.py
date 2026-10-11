@@ -351,7 +351,8 @@ class Brain:
                                      skill.name if skill else None, state["evidence"],
                                      per_source_quota=self.settings.per_source_quota,
                                      max_evidence=skill.max_evidence if skill else self.settings.max_evidence,
-                                     procedure=skill.procedure if skill else None, history=state.get("history"))
+                                     procedure=skill.procedure if skill else None, history=state.get("history"),
+                                     standalone=state["search_query"] if state.get("rewritten") else None)
         flags = sorted({f for e in pkt["evidence"] for f in e["flags"]})
         return {"packet": pkt, "generated": self.generator.generate(pkt), "flags": flags}
 
