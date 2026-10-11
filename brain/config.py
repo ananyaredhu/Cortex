@@ -99,6 +99,8 @@ class Settings:
             audit_head_path=env("AUDIT_HEAD_PATH") or None,
             audit_head_adopt=env("AUDIT_HEAD_ADOPT") == "1",
             baseline_interval_s=float(env("BRAIN_BASELINE_INTERVAL_S") or cls.baseline_interval_s),
+            identity_ttl_s=float(env("BRAIN_IDENTITY_TTL_S") or cls.identity_ttl_s),
+            decision_ttl_s=float(env("BRAIN_DECISION_TTL_S") or cls.decision_ttl_s),
             audit_planner_base_url=env("AUDIT_PLANNER_BASE_URL") or None,
             audit_planner_api_key=env("AUDIT_PLANNER_API_KEY") or None,
             audit_planner_model=env("AUDIT_PLANNER_MODEL") or None,
