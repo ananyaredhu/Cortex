@@ -149,7 +149,7 @@ def test_the_api_serves_the_scoreboard_leakci_wrote(tmp_path):
     settings = Settings(floor_latency_ms=0, dev_auth=True, leakci_scoreboard=str(board_path))
     client = TestClient(create_app(fixture_runtime(settings)))
     empty = client.get("/v1/leakci/latest", headers=H("dana")).json()
-    assert empty["cases"] == 0 and empty["leaks"] == 0 and empty["suites"] == []
+    assert empty["cases"] == 0 and empty["leaks"] is None and empty["suites"] == [] and empty["status"] == "not_run"   # F7
 
     write_scoreboard({"as_of": "2026-10-09T20:00:00Z", "target": "fixture", "cases": 6, "leaks": 0, "failed": 0,
                       "suites": [{"name": "Hidden document planted", "category": "noninterference", "passed": 5, "failed": 0,
@@ -157,5 +157,6 @@ def test_the_api_serves_the_scoreboard_leakci_wrote(tmp_path):
                       "details": [{"case": "x", "checks": [{"note": "LEAKCI-CANARY-0123456789abcdef"}]}]}, board_path)
     served = client.get("/v1/leakci/latest", headers=H("dana")).json()
     assert served["cases"] == 6 and served["leaks"] == 0 and served["suites"][0]["name"] == "Hidden document planted"
+    assert served["status"] == "ok"
     assert "details" not in served and not CANARY.search(json.dumps(served))   # the API serves the summary, never the notes
     assert client.get("/v1/leakci/latest", headers=H("priya")).status_code == 403
