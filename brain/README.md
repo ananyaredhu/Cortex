@@ -9,6 +9,8 @@ Workstream B. The query path of [01-architecture](../docs/01-architecture.md) as
 make brain-api              # the real thing: Postgres index, simulators, real Slack and Drive from .env, bge-m3, :8000
 make brain-api-fixture      # the real pipeline over the fixture corpus: no database, no model; /sim/advance applies e1 and e2
 python -m brain.timing      # revocation-to-enforcement timing, B's stage on top of A's script
+python -m brain.relevance.run   # retrieval relevance as the corpus grows to 12,000 pages (needs the local Postgres); ADR-006
+python -m brain.projects.suggest --fixture   # proposals for the project registry; changes nothing
 ```
 Auth is `Authorization: Bearer dev:<persona>` while `BRAIN_DEV_AUTH` is not `0`, or a JWT (HS256, `JWT_SIGNING_KEY`,
 claims `sub`, `email`, `roles`, `aud`). The UI switches from the stub to this with `API_TARGET`.
