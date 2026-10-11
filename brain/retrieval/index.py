@@ -17,6 +17,7 @@ import psycopg
 from connectors.ingestion.store import ChunkRow, InMemoryStore
 
 WORD = re.compile(r"[a-z0-9]+")
+TITLE_TERM = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")        # a title term may be a ticket key: dbmig-150
 
 
 @dataclass(frozen=True)
@@ -44,6 +45,7 @@ class Hit:
 class IndexReader(Protocol):
     def vector_search(self, source: str, vector: list[float], model: str, tokens: list[str], k: int) -> list[Hit]: ...
     def keyword_search(self, source: str, terms: list[str], tokens: list[str], k: int) -> list[Hit]: ...
+    def title_search(self, source: str, terms: list[str], tokens: list[str], k: int) -> list[Hit]: ...
     def document(self, doc_id: str) -> DocRow | None: ...
     def chunks_of(self, doc_id: str) -> list[ChunkRow]: ...
     def documents_visible(self, tokens: list[str], source: str | None = None, limit: int = 200) -> list[DocRow]: ...
@@ -51,6 +53,13 @@ class IndexReader(Protocol):
     def parents_visible(self, tokens: list[str]) -> set[str]: ...
     def documents_under(self, parents: list[str], tokens: list[str], limit: int = 10) -> list[DocRow]: ...
     def documents_all(self) -> list[DocRow]: ...
+
+
+def _title_match(term: str, stems: set[str], words: set[str]) -> bool:
+    """A plain term matches a title word; a key like `dbmig-150` needs every part of it in the title."""
+    if "-" in term:
+        return all(_stem(part) in words for part in term.split("-"))
+    return _stem(term) in words and _stem(term) in stems
 
 
 def _stem(word: str) -> str:
@@ -64,6 +73,7 @@ def _stem(word: str) -> str:
 class MemoryIndex:
     def __init__(self, store: InMemoryStore) -> None:
         self._store = store
+        self.title_leg = True
 
     def _rows(self, source: str | None, tokens: list[str]) -> list[ChunkRow]:
         held = set(tokens)
@@ -89,6 +99,23 @@ class MemoryIndex:
             if matched:
                 hits.append(Hit(c.chunk_id, c.doc_id, float(matched)))
         return sorted(hits, key=lambda h: (-h.score, h.chunk_id))[:k]
+
+    def title_search(self, source: str, terms: list[str], tokens: list[str], k: int) -> list[Hit]:
+        """Documents whose title holds the terms (ticket keys, names): a document's title is not in its chunks (T10)."""
+        stems = {_stem(t) for t in terms}
+        held = {c.doc_id: c for c in self._rows(source, tokens)}
+        terms = [t for t in terms if TITLE_TERM.fullmatch(t)]
+        hits = []
+        for doc_id, chunk in held.items():
+            row = self._store.documents.get(doc_id)
+            if row is None or row.get("deleted"):
+                continue
+            words = {_stem(w) for w in WORD.findall((row["title"] or "").lower())}
+            matched = sum((2 if "-" in t else 1) for t in terms if _title_match(t, stems, words))
+            if matched:
+                first = min((c for c in self._store.chunks_of(doc_id)), key=lambda c: c.position, default=chunk)
+                hits.append(Hit(first.chunk_id, doc_id, float(matched)))
+        return sorted(hits, key=lambda h: (-h.score, h.doc_id))[:k]
 
     def document(self, doc_id: str) -> DocRow | None:
         row = self._store.documents.get(doc_id)
@@ -141,10 +168,20 @@ SELECT chunk_id, doc_id, distance FROM relaxed ORDER BY distance
 KEYWORD_SQL = """
 SELECT chunk_id, doc_id,
        (SELECT count(*) FROM unnest(%(terms)s::text[]) AS t WHERE tsv @@ plainto_tsquery('english', t)) AS matched,
-       ts_rank_cd(tsv, to_tsquery('english', %(orq)s)) AS rank
+       ts_rank_cd(tsv, to_tsquery('english', %(orq)s), %(norm)s) AS rank
 FROM chunks
 WHERE tsv @@ to_tsquery('english', %(orq)s) AND acl_tokens && %(tokens)s::text[] AND source = %(source)s
 ORDER BY matched DESC, rank DESC, chunk_id
+LIMIT %(k)s
+"""
+TITLE_SQL = """
+SELECT (SELECT c.chunk_id FROM chunks c WHERE c.doc_id = d.doc_id ORDER BY c.position LIMIT 1) AS chunk_id, d.doc_id,
+       (SELECT coalesce(sum(CASE WHEN t LIKE '%%-%%' THEN 2 ELSE 1 END), 0) FROM unnest(%(terms)s::text[]) AS t
+         WHERE to_tsvector('english', d.title) @@ plainto_tsquery('english', t)) AS matched
+FROM documents d
+WHERE NOT d.deleted AND d.source = %(source)s AND to_tsvector('english', d.title) @@ to_tsquery('english', %(orq)s)
+  AND EXISTS (SELECT 1 FROM chunks c WHERE c.doc_id = d.doc_id AND c.acl_tokens && %(tokens)s::text[])
+ORDER BY matched DESC, d.doc_id
 LIMIT %(k)s
 """
 DOC_COLUMNS = "doc_id, source, kind, title, url, parent_id, links, author, updated_at, version, deleted"
@@ -160,6 +197,8 @@ class PostgresIndex:
         """
         self._conn = conn
         self._lock = threading.Lock()
+        self.rank_normalization = 0          # ts_rank_cd's normalization bit mask; 2 (divide by length) measured no gain with the title leg
+        self.title_leg = True                # also search titles, which are not in the chunks (T10)
 
     @classmethod
     def connect(cls, url: str) -> "PostgresIndex":
@@ -178,8 +217,16 @@ class PostgresIndex:
         if not terms:
             return []
         rows = self._conn.execute(KEYWORD_SQL, {"terms": terms, "orq": " | ".join(terms), "tokens": list(tokens),
-                                                "source": source, "k": k}).fetchall()
+                                                "source": source, "k": k, "norm": self.rank_normalization}).fetchall()
         return [Hit(r[0], r[1], float(r[2])) for r in rows]
+
+    def title_search(self, source: str, terms: list[str], tokens: list[str], k: int) -> list[Hit]:
+        terms = [t for t in terms if TITLE_TERM.fullmatch(t)]
+        if not terms:
+            return []
+        rows = self._conn.execute(TITLE_SQL, {"terms": terms, "orq": " | ".join(terms), "tokens": list(tokens), "source": source,
+                                              "k": k}).fetchall()
+        return [Hit(r[0], r[1], float(r[2])) for r in rows if r[0]]
 
     @staticmethod
     def _doc(r) -> DocRow:

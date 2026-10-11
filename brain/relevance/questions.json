@@ -1,0 +1,408 @@
+{
+ "version": 1,
+ "note": "43 questions with known relevant documents in Company A. The generated corpus is filler, so by construction it holds nothing relevant. 'relevant' lists every document that answers or helps answer the question; a question counts as found when at least one of them is a candidate (hit) and recall is the share of them that are.",
+ "questions": [
+  {
+   "id": "db-status",
+   "persona": "priya",
+   "question": "What's the status of the database migration cutover?",
+   "relevant": [
+    "jira:DBMIG-142"
+   ],
+   "kind": "natural"
+  },
+  {
+   "id": "db-why-blocked",
+   "persona": "priya",
+   "question": "Why is the cutover blocked?",
+   "relevant": [
+    "jira:DBMIG-142",
+    "slack:C_DBMIG/thread-1"
+   ],
+   "kind": "natural"
+  },
+  {
+   "id": "db-lag",
+   "persona": "priya",
+   "question": "replica lag threshold for the migration",
+   "relevant": [
+    "jira:DBMIG-142"
+   ],
+   "kind": "keyword"
+  },
+  {
+   "id": "db-150",
+   "persona": "priya",
+   "question": "what is DBMIG-150 about",
+   "relevant": [
+    "jira:DBMIG-150"
+   ],
+   "kind": "key"
+  },
+  {
+   "id": "db-tuning",
+   "persona": "priya",
+   "question": "Which ticket tracks the replication tuning?",
+   "relevant": [
+    "jira:DBMIG-150",
+    "jira:DBMIG-142"
+   ],
+   "kind": "natural"
+  },
+  {
+   "id": "db-blockers-slack",
+   "persona": "priya",
+   "question": "What blockers were raised in the migration channel last week?",
+   "relevant": [
+    "slack:C_DBMIG/thread-1"
+   ],
+   "kind": "natural"
+  },
+  {
+   "id": "db-snapshot",
+   "persona": "priya",
+   "question": "staging snapshot restore too slow",
+   "relevant": [
+    "slack:C_DBMIG/thread-1"
+   ],
+   "kind": "keyword"
+  },
+  {
+   "id": "db-owner",
+   "persona": "priya",
+   "question": "Who owns the blocker for the database cutover?",
+   "relevant": [
+    "jira:DBMIG-142"
+   ],
+   "kind": "paraphrase"
+  },
+  {
+   "id": "db-target",
+   "persona": "priya",
+   "question": "When should the replication tuning be finished?",
+   "relevant": [
+    "jira:DBMIG-150"
+   ],
+   "kind": "paraphrase"
+  },
+  {
+   "id": "db-leads-delay",
+   "persona": "maya",
+   "question": "Are the leads thinking about delaying the cutover?",
+   "relevant": [
+    "slack:C_DBMIGPRIV/thread-1"
+   ],
+   "kind": "natural"
+  },
+  {
+   "id": "db-leads-budget",
+   "persona": "maya",
+   "question": "What else could stop the migration besides replica lag, like budget or vendors?",
+   "relevant": [
+    "slack:C_DBMIGPRIV/thread-1"
+   ],
+   "kind": "paraphrase"
+  },
+  {
+   "id": "pay-runbook",
+   "persona": "priya",
+   "question": "What is the payment-service runbook?",
+   "relevant": [
+    "confluence:PAY/runbook-payment-service"
+   ],
+   "kind": "natural"
+  },
+  {
+   "id": "pay-escalate",
+   "persona": "priya",
+   "question": "Who do I escalate to if payment errors persist?",
+   "relevant": [
+    "confluence:PAY/runbook-payment-service"
+   ],
+   "kind": "paraphrase"
+  },
+  {
+   "id": "pay-restart",
+   "persona": "priya",
+   "question": "How do I restart the payment workers during an incident?",
+   "relevant": [
+    "confluence:PAY/runbook-payment-service"
+   ],
+   "kind": "natural"
+  },
+  {
+   "id": "pay-first",
+   "persona": "priya",
+   "question": "What should I do first when a payment incident starts?",
+   "relevant": [
+    "confluence:PAY/runbook-payment-service"
+   ],
+   "kind": "paraphrase"
+  },
+  {
+   "id": "pay-root",
+   "persona": "priya",
+   "question": "What was the root cause of the payment outage?",
+   "relevant": [
+    "jira:PAYINC-9",
+    "gdrive:postmortem-pay-outage",
+    "slack:C_PAYINC/thread-1"
+   ],
+   "kind": "natural"
+  },
+  {
+   "id": "pay-pool",
+   "persona": "priya",
+   "question": "What happened to the connection pool?",
+   "relevant": [
+    "jira:PAYINC-9",
+    "gdrive:postmortem-pay-outage",
+    "slack:C_PAYINC/thread-1"
+   ],
+   "kind": "paraphrase"
+  },
+  {
+   "id": "pay-followups",
+   "persona": "priya",
+   "question": "Which follow-up tickets came out of the outage?",
+   "relevant": [
+    "jira:PAYINC-10",
+    "jira:PAYINC-11",
+    "jira:PAYINC-9"
+   ],
+   "kind": "natural"
+  },
+  {
+   "id": "pay-breaker",
+   "persona": "priya",
+   "question": "Is the circuit breaker done?",
+   "relevant": [
+    "jira:PAYINC-10"
+   ],
+   "kind": "paraphrase"
+  },
+  {
+   "id": "pay-alerts",
+   "persona": "priya",
+   "question": "Are the connection pool alerts raised yet?",
+   "relevant": [
+    "jira:PAYINC-11"
+   ],
+   "kind": "natural"
+  },
+  {
+   "id": "pay-timeline",
+   "persona": "priya",
+   "question": "When did the payment errors start and when were they mitigated?",
+   "relevant": [
+    "slack:C_PAYINC/thread-1"
+   ],
+   "kind": "paraphrase"
+  },
+  {
+   "id": "pay-postmortem",
+   "persona": "priya",
+   "question": "Where is the postmortem for last quarter's outage?",
+   "relevant": [
+    "gdrive:postmortem-pay-outage"
+   ],
+   "kind": "natural"
+  },
+  {
+   "id": "pay-lessons",
+   "persona": "priya",
+   "question": "What lessons did we learn from the outage?",
+   "relevant": [
+    "gdrive:postmortem-pay-outage"
+   ],
+   "kind": "paraphrase"
+  },
+  {
+   "id": "auth-format",
+   "persona": "priya",
+   "question": "Which token format did we choose for the new auth service?",
+   "relevant": [
+    "confluence:ENG/auth-service-decision",
+    "slack:C_AUTH/thread-1"
+   ],
+   "kind": "natural"
+  },
+  {
+   "id": "auth-why",
+   "persona": "priya",
+   "question": "Why signed JWTs?",
+   "relevant": [
+    "confluence:ENG/auth-service-decision"
+   ],
+   "kind": "paraphrase"
+  },
+  {
+   "id": "auth-lifetime",
+   "persona": "priya",
+   "question": "How long do the auth tokens live?",
+   "relevant": [
+    "confluence:ENG/auth-service-decision"
+   ],
+   "kind": "paraphrase"
+  },
+  {
+   "id": "auth-concerns",
+   "persona": "priya",
+   "question": "What are the open concerns in the auth service threat model?",
+   "relevant": [
+    "slack:C_AUTHPRIV/thread-1"
+   ],
+   "kind": "natural"
+  },
+  {
+   "id": "auth-refresh",
+   "persona": "priya",
+   "question": "Is refresh token storage a problem?",
+   "relevant": [
+    "slack:C_AUTHPRIV/thread-1"
+   ],
+   "kind": "paraphrase"
+  },
+  {
+   "id": "auth-summary",
+   "persona": "priya",
+   "question": "Summarize the auth design discussion from last sprint",
+   "relevant": [
+    "slack:C_AUTH/thread-1",
+    "confluence:ENG/auth-service-decision"
+   ],
+   "kind": "natural"
+  },
+  {
+   "id": "sec-report",
+   "persona": "dana",
+   "question": "Show me the Q3 security incident report",
+   "relevant": [
+    "confluence:SEC/q3-breach-report"
+   ],
+   "kind": "natural"
+  },
+  {
+   "id": "sec-how",
+   "persona": "dana",
+   "question": "How did the breach happen?",
+   "relevant": [
+    "confluence:SEC/q3-breach-report"
+   ],
+   "kind": "paraphrase"
+  },
+  {
+   "id": "sec-remediation",
+   "persona": "dana",
+   "question": "What was the remediation after the breach?",
+   "relevant": [
+    "confluence:SEC/q3-breach-report"
+   ],
+   "kind": "natural"
+  },
+  {
+   "id": "sec-replay",
+   "persona": "dana",
+   "question": "Which vulnerability lets auth tokens be replayed?",
+   "relevant": [
+    "jira:SEC-17"
+   ],
+   "kind": "paraphrase"
+  },
+  {
+   "id": "sec-17",
+   "persona": "dana",
+   "question": "SEC-17",
+   "relevant": [
+    "jira:SEC-17"
+   ],
+   "kind": "key"
+  },
+  {
+   "id": "sam-laptop",
+   "persona": "sam",
+   "question": "How do I get a laptop as a contractor?",
+   "relevant": [
+    "confluence:HR/contractor-onboarding"
+   ],
+   "kind": "natural"
+  },
+  {
+   "id": "sam-review",
+   "persona": "sam",
+   "question": "What are the code review rules for contractors?",
+   "relevant": [
+    "confluence:HR/contractor-onboarding"
+   ],
+   "kind": "natural"
+  },
+  {
+   "id": "sam-sandbox",
+   "persona": "sam",
+   "question": "Where are the vendor sandbox endpoints?",
+   "relevant": [
+    "gdrive:vendor-integration-notes"
+   ],
+   "kind": "natural"
+  },
+  {
+   "id": "sam-accounts",
+   "persona": "sam",
+   "question": "test accounts for the vendor integration",
+   "relevant": [
+    "gdrive:vendor-integration-notes"
+   ],
+   "kind": "keyword"
+  },
+  {
+   "id": "golden-s1",
+   "persona": "maya",
+   "question": "What's the status of the database migration, and were there blockers raised in Slack last week?",
+   "relevant": [
+    "jira:DBMIG-142",
+    "slack:C_DBMIG/thread-1"
+   ],
+   "kind": "golden"
+  },
+  {
+   "id": "golden-s2",
+   "persona": "priya",
+   "question": "What's the latest runbook for payment-service incident failover?",
+   "relevant": [
+    "confluence:PAY/runbook-payment-service"
+   ],
+   "kind": "golden"
+  },
+  {
+   "id": "golden-cto1",
+   "persona": "priya",
+   "question": "What was the root cause of the payment outage last quarter, and what follow-up tickets were created?",
+   "relevant": [
+    "jira:PAYINC-9",
+    "gdrive:postmortem-pay-outage",
+    "jira:PAYINC-10",
+    "jira:PAYINC-11"
+   ],
+   "kind": "golden"
+  },
+  {
+   "id": "golden-cto2",
+   "persona": "priya",
+   "question": "Summarize the design discussion around the new auth service from last sprint's Slack threads and link the Confluence decision doc",
+   "relevant": [
+    "slack:C_AUTH/thread-1",
+    "confluence:ENG/auth-service-decision"
+   ],
+   "kind": "golden"
+  },
+  {
+   "id": "golden-s3",
+   "persona": "priya",
+   "question": "What is the migration status page situation?",
+   "relevant": [
+    "slack:C_DBMIG/thread-2"
+   ],
+   "kind": "golden"
+  }
+ ]
+}

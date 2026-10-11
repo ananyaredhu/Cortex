@@ -39,6 +39,8 @@ CREATE TABLE IF NOT EXISTS chunks (
 -- ACL prefilter: chunk.acl_tokens && asker_tokens
 CREATE INDEX IF NOT EXISTS chunks_acl_gin ON chunks USING gin (acl_tokens);
 CREATE INDEX IF NOT EXISTS chunks_tsv_gin ON chunks USING gin (tsv);
+-- Titles are not in the chunks (they carry ticket keys and names), so retrieval searches them too (brain/retrieval/index.py, T10)
+CREATE INDEX IF NOT EXISTS documents_title_tsv ON documents USING gin (to_tsvector('english', title));
 CREATE INDEX IF NOT EXISTS chunks_doc_idx ON chunks (doc_id);
 CREATE INDEX IF NOT EXISTS chunks_source_idx ON chunks (source);
 CREATE INDEX IF NOT EXISTS chunks_embedding_idx ON chunks USING hnsw (embedding vector_cosine_ops);
