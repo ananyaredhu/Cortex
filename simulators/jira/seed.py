@@ -36,6 +36,7 @@ def seed_company_a(sim: JiraSim, data: dict | None = None) -> None:
             elif kind == "role" and project in sim.projects:
                 sim.add_role_actor(project, name, persona["email"])
 
+    by_name = {p["display_name"]: p["email"] for p in data["personas"]}
     for doc in jira_docs:
         key = doc["doc_id"].split(":", 1)[1]
         project_key = doc["acl"]["native"]["project"]
@@ -49,8 +50,11 @@ def seed_company_a(sim: JiraSim, data: dict | None = None) -> None:
                                    known.users | readers.users)
         sim.set_browse(project_key, project.browse.roles | readers.roles, project.browse.groups | readers.groups,
                        project.browse.users | readers.users)
+        # The issue's own fields (connector-interface 0.4): Jira holds a status and an assignee as fields, not as text.
+        fields = doc.get("fields") or {}
         sim.create_issue(
             project_key, doc["title"], doc["body"], key=key, reporter=doc["author"], security_level=level,
             links=doc["links"], labels=doc.get("tags", []), created_at=doc["created_at"],
             updated_at=doc["updated_at"], version=doc["version"],
+            status=fields.get("status"), assignee=by_name.get(fields.get("assignee")),
         )

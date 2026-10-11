@@ -22,7 +22,9 @@ from brain.audit.chain import sha256_text
 from brain.audit.store import AuditStore
 from brain.auth import Principal
 from brain.checker import CheckResult, GroundingScorer, Layer2Result, check, check_layer2
-from brain.checker.layer2 import rebuild_answer
+from brain.checker.fields import FieldsResult, check_fields
+from brain.checker.layer1 import render_answer
+from brain.checker.layer2 import lead_in, rebuild_answer
 from brain.config import ABSTAIN, POLICY_VERSION, REFUSAL, SOURCES, STAGES, UNAVAILABLE, Settings
 from brain.gateway.models import Generated, Generator
 from brain.pipeline.rewrite import rewrite_query
@@ -83,6 +85,7 @@ class State(TypedDict, total=False):
     packet: dict
     generated: Generated
     checked: CheckResult
+    by_field: FieldsResult
     grounded: Layer2Result
     flags: list[str]
     response: dict
@@ -360,6 +363,7 @@ class Brain:
             connector = self.connectors.get(cand.source)
             text_by_chunk = {c.chunk_id: c.text for c in chunks}
             title, url, as_of, tokens = row.title, row.url, row.updated_at, chunks[0].acl_tokens
+            fields = dict(row.fields)
             refetched = 0
             unverified = False
             try:
@@ -367,6 +371,7 @@ class Brain:
                     doc = connector.fetch(cand.doc_id)
                     text_by_chunk = {f"{cand.doc_id}#0": doc.body}
                     title, url, as_of, tokens = doc.title, doc.url, doc.updated_at, list(doc.acl.tokens)
+                    fields = dict(doc.fields)
                     cand.chunk_ids = [f"{cand.doc_id}#0"]
                     refetched = 1
             except DocumentNotFound:
@@ -376,7 +381,7 @@ class Brain:
             best = [cid for cid in cand.chunk_ids if cid in text_by_chunk] or [chunks[0].chunk_id]
             text = " ".join(text_by_chunk[cid] for cid in best[:2])
             ev = packetlib.make_evidence(best[0], cand.doc_id, cand.source, title, url, text, as_of, tokens, terms, cand.score,
-                                         state.get("linked", {}).get(cand.doc_id))
+                                         state.get("linked", {}).get(cand.doc_id), fields)
             if unverified:
                 ev.flags.append(UNVERIFIED)
             return ev, refetched
@@ -405,14 +410,21 @@ class Brain:
     def _check(self, state: State) -> dict:
         allowed_ids = {e["doc_id"] for e in state["packet"]["evidence"]}
         checked = check(state["generated"], allowed_ids, state["denied_docs"])
+        # Layer 1b (fix F23): what a claim says about a status or an assignee is compared with the field, by code.
+        in_packet = {e.doc_id: e.fields for e in state["evidence"] if e.doc_id in allowed_ids and e.fields}
+        by_field = check_fields(checked.claims, in_packet)
+        if by_field.removed_claims:
+            checked = CheckResult(render_answer(by_field.claims), by_field.claims, checked.removed_claims + by_field.removed_claims,
+                                  checked.leak_hits, abstained=checked.abstained or not by_field.claims)
         evidence_text = {e.doc_id: f"{e.title}. {e.raw}" for e in state["evidence"]}
+        context = {e.doc_id: lead_in(e.source, e.as_of) for e in state["evidence"]}   # packet metadata the generator also saw
         grounded = check_layer2(checked.claims, evidence_text, self.scorer, threshold=self.settings.grounding_threshold,
-                                floor=self.settings.grounding_floor)
+                                floor=self.settings.grounding_floor, context=context)
         if grounded.removed_claims or grounded.lower_confidence:
             checked = CheckResult(rebuild_answer(checked.answer, grounded.claims, grounded.removed_claims), grounded.claims,
                                   checked.removed_claims + grounded.removed_claims, checked.leak_hits,
                                   abstained=checked.abstained or not grounded.claims)
-        return {"checked": checked, "grounded": grounded}
+        return {"checked": checked, "grounded": grounded, "by_field": by_field}
 
     def _finalize(self, state: State) -> dict:
         req, checked, pkt = state["request"], state["checked"], state["packet"]
@@ -494,6 +506,7 @@ class Brain:
                        "unavailable": resp["generator_unavailable"], "acl_label": label},
             "checks": {**checked.status, "leak_scan_docs": len(state["denied_docs"]),
                        "generator": "unavailable" if resp["generator_unavailable"] else "ok",
+                       "fields": state["by_field"].status, "field_mismatches": state["by_field"].mismatches,
                        "grounding_model": state["grounded"].status,
                        "grounding_scores": state["grounded"].scores,
                        "grounding_lower_confidence": state["grounded"].lower_confidence,
@@ -632,10 +645,15 @@ class Brain:
         """Answers whose cited documents changed since, for documents the person may still see.
 
         Rebuilt from the person's own `ask` events, which record the version of every document each answer cited, so alerts
-        survive a restart (fix F16)."""
+        survive a restart (fix F16). Only the person's latest ask of each question counts: once they have asked again, the
+        older answers are superseded, and an alert on them would send them to "ask again" for something they already did
+        (11 Oct, the real-stack run: 85 alerts on My Work, 46 of them for one question asked 46 times)."""
         out = []
         asker = self.resolver.resolve(principal.email)
-        for event in self._asks(principal.email):
+        latest: dict[str, dict] = {}
+        for event in self._asks(principal.email):                    # oldest first, so the last one per question wins
+            latest[" ".join(event["query"]["text"].lower().split())] = event
+        for event in latest.values():
             cited = set((event.get("answer") or {}).get("citations", []))
             versions = {d["doc_id"]: d.get("doc_version") for d in event.get("decisions", [])
                         if d.get("allowed") and d.get("doc_id") in cited}

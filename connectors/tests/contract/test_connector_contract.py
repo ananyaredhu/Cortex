@@ -104,6 +104,10 @@ def test_fetch_and_version_match_seed(conn):
         else:
             assert got.acl.tokens == d["acl"]["tokens"]
         assert got.acl.snapshot_hash.startswith("sha256:")
+        # 0.4: structured fields are strings by name, and say what the seed says (a Jira issue's status and assignee).
+        assert isinstance(got.fields, dict) and all(isinstance(k, str) and isinstance(v, str) for k, v in got.fields.items())
+        for name, value in (d.get("fields") or {}).items():
+            assert got.fields.get(name) == value, (d["doc_id"], name)
 
 
 @pytest.mark.parametrize("persona_id", [p["id"] for p in DATA["personas"]])

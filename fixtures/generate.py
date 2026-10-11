@@ -24,6 +24,17 @@ def canon(obj) -> str:
     return json.dumps(obj, sort_keys=True, separators=(",", ":"))
 
 
+def _fields(source, body):
+    """`Document.fields` (connector-interface 0.4). A fixture issue states its status and assignee once, in its body, as the
+    Jira connector writes them; the structured copy is read from there so the two cannot disagree."""
+    if source != "jira":
+        return {}
+    import re
+    status = re.search(r"\bStatus: ([A-Za-z][A-Za-z ]*[A-Za-z])", body)
+    assignee = re.search(r"\bAssignee: ([A-Za-z][A-Za-z '-]*[A-Za-z])", body)
+    return {k: m.group(1) for k, m in (("status", status), ("assignee", assignee)) if m}
+
+
 def doc(doc_id, source, kind, title, body, parent, tokens, native, links=(), author="system",
         updated=f"{D}T08:00:00Z", version=None, tags=(), created=f"{D}T00:00:00Z"):
     return {
@@ -39,6 +50,7 @@ def doc(doc_id, source, kind, title, body, parent, tokens, native, links=(), aut
         "created_at": created,
         "updated_at": updated,
         "version": version or updated,
+        "fields": _fields(source, body),
         "tags": list(tags),
         "acl": {
             "tokens": list(tokens),

@@ -237,6 +237,8 @@ def mywork(authorization: str | None = Header(None)):
                    for d in vis if d["source"] == "jira"],
         "projects": sorted({d["parent_id"] for d in vis if d["source"] == "jira"}),
         "channels": sorted({d["parent_id"] for d in vis if d["source"] == "slack"}),
+        "channel_names": {d["parent_id"]: d["title"].partition(" thread:")[0] for d in vis
+                          if d["source"] == "slack" and " thread:" in d["title"]},
         "recent_pages": [{"doc_id": d["doc_id"], "title": d["title"], "updated_at": d["updated_at"], "url": d["url"]}
                          for d in sorted((x for x in vis if x["source"] in ("confluence", "gdrive")),
                                          key=lambda x: x["updated_at"], reverse=True)[:5]],
@@ -311,6 +313,41 @@ def audit_query(body: dict, authorization: str | None = Header(None)):
                    "query": {"text": body.get("question") or json.dumps(f, sort_keys=True), "skill": None},
                    "decisions": [], "flags": []})
     return {"events": shown, "count": len(shown)}
+
+
+@app.post("/v1/audit/ask")
+def audit_ask(body: dict, authorization: str | None = Header(None)):
+    """The audit agent's shape (api.md): `{question, plan, clarify, summary, result}`. The stub's planner is three rules: a
+    persona's first name becomes the `user` filter, a Confluence space key in capitals the `space` filter, and "denied" or
+    "refused" the `decision` filter. Anything else comes back with `plan: null` and a `clarify` message. No time travel."""
+    question = body.get("question")
+    if not isinstance(question, str):
+        raise HTTPException(422, "`question` is required")
+    _require(_persona(authorization), {"compliance"})
+    flt: dict = {}
+    notes = []
+    for person in STATE.data["personas"]:
+        if re.search(rf"\b{re.escape(person['id'])}\b", question, re.I):
+            flt["user"] = person["email"]
+            notes.append(f"Events of {person['email']}")
+            break
+    spaces = {d["doc_id"].split(":", 1)[1].split("/", 1)[0] for d in STATE.docs.values() if d["doc_id"].startswith("confluence:")}
+    space = next((k for k in sorted(spaces) if re.search(rf"\b{re.escape(k)}\b", question)), None)
+    if space:
+        flt["space"] = f"confluence:{space}"
+        notes.append(f"touching the {space} space")
+    if re.search(r"\b(denied|refused|blocked)\b", question, re.I):
+        flt["decision"] = "denied"
+        notes.append("with a denied decision")
+    if not flt:
+        return {"question": question, "plan": None, "result": None,
+                "clarify": "Name a person, a Confluence space or a decision (for example: what did Priya access in the PAY space?)."}
+    result = audit_query({"question": question, "filter": flt}, authorization)
+    allowed = sum(d["allowed"] for e in result["events"] for d in e["decisions"])
+    denied = sum(not d["allowed"] for e in result["events"] for d in e["decisions"])
+    plan = {"kind": "query", "filter": flt, "user": None, "at": None, "understood": ", ".join(notes) + ".", "source": "rules"}
+    return {"question": question, "plan": plan, "clarify": None, "result": result,
+            "summary": f"{result['count']} events. Access decisions: {allowed} allowed, {denied} denied."}
 
 
 def _for_officer(event: dict, officer_tokens: set[str]) -> dict:

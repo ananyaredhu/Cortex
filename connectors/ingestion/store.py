@@ -48,6 +48,7 @@ class Indexed:
     embedding_model: str | None        # None when the document has no chunks
     embedding_version: str | None
     updated_at: str | None = None      # the source's time of the indexed version (Document.updated_at)
+    fields: dict | None = None         # Document.fields as indexed ({} for a document indexed before connector-interface 0.4)
 
 
 class Store(Protocol):
@@ -130,13 +131,14 @@ class InMemoryStore:
         return Indexed(row["version"], row["deleted"],
                        current.snapshot_hash if current else None, list(current.tokens) if current else None,
                        first.embedding_model if first else None, first.embedding_version if first else None,
-                       row["updated_at"] or None)
+                       row["updated_at"] or None, dict(row.get("fields") or {}))
 
     def replace_document(self, doc: Document, chunks: list[ChunkRow], at: str) -> None:
         self.documents[doc.doc_id] = {
             "doc_id": doc.doc_id, "source": doc.source, "kind": doc.kind, "title": doc.title, "url": doc.url,
             "parent_id": doc.parent_id, "links": list(doc.links), "author": doc.author,
             "created_at": doc.created_at, "updated_at": doc.updated_at, "version": doc.version, "deleted": False,
+            "fields": dict(doc.fields),
         }
         self.chunks[doc.doc_id] = list(chunks)
         self._roll_snapshot(doc, at)

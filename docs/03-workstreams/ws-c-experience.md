@@ -53,7 +53,7 @@ Mock IdP and JWT claims; UI; `evals/` suites and the scoreboard; `deploy/`; the 
 - [ ] WorkBuddy as MCP client: Jordan's audit question; scheduled weekly digest
 
 ### Days 11 to 12 (Mon 12 to Tue 13 Oct)
-- [ ] Red-team harness: prompt injection in documents, existence side-channel probes, canary strings, revocation races; public scoreboard (leaks 0/N, freshness p95, citation precision)
+- [x] Red-team harness: prompt injection in documents, existence side-channel probes, canary strings, revocation races (11 Oct: `python -m evals.redteam`; 0 leaks in 38 probes on the real stack). Still open: showing it on the public scoreboard next to Leak-CI (leaks 0/N, freshness p95, citation precision)
 - [x] Accessibility pass (keyboard, ARIA, contrast)
 - [ ] Stretch: TRTC voice question and spoken answer
 

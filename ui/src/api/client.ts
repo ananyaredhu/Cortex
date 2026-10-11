@@ -3,6 +3,7 @@ import { authHeader, authMode, forgetToken } from "../auth/token";
 import type {
   AskRequest,
   AskResponse,
+  AuditAnswer,
   AuditEvent,
   AuditFilter,
   Conversation,
@@ -69,6 +70,7 @@ export function api(persona: PersonaId) {
       call<ExplainAccess>(persona, `/v1/explain-access?doc_id=${encodeURIComponent(docId)}`),
     auditQuery: (body: { question?: string; filter?: AuditFilter }) =>
       call<{ events: AuditEvent[]; count: number }>(persona, "/v1/audit/query", post(body)),
+    auditAsk: (question: string) => call<AuditAnswer>(persona, "/v1/audit/ask", post({ question })),
     auditVerify: () => call<VerifyResult>(persona, "/v1/audit/verify"),
     auditReplay: (requestId: string) =>
       call<Replay>(persona, `/v1/audit/replay?request_id=${encodeURIComponent(requestId)}`),

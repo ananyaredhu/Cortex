@@ -33,6 +33,7 @@ class DocRow:
     updated_at: str | None
     version: str
     deleted: bool = False
+    fields: tuple[tuple[str, str], ...] = ()      # Document.fields as sorted pairs (the row is frozen); `dict(row.fields)`
 
 
 @dataclass(frozen=True)
@@ -122,7 +123,8 @@ class MemoryIndex:
         if row is None:
             return None
         return DocRow(row["doc_id"], row["source"], row["kind"], row["title"], row["url"], row["parent_id"],
-                      tuple(row["links"]), row["author"], row["updated_at"], row["version"], row["deleted"])
+                      tuple(row["links"]), row["author"], row["updated_at"], row["version"], row["deleted"],
+                      tuple(sorted((row.get("fields") or {}).items())))
 
     def chunks_of(self, doc_id: str) -> list[ChunkRow]:
         return self._store.chunks_of(doc_id)
@@ -184,7 +186,7 @@ WHERE NOT d.deleted AND d.source = %(source)s AND to_tsvector('english', d.title
 ORDER BY matched DESC, d.doc_id
 LIMIT %(k)s
 """
-DOC_COLUMNS = "doc_id, source, kind, title, url, parent_id, links, author, updated_at, version, deleted"
+DOC_COLUMNS = "doc_id, source, kind, title, url, parent_id, links, author, updated_at, version, deleted, fields"
 
 
 class PostgresIndex:
@@ -230,7 +232,8 @@ class PostgresIndex:
 
     @staticmethod
     def _doc(r) -> DocRow:
-        return DocRow(r[0], r[1], r[2], r[3], r[4], r[5], tuple(r[6] or ()), r[7], _iso(r[8]), r[9], bool(r[10]))
+        return DocRow(r[0], r[1], r[2], r[3], r[4], r[5], tuple(r[6] or ()), r[7], _iso(r[8]), r[9], bool(r[10]),
+                      tuple(sorted((str(k), str(v)) for k, v in (r[11] or {}).items())))
 
     def document(self, doc_id: str) -> DocRow | None:
         r = self._conn.execute(f"SELECT {DOC_COLUMNS} FROM documents WHERE doc_id = %s", (doc_id,)).fetchone()

@@ -62,7 +62,7 @@ class PostgresStore:
         return {r[0] for r in rows}
 
     def indexed(self, doc_id: str) -> Indexed | None:
-        row = self._conn.execute("SELECT version, deleted, updated_at FROM documents WHERE doc_id = %s", (doc_id,)).fetchone()
+        row = self._conn.execute("SELECT version, deleted, updated_at, fields FROM documents WHERE doc_id = %s", (doc_id,)).fetchone()
         if row is None:
             return None
         snap = self._conn.execute(
@@ -70,19 +70,19 @@ class PostgresStore:
         chunk = self._conn.execute(
             "SELECT embedding_model, embedding_version FROM chunks WHERE doc_id = %s LIMIT 1", (doc_id,)).fetchone()
         return Indexed(row[0], row[1], snap[0] if snap else None, list(snap[1]) if snap else None,
-                       chunk[0] if chunk else None, chunk[1] if chunk else None, _iso(row[2]))
+                       chunk[0] if chunk else None, chunk[1] if chunk else None, _iso(row[2]), dict(row[3] or {}))
 
     def replace_document(self, doc: Document, chunks: list[ChunkRow], at: str) -> None:
         with self._conn.transaction():
             self._conn.execute(
                 "INSERT INTO documents (doc_id, source, kind, title, url, parent_id, links, author, created_at, updated_at,"
-                " version, deleted) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, false) "
+                " version, fields, deleted) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, false) "
                 "ON CONFLICT (doc_id) DO UPDATE SET source = EXCLUDED.source, kind = EXCLUDED.kind, title = EXCLUDED.title,"
                 " url = EXCLUDED.url, parent_id = EXCLUDED.parent_id, links = EXCLUDED.links, author = EXCLUDED.author,"
                 " created_at = EXCLUDED.created_at, updated_at = EXCLUDED.updated_at, version = EXCLUDED.version,"
-                " deleted = false",
+                " fields = EXCLUDED.fields, deleted = false",
                 (doc.doc_id, doc.source, doc.kind, doc.title, doc.url, doc.parent_id, list(doc.links), doc.author,
-                 doc.created_at or None, doc.updated_at or None, doc.version))
+                 doc.created_at or None, doc.updated_at or None, doc.version, Jsonb(dict(doc.fields))))
             self._conn.execute("DELETE FROM chunks WHERE doc_id = %s", (doc.doc_id,))
             with self._conn.cursor() as cur:
                 cur.executemany(

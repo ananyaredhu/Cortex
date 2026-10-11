@@ -104,6 +104,8 @@ export interface MyWork {
   issues: { doc_id: string; title: string; status?: string | null; url?: string }[];
   projects: string[];
   channels: string[];
+  /** (0.2, optional) What to call each channel, taken from threads the caller may open. A real Slack ID says nothing. */
+  channel_names?: Record<string, string>;
   recent_pages: { doc_id: string; title: string; updated_at: string; url?: string }[];
   suggested_questions: string[];
   alerts: StaleAlert[];
@@ -200,6 +202,38 @@ export interface AuditFilter {
   decision?: "all" | "allowed" | "denied";
   from?: string;
   to?: string;
+}
+
+/** A document in a time-travel answer: its title and `via` only when the viewing officer may open it. */
+export type SeenDoc =
+  | { doc_id: string; title: string; url?: string; source: Source; via?: string[] }
+  | { doc_id: string; restricted: true };
+
+/** GET /v1/audit/time-travel, and the `result` of an audit question planned as `time_travel` (api.md). */
+export interface TimeTravel {
+  user: string;
+  at: string;
+  identity: { known: boolean; recorded_at?: string; first_recorded_at?: string; tokens?: string[] };
+  could_see: SeenDoc[];
+  changed_since: { lost: SeenDoc[]; gained: SeenDoc[] };
+}
+
+export interface AuditPlan {
+  kind: "query" | "time_travel" | "verify";
+  filter?: AuditFilter & { doc?: string };
+  user?: string | null;
+  at?: string | null;
+  understood: string;
+  source: string;
+}
+
+/** POST /v1/audit/ask: the audit agent. `plan` is null when the question could not be planned; `clarify` then says why. */
+export interface AuditAnswer {
+  question: string;
+  plan: AuditPlan | null;
+  clarify: string | null;
+  summary?: string;
+  result?: { events: AuditEvent[]; count: number } | TimeTravel | VerifyResult;
 }
 
 export type ReplayCitation = { doc_id: string; title: string; source: Source } | { doc_id: string; restricted: true };
