@@ -52,7 +52,7 @@ Context engineering is an explicit pipeline stage: select, compress, order and b
 3. **Compress** to relevant snippets (extractive first), keeping provenance; never merge across documents.
 4. **Order** evidence to avoid "lost in the middle" (strongest first and last).
 5. **Token budget** enforced; drop lowest-ranked evidence first, never truncate mid-sentence.
-6. **Spotlighting and sanitization:** wrap each snippet in delimiters; strip or neutralize instruction-like text; set `flags: ["possible_injection"]` and record it in the audit log. Retrieved text is data, never instructions.
+6. **Spotlighting and sanitization:** wrap each snippet in delimiters; drop every sentence that gives the model orders (override or forget its instructions, take a new role, read out its prompt or secrets, imitate a chat role marker, in English, French, Spanish, Portuguese, German, Chinese and Japanese); set `flags: ["possible_injection"]` and record it in the audit log. A sentence that merely mentions "reveal", "token" or "credentials" is evidence and stays. The patterns are one layer, not the defence: the model has no tools, evidence sits in delimiters, every claim must cite, and the checker and the leak scan run afterwards. Retrieved text is data, never instructions.
 7. **User context is built only from data the user may see** and is itself ACL-labeled. It may boost ranking and resolve references; it never filters out results the user may see, and never grants access.
 8. **No secrets and no connector credentials** anywhere in the packet.
 
@@ -63,6 +63,8 @@ Conversation memory entries are labeled with the intersection of their sources' 
 Context precision and recall on the golden set, citation precision, abstention correctness, and token cost per answer.
 
 ## Changelog
+- 0.1, 11 Oct: evidence `flags` may hold `freshness_unverified`: the live version check failed and the indexed copy was served (fix F9). It is also recorded in the audit event's `flags`.
+- 0.1, 11 Oct: sanitizer narrowed and extended (fix F6); sentences end at . ! ? 。！？ or a new line.
 - 0.1, 11 Oct: `task.standalone_question`: for a follow-up ("why?"), the question restated with the last turn's topic, which is also what retrieval searched for; `null` otherwise. The model is told to answer it. Found by running a follow-up against the real ADP agent, which abstained when given only the bare question.
 - 0.1, 11 Oct: `task.procedure` (the selected skill's procedure, from a reviewed file, or `null`) and `history` (the person's own earlier turns of this conversation, at most `memory_turns`, each re-checked against the person's current access: a turn whose cited documents they may no longer open is left out; `query` is the standalone search text the turn was run with). `history` says what a follow-up refers to and is never evidence: every claim still cites `evidence`.
 - 0.1, 10 Oct: `evidence[].via_link_from` (set when the document was reached through a stored link from an allowed hit; the link target passed the same permission check, ranks below direct hits).

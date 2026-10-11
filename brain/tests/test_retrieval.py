@@ -71,6 +71,16 @@ def test_document_rows_and_visible_listing(index):
     assert visible == {d["doc_id"] for d in DATA["documents"] if set(d["acl"]["tokens"]) & set(TOKENS["sam"])}
 
 
+def test_hidden_listing_is_the_complement_of_visible(index):
+    """`documents_hidden` (fix F5) is every live document the asker's tokens do not reach: the leak scan's denied set."""
+    for who in ("sam", "priya", "dana"):
+        hidden = {d.doc_id for d in index.documents_hidden(TOKENS[who])}
+        visible = {d.doc_id for d in index.documents_visible(TOKENS[who])}
+        assert hidden.isdisjoint(visible) and hidden | visible == {d["doc_id"] for d in DATA["documents"]}
+    assert {"confluence:SEC/q3-breach-report", "jira:SEC-17"} <= {d.doc_id for d in index.documents_hidden(TOKENS["sam"])}
+    assert len(index.documents_hidden([])) == len(DATA["documents"])               # no tokens: everything is hidden
+
+
 def test_concurrent_searches_share_one_connection_safely(index):
     """Request threads share one index connection (the split-screen asks as three people at once). Two vector
     legs entering a transaction block together was OutOfOrderTransactionNesting on Postgres."""
