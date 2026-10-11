@@ -12,6 +12,9 @@ Events the app must subscribe to, all covered by the bot's existing read scopes:
 `message.groups`, `member_joined_channel`, `member_left_channel`, `channel_created`, `channel_deleted`,
 `channel_rename`, `channel_archive`, `channel_unarchive`, `group_rename`, `group_archive`, `group_unarchive`,
 `group_left`, `user_change`, `team_join`.
+
+For DMs (acl-model.md, "Slack DMs"), also `tokens_revoked` (no scope needed) and, under "Subscribe to events on
+behalf of users", `message.im` and `message.mpim`: Slack then sends the DM messages of everyone who authorized.
 """
 import json
 import logging
@@ -33,7 +36,8 @@ _STRUCTURE_SUBTYPES = {"channel_join", "channel_leave", "group_join", "group_lea
 STRUCTURE_EVENTS = {"member_joined_channel", "member_left_channel", "channel_created", "channel_deleted", "channel_rename",
                     "channel_archive", "channel_unarchive", "channel_left", "channel_shared", "channel_unshared",
                     "group_open", "group_close", "group_deleted", "group_rename", "group_archive", "group_unarchive",
-                    "group_left", "user_change", "team_join"}
+                    "group_left", "user_change", "team_join",
+                    "tokens_revoked"}   # someone withdrew their DM authorization: their DMs must leave the index
 
 log = logging.getLogger(__name__)
 
@@ -47,11 +51,12 @@ class Hint:
 
 
 def classify(event: dict) -> Hint | None:
-    """The hint in one Events API `event`, or None when it does not matter (DMs, bot chatter we do not index)."""
+    """The hint in one Events API `event`, or None when it does not matter (bot chatter we do not index).
+    A message in a DM is a thread hint like any other: whether that DM is a document is the connector's decision."""
     kind = event.get("type")
     if kind in STRUCTURE_EVENTS:
         return Hint(structure=True)
-    if kind != "message" or event.get("channel_type") in ("im", "mpim"):
+    if kind != "message":
         return None
     subtype = event.get("subtype")
     if subtype in _STRUCTURE_SUBTYPES:

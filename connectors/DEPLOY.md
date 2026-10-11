@@ -31,7 +31,9 @@ always safe: every step is idempotent and cursors are saved after each batch.
 - Files, all gitignored, copied from the machine where the accounts were signed in:
   `connectors/identity-map.local.json`, `connectors/slack/seed-manifest.local.json`,
   `connectors/gdrive/gdrive.local.json`, `connectors/gdrive/seed-manifest.local.json`,
-  `connectors/gdrive/token-gdrive-*.json`. `watch-channels.local.json` is written by `watch start` on the host.
+  `connectors/gdrive/token-gdrive-*.json`, and for Slack DMs `connectors/slack/token-slack-*.json` (or wherever
+  `SLACK_USER_TOKENS_DIR` points; both ingestion and the Brain read them). `watch-channels.local.json` is written
+  by `watch start` on the host.
 - The Slack app needs Socket Mode on and the bot events in `connectors/slack/README.md`, "Events".
 
 ## Sizing

@@ -53,6 +53,7 @@ dev login off. The images contain no `.env`, token or account file (`.dockerigno
    | `connectors/gdrive/gdrive.local.json` | `gdrive.local.json` |
    | `connectors/gdrive/seed-manifest.local.json` | `gdrive-seed-manifest.local.json` |
    | `connectors/gdrive/token-gdrive-*.json` | the same names |
+   | `connectors/slack/token-slack-*.json` (only for Slack DMs) | the same names |
 
    Fill in the Slack and Google values in `.env`, set `BRAIN_SOURCES=confluence,jira,slack,gdrive`, then
    `docker compose up -d`. For Drive push notifications:
