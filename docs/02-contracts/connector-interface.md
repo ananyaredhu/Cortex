@@ -153,6 +153,7 @@ LIMIT :k;
 | Source | One `Document` is | `doc_id` | `parent_id` | `version` |
 |---|---|---|---|---|
 | Slack | One thread: the root message plus its replies. A message with no replies is a thread of one | `slack:<channel id>/<thread ts>` | `slack:<channel id>` | Timestamp of the latest reply or edit |
+| Slack DM or group DM | The same: one thread of the conversation. `kind` stays `thread` | `slack:<conversation id>/<thread ts>` (the ID starts with `D` for a DM; a group DM has a `G` or `C` ID like a channel) | `slack:<conversation id>` | The same |
 | Google Drive | One file | `gdrive:<file id>` | `gdrive:<folder id>` | File version or modified time |
 | Confluence | One page | `confluence:<space>/<page id>` | `confluence:<space>` | Page version |
 | Jira | One issue, including its comments | `jira:<issue key>` | `jira:<project key>` | Updated timestamp |
@@ -169,7 +170,7 @@ Real platforms assign their own IDs (Slack channel IDs, Drive file IDs), so they
 - `check_access` must never return `allowed=True` on an error or timeout: **fail closed**.
 - A deny for a forbidden document and for a nonexistent document has `allowed=False` and `proof_path=[]`. `acl_snapshot_hash` is empty when the document does not exist and may be set when it does (the audit log needs it for replay), so an `AccessDecision` **never leaves the policy plane**: it is not serialized to the LLM plane or to the user.
 - Rate limits: connectors back off and surface lag as a metric (`freshness_lag_seconds`).
-- Credentials are read-only, least-privilege, and live only in the connector process.
+- Credentials are read-only, least-privilege, and live only in the connector process. A connector that reads with per-person credentials (Drive's refresh tokens, Slack's user tokens for DMs) answers `check_access` for a person-private document with **that person's own** credential, and denies when it has none.
 
 ## Contract tests (`connectors/tests/contract/`)
 1. Seeded fixture: known docs with known ACLs, expected `fetch`, `version` and `check_access` results per persona. A real backend whose native model expresses the same ACL in other tokens (Drive on personal accounts: a group inferred from shares to each of its members, in place of their own tokens) may be compared by readers, the personas the tokens let in, instead of token by token. `check_access` is still compared exactly.
@@ -180,6 +181,7 @@ Real platforms assign their own IDs (Slack channel IDs, Drive file IDs), so they
 6. Initial load: `list_changes(None)`, followed until `has_more` is false, returns an `upsert` for every seeded document of that source.
 
 ## Changelog
+- 0.3, 11 Oct addition: Slack DMs and group DMs are documents (same thread unit and `doc_id` shape, conversation IDs may start with `D`); `check_access` on a person-private document uses the asker's own credential. Rules in acl-model.md, "Slack DMs". No change to the interface.
 - 0.3, 7 Oct addition: `CursorExpired` from `list_changes`; the consumer crawls again. Raised by the simulators' connectors; Slack and Drive resync on their own and never raise it.
 - 0.3, 6 Oct addition: contract test 1 may compare a real backend's ACL by readers when its native model uses other tokens for the same people (real Drive's inferred groups). No change to the interface.
 - 0.3: the `chunks` schema agreed (`db/init.sql`): new `source` column, `embedding` may be null; new section "Reading the index" with the rules and reference queries for B's retrieval.
