@@ -9,6 +9,8 @@ from dataclasses import dataclass, field
 from brain.gateway.models import Generated
 from brain.policy.leakscan import DeniedDoc, scan
 
+LOWER_NOTE = " (lower confidence: a source supports this only weakly)"
+
 
 @dataclass
 class CheckResult:
@@ -28,12 +30,14 @@ class CheckResult:
         total = len(self.claims) + self.removed_claims
         if total == 0:
             return None
-        return {"score": round(len(self.claims) / total, 2), "removed_claims": self.removed_claims}
+        return {"score": round(len(self.claims) / total, 2), "removed_claims": self.removed_claims,
+                "lower_confidence": sum(c.get("confidence") == "lower" for c in self.claims)}
 
 
 def render_answer(claims: list[dict]) -> str:
     """The answer text a client receives: the verified claims and nothing else. Empty when there are none."""
-    return ("Here is what I found:\n" + "\n".join(f"- {c['text']}" for c in claims)) if claims else ""
+    lines = (f"- {c['text']}" + (LOWER_NOTE if c.get("confidence") == "lower" else "") for c in claims)
+    return ("Here is what I found:\n" + "\n".join(lines)) if claims else ""
 
 
 def check(generated: Generated, allowed_doc_ids: set[str], denied: list[DeniedDoc]) -> CheckResult:
