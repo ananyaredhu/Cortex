@@ -114,3 +114,36 @@ def test_concurrent_searches_share_one_connection_safely(index):
     for t in threads:
         t.join()
     assert errors == []
+
+
+# -- the title leg (T10): a title is not in the chunks, but it carries ticket keys and names --------------------------------------
+def test_a_ticket_key_finds_its_ticket_by_title(index):
+    found = [c.doc_id for c in hybrid_search(index, "what is DBMIG-150 about", TOKENS["priya"], SOURCES)]
+    assert "jira:DBMIG-150" in found[:2]                          # DBMIG-142's body also names it, so the two may share the top
+    assert [c.doc_id for c in hybrid_search(index, "SEC-17", TOKENS["dana"], SOURCES)][:1] == ["jira:SEC-17"]
+
+
+def test_the_title_leg_can_be_switched_off(index):
+    index.title_leg = False
+    try:
+        found = [c.doc_id for c in hybrid_search(index, "what is DBMIG-150 about", TOKENS["priya"], SOURCES)]
+    finally:
+        index.title_leg = True
+    assert "jira:DBMIG-150" not in found[:1]                                   # the body alone does not say its own key
+
+
+def test_a_title_hit_still_needs_the_asker_to_hold_a_token(index):
+    assert [c.doc_id for c in hybrid_search(index, "SEC-17", TOKENS["sam"], SOURCES)] == []
+    assert hybrid_search(index, "SEC-17", [], SOURCES) == []
+    assert "jira:SEC-17" not in {c.doc_id for c in hybrid_search(index, "SEC-17 token replay", TOKENS["priya"], SOURCES)}
+
+
+def test_title_words_alone_find_a_document_whose_body_lacks_them(index):
+    found = [c.doc_id for c in hybrid_search(index, "payment service incident runbook", TOKENS["priya"], SOURCES)]
+    assert found[0] == "confluence:PAY/runbook-payment-service"
+
+
+def test_a_plain_word_matches_a_title_word_and_a_partial_key_does_not(index):
+    assert [h.doc_id for h in index.title_search("jira", ["cutover", "blocked"], TOKENS["priya"], 5)][:1] == ["jira:DBMIG-142"]
+    assert index.title_search("jira", ["dbmig-999"], TOKENS["priya"], 5) == []
+    assert index.title_search("jira", ["dbmig-150"], TOKENS["priya"], 5)[0].score == 2.0         # a whole key counts double

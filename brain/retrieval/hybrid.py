@@ -10,11 +10,13 @@ from dataclasses import dataclass, field
 from .index import Hit, IndexReader
 
 WORD = re.compile(r"[a-z0-9]+")
+KEY = re.compile(r"\b[a-z][a-z0-9]+-\d+\b")           # a ticket key: dbmig-150, sec-17
 STOP = frozenset("""
 the and what whats were was there that this with from show have about which for are any our you did does can how who
 when into last week what's its it's they them their been being will would should could than then also just like
 """.split())
 RRF_K = 60
+TITLE_WEIGHT = 1.0       # how much a title match counts against a body match in the rank fusion (T10)
 
 
 @dataclass
@@ -25,6 +27,7 @@ class Candidate:
     chunk_ids: list[str] = field(default_factory=list)
     keyword_rank: int | None = None
     vector_rank: int | None = None
+    title_rank: int | None = None
 
 
 def query_terms(question: str) -> list[str]:
@@ -49,7 +52,7 @@ def hybrid_search(index: IndexReader, question: str, tokens: Iterable[str], sour
     need = min(min_terms, len(terms)) if terms else 1
     by_doc: dict[str, Candidate] = {}
 
-    def fuse(hits: list[Hit], leg: str) -> None:
+    def fuse(hits: list[Hit], leg: str, weight: float = 1.0) -> None:
         rank = 0
         seen_docs: set[str] = set()
         for h in hits:
@@ -60,7 +63,7 @@ def hybrid_search(index: IndexReader, question: str, tokens: Iterable[str], sour
             seen_docs.add(h.doc_id)
             rank += 1
             cand = by_doc.setdefault(h.doc_id, Candidate(h.doc_id, h.doc_id.split(":", 1)[0]))
-            cand.score += 1.0 / (RRF_K + rank)
+            cand.score += weight / (RRF_K + rank)
             if h.chunk_id not in cand.chunk_ids:
                 cand.chunk_ids.append(h.chunk_id)
             setattr(cand, f"{leg}_rank", rank)
@@ -68,6 +71,10 @@ def hybrid_search(index: IndexReader, question: str, tokens: Iterable[str], sour
     for source in sources:
         if terms:
             fuse([h for h in index.keyword_search(source, terms, tokens, k) if h.score >= need], "keyword")
+        title_terms = terms + sorted(set(KEY.findall(question.lower())))
+        if title_terms and getattr(index, "title_leg", False):
+            fuse([h for h in index.title_search(source, title_terms, tokens, k) if h.score >= need], "title",
+                 getattr(index, "title_weight", TITLE_WEIGHT))
         if vector is not None and model:
             fuse([h for h in index.vector_search(source, vector, model, tokens, k) if h.score <= max_distance], "vector")
     return sorted(by_doc.values(), key=lambda c: (-c.score, c.doc_id))[:candidates]
