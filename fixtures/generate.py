@@ -15,6 +15,9 @@ from pathlib import Path
 
 D = "2026-10-10"
 ORG = "companya.com"
+# The five issues whose text gained a status or assignee line on 11 Oct. Ingestion re-reads a document only when its
+# version changes, so an index built before then needs the new label to pick the lines up.
+EDITED = f"{D}T08:00:00Z#2"
 
 
 def canon(obj) -> str:
@@ -93,12 +96,12 @@ docs = [
         "Blocker owner: platform team. Follow-up DBMIG-150 tracks the replication tuning.",
         "jira:DBMIG", ["role:DBMIG:developer", "role:DBMIG:lead"],
         {"project": "DBMIG", "roles": ["developer", "lead"], "security_level": None},
-        links=["slack:C_DBMIG/thread-1", "jira:DBMIG-150"], author="maya@companya.com"),
+        links=["slack:C_DBMIG/thread-1", "jira:DBMIG-150"], author="maya@companya.com", version=EDITED),
     doc("jira:DBMIG-150", "jira", "issue", "DBMIG-150 Tune replication for database migration",
         "Tune replication settings to remove the migration blocker. Status: To Do. Assignee: Priya. Target: before cutover.",
         "jira:DBMIG", ["role:DBMIG:developer", "role:DBMIG:lead"],
         {"project": "DBMIG", "roles": ["developer", "lead"], "security_level": None},
-        links=["jira:DBMIG-142"], author="priya@companya.com"),
+        links=["jira:DBMIG-142"], author="priya@companya.com", version=EDITED),
     doc("slack:C_DBMIG/thread-1", "slack", "thread", "#db-migration thread: blockers last week",
         "Blockers raised last week on the database migration: replica lag is the main blocker, and the staging "
         "snapshot restore took too long. Platform team is looking at replication tuning.",
@@ -132,7 +135,7 @@ docs = [
         "Status: In Progress. Assignee: Dana. CANARY-9b21-SEC17.",
         "jira:SEC", ["group:jira:security-team"],
         {"project": "SEC", "roles": [], "security_level": "security"},
-        links=["confluence:SEC/q3-breach-report"], author="dana@companya.com", tags=["canary", "restricted"]),
+        links=["confluence:SEC/q3-breach-report"], author="dana@companya.com", tags=["canary", "restricted"], version=EDITED),
     doc("confluence:HR/contractor-onboarding", "confluence", "page", "Contractor onboarding guide",
         "Welcome contractors. Get a laptop, request repository access, and follow the code review rules.",
         "confluence:HR", ["group:confluence:contractors", "public:org"], {"space": "HR", "restrictions": []},
@@ -165,12 +168,12 @@ docs = [
         "Follow-up to the payment outage: add a circuit breaker to the payment client. Status: In Progress. Assignee: Priya.",
         "jira:PAYINC", ["role:PAYINC:developer"],
         {"project": "PAYINC", "roles": ["developer"], "security_level": None},
-        links=["jira:PAYINC-9"], author="priya@companya.com"),
+        links=["jira:PAYINC-9"], author="priya@companya.com", version=EDITED),
     doc("jira:PAYINC-11", "jira", "issue", "PAYINC-11 Raise connection pool alerts",
         "Follow-up to the payment outage: raise alerts on connection pool saturation. Status: To Do. Assignee: Priya.",
         "jira:PAYINC", ["role:PAYINC:developer"],
         {"project": "PAYINC", "roles": ["developer"], "security_level": None},
-        links=["jira:PAYINC-9"], author="priya@companya.com"),
+        links=["jira:PAYINC-9"], author="priya@companya.com", version=EDITED),
     doc("slack:C_PAYINC/thread-1", "slack", "thread", "#payments-incident thread: outage timeline",
         "Payment outage timeline: errors started at 02:10, the retry storm exhausted the connection pool, "
         "mitigated at 03:05 by restarting workers. Root cause analysis is in the postmortem.",
