@@ -108,7 +108,9 @@ Status column: **done** = merged to `main`. **branch** = built on `ws-c/ui-signi
 
 **Recommended approach.** Add DMs to the **Slack simulator only**, with participants-only access rules, to show the permission semantics without real DM scopes: access tokens for both participants (`user:<email>` for each), `check_access` true only for participants, plus a test that a third person never sees it. Describe real DM ingestion (per-user consent and user scopes) in the docs as the production path.
 
-**If real DMs are wanted anyway.** Each persona who authorizes the app gets user scopes `im:read`, `im:history`, `mpim:read`, `mpim:history`. The connector lists DMs per user token, deduplicates by channel ID, and sets the access tokens to the two participants. Default to opt-in.
+**Decided 11 Oct: real DMs, not the simulator-only version.** Built on `ws-a/slack-dms`: each person authorizes with their own read-only user token (`python -m connectors.slack.authorize`), a DM is indexed only when everyone in it has authorized, it carries `user:` tokens only, the live check uses the asker's own token, and withdrawing deletes the DMs. Rules in `docs/02-contracts/acl-model.md`, "Slack DMs"; set-up in `connectors/slack/README.md`. Tested on the in-memory Slack (`connectors/slack/tests/test_slack_dms.py`, `evals/tests/test_slack_dm_leak.py`). **Not yet run on the real workspace:** that needs the app's user scopes and each persona's authorization.
+
+**If real DMs are wanted anyway (the note from before the decision).** Each persona who authorizes the app gets user scopes `im:read`, `im:history`, `mpim:read`, `mpim:history`. The connector lists DMs per user token, deduplicates by channel ID, and sets the access tokens to the two participants. Default to opt-in.
 
 ---
 

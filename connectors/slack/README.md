@@ -1,6 +1,7 @@
 # Slack connector
 
-A real Slack workspace through a read-only bot token. Implements `docs/02-contracts/connector-interface.md`.
+A real Slack workspace through a read-only bot token, plus, for DMs, the read-only user token of each person who
+authorized (see "DMs and group DMs"). Implements `docs/02-contracts/connector-interface.md`.
 
 ## What it needs
 1. **A custom internal app** in the workspace with these bot token scopes, all read-only: `channels:read`,
@@ -50,6 +51,47 @@ run with `--once`, still sees what changed since the last run.
 | Thread deleted, or the bot removed from the channel | `delete` |
 | Channel made private or public | `acl_change` for each of its threads |
 | Someone joins or leaves a channel, or changes between guest and full member | `principal_change` with the token |
+| A DM or group DM begins or gets a message, and everyone in it has authorized | `upsert` |
+| Someone in a DM withdraws their authorization | `delete` for every thread of every DM they are in |
+
+## DMs and group DMs
+Off until someone authorizes. The rules are in `docs/02-contracts/acl-model.md`, "Slack DMs"; in short:
+
+- A bot cannot read a DM between two people, so each person authorizes the app once and the connector reads with
+  **that person's own read-only user token**. The bot token never reads a DM.
+- A DM is a document only while **everyone in it** is a mapped person who has authorized. A DM with Slackbot, a
+  bot, an unmapped account or someone who has not agreed is not read at all.
+- Its tokens are `user:<canonical email>` per participant and nothing else. `native` is
+  `{"channel": <id>, "dm": true, "participants": [<emails>]}`. The `doc_id` has the same shape as a channel
+  thread's (a DM's ID starts with `D`; a group DM's looks like a channel's).
+- `check_access` asks Slack with the **asker's own** token (who the token belongs to, the conversation, the thread)
+  and the bot's token for the account's status. No token, a withdrawn one, an error or a timeout is a deny, with
+  the same answer as for a DM that does not exist.
+- When someone withdraws (removes the app under their Slack account's apps, or their token file is deleted), the
+  next scan reports their DMs as deleted and ingestion removes the chunks. The `tokens_revoked` event brings that
+  scan forward. Their own live check denies at once.
+
+Set-up, once for the app (api.slack.com/apps, the same internal app):
+1. **OAuth & Permissions, User Token Scopes:** `im:read`, `im:history`, `mpim:read`, `mpim:history`. Nothing that
+   writes. Leave token rotation off.
+2. **OAuth & Permissions, Redirect URLs:** add one HTTPS address, e.g. `https://localhost/slack/oauth`. Nothing has
+   to answer there: the authorize tool reads the code from the address the browser ends on.
+3. **Event Subscriptions:** under "Subscribe to events on behalf of users" add `message.im` and `message.mpim`; under
+   bot events add `tokens_revoked`. Save Changes, and reinstall if Slack asks.
+4. **`.env`:** `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET` (Basic Information), `SLACK_REDIRECT_URI` (the address from
+   step 2, exactly).
+
+Then once per person, signed in to Slack in the browser as that person:
+```
+python -m connectors.slack.authorize priya@companya.com
+```
+It saves `token-slack-<persona>.json` here (gitignored; `SLACK_USER_TOKENS_DIR` moves them, as `deploy/` does). It
+refuses to save when a different account or workspace signed in than the identity map lists. Ingestion and the
+Brain both read the files and notice new ones without a restart.
+
+Limits: each person's token is asked twice per scan plus once per DM they are in, so a scan grows with the number
+of DMs. On a free workspace Slack hides messages older than 90 days, from DMs too. A DM thread is usually a single
+message, so DMs make many small documents.
 
 ## Events (Socket Mode)
 ```
@@ -63,7 +105,9 @@ never logs message text, the token or the websocket URL. An event is a hint, not
 |---|---|
 | `message` in a channel the bot reads (new, reply, edit, delete, `message_replied`) | `note_thread`: that thread is re-sent as an `upsert`. A deleted thread becomes `DocumentNotFound` on fetch, so ingestion deletes it |
 | `member_joined_channel`, `member_left_channel`, `channel_*`, `group_*`, `user_change`, `team_join`, join and leave messages | `note_structure`: the next pass scans the whole workspace and diffs, as above |
-| Anything else, DMs included | Nothing |
+| `message` in a DM or group DM of someone who authorized | `note_thread`, as for a channel. A DM the last scan did not see makes the pass a full scan |
+| `tokens_revoked` | `note_structure`: the scan finds whose token stopped working and their DMs are deleted |
+| Anything else | Nothing |
 
 Two seconds after an event (so a burst becomes one pass), ingestion runs Slack alone. If only thread events
 arrived, it fetches just those threads (two calls each) without scanning: this is what lets events scale to
@@ -94,7 +138,7 @@ Limits, all known:
 - **Cost of a scan:** two calls plus two per channel, more with paging. Events avoid it for content changes; the
   scheduled poll still pays it, so with 200 channels keep `--poll` long (10 minutes or more).
 - **A channel made private or public** sends no event of its own that we rely on; the scheduled scan catches it.
-- **Not covered:** DMs and group DMs (would need `im:history` and `mpim:history`, wider scopes), files, links to
+- **Not covered:** files, links to
   other documents (`links` is always empty), archived-channel special cases.
 - `check_access` asks Slack four questions at once (channel, thread, user, members) and caches nothing. Measured on
   the real workspace on 5 Oct: median about 270 ms, worst about 310 ms. One after another they took about 740 ms.
