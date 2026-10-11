@@ -7,6 +7,11 @@ there is no "of N" over documents the caller cannot open. Plain code, no model.
 
 An issue's status and assignee are read from its text, where the Jira connector writes them as `Status: <name>` and
 `Assignee: <display name>`; the connector contract has no structured fields yet (docs/02-contracts/connector-interface.md).
+
+The timeline (start, target, milestone) and the sprint (name, dates, goal) are written by hand in the registry. Jira's sprint
+field is not ingested, so which issues are "in the sprint" is a rule, not Jira's list: an issue is in it when it has a status
+and is still open, or was last changed on or after the sprint's first day. Counted, like everything else, from what the caller
+may open.
 """
 import re
 from collections.abc import Callable, Iterable
@@ -43,20 +48,29 @@ def team_focus(views: Iterable[ProjectView], docs: Iterable, *, text: Callable[[
             continue
         place_of = {container(place): place for place in view.places}
         mine = [d for d in docs if d.parent_id in place_of]
-        issues = []
+        project = view.project
+        issues, in_sprint, sprint_done = [], 0, 0
         for d in mine:
             if d.source == "jira":
                 body = text(d.doc_id)
-                assignee = assignee_of(body)
-                issues.append({"doc_id": d.doc_id, "title": d.title, "status": status_of(body), "assignee": assignee,
+                assignee, status = assignee_of(body), status_of(body)
+                issues.append({"doc_id": d.doc_id, "title": d.title, "status": status, "assignee": assignee,
                                "mine": bool(me) and assignee == me, "url": d.url})
+                done = bool(status) and status.lower() in DONE
+                if project.sprint and status and (not done or (d.updated_at or "")[:10] >= project.sprint.start_date):
+                    in_sprint += 1
+                    sprint_done += done
         counts: dict[str, int] = {}
         for issue in issues:
             if issue["status"]:
                 counts[issue["status"]] = counts.get(issue["status"], 0) + 1
-        project = view.project
+        sprint, milestone = project.sprint, project.milestone
         teams.append({
-            "project_id": project.project_id, "name": project.name, "goal": project.goal, "target_date": project.target_date,
+            "project_id": project.project_id, "name": project.name, "goal": project.goal,
+            "start_date": project.start_date, "target_date": project.target_date,
+            "milestone": {"label": milestone[0], "date": milestone[1]} if milestone else None,
+            "sprint": {"name": sprint.name, "start_date": sprint.start_date, "end_date": sprint.end_date, "goal": sprint.goal,
+                       "total": in_sprint, "done": sprint_done} if sprint else None,
             "leads": [names.get(owner, owner) for owner in project.owners],
             "places": view.places,
             "issues": {"total": len(issues), "done": sum(n for s, n in counts.items() if s.lower() in DONE),

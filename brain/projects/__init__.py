@@ -32,6 +32,15 @@ class RegistryError(ValueError):
 
 
 @dataclass(frozen=True)
+class Sprint:
+    """The project's current sprint, written by hand: Jira's own sprint field is not ingested."""
+    name: str
+    start_date: str
+    end_date: str
+    goal: str | None = None
+
+
+@dataclass(frozen=True)
 class Project:
     project_id: str
     name: str
@@ -41,6 +50,9 @@ class Project:
     owners: tuple[str, ...] = ()
     goal: str | None = None                         # one sentence, shown on Team focus
     target_date: str | None = None                  # YYYY-MM-DD, set by hand like the rest
+    start_date: str | None = None
+    milestone: tuple[str, str] | None = None        # (label, date): the next dated step on the timeline
+    sprint: "Sprint | None" = None
 
     def containers(self) -> list[str]:
         """`source:id` for every place listed under the project, in registry order."""
@@ -75,7 +87,8 @@ def parse(data: dict) -> list[Project]:
         if pid in seen_ids:
             raise RegistryError(f"{pid}: listed twice")
         seen_ids.add(pid)
-        unknown = set(raw) - {"project_id", "name", "aliases", "components", "member_tokens", "owners", "goal", "target_date"}
+        unknown = set(raw) - {"project_id", "name", "aliases", "components", "member_tokens", "owners", "goal", "target_date",
+                              "start_date", "milestone", "sprint"}
         if unknown:
             raise RegistryError(f"{pid}: unknown key {sorted(unknown)[0]}")
         if not isinstance(raw.get("name"), str) or not raw["name"].strip():
@@ -92,14 +105,49 @@ def parse(data: dict) -> list[Project]:
             raise RegistryError(f"{pid}: unknown source {sorted(set(comps) - set(SOURCES))[0]}")
         components = {s: _tuple(v, f"components.{s}", pid) for s, v in comps.items()}
         members = _tuple(raw.get("member_tokens", []), "member_tokens", pid)
-        goal, target = raw.get("goal"), raw.get("target_date")
-        if goal is not None and (not isinstance(goal, str) or not goal.strip()):
-            raise RegistryError(f"{pid}: goal must be text")
-        if target is not None and (not isinstance(target, str) or not DATE.fullmatch(target)):
-            raise RegistryError(f"{pid}: target_date must look like 2026-10-23")
+        goal = _text(raw.get("goal"), "goal", pid)
+        target, start = _date(raw.get("target_date"), "target_date", pid), _date(raw.get("start_date"), "start_date", pid)
+        if start and target and start > target:
+            raise RegistryError(f"{pid}: start_date is after target_date")
         projects.append(Project(pid, raw["name"].strip(), aliases, components, members, _tuple(raw.get("owners", []), "owners", pid),
-                                goal.strip() if goal else None, target))
+                                goal, target, start, _milestone(raw.get("milestone"), pid), _sprint(raw.get("sprint"), pid)))
     return projects
+
+
+def _text(value, what: str, project: str, required: bool = False) -> str | None:
+    if value is None and not required:
+        return None
+    if not isinstance(value, str) or not value.strip():
+        raise RegistryError(f"{project}: {what} must be text")
+    return value.strip()
+
+
+def _date(value, what: str, project: str, required: bool = False) -> str | None:
+    if value is None and not required:
+        return None
+    if not isinstance(value, str) or not DATE.fullmatch(value):
+        raise RegistryError(f"{project}: {what} must look like 2026-10-23")
+    return value
+
+
+def _milestone(raw, project: str) -> tuple[str, str] | None:
+    if raw is None:
+        return None
+    if not isinstance(raw, dict) or set(raw) != {"label", "date"}:
+        raise RegistryError(f"{project}: milestone needs a label and a date")
+    return _text(raw["label"], "milestone.label", project, True), _date(raw["date"], "milestone.date", project, True)
+
+
+def _sprint(raw, project: str) -> Sprint | None:
+    if raw is None:
+        return None
+    if not isinstance(raw, dict) or set(raw) - {"name", "start_date", "end_date", "goal"}:
+        raise RegistryError(f"{project}: sprint takes name, start_date, end_date and goal")
+    sprint = Sprint(_text(raw.get("name"), "sprint.name", project, True), _date(raw.get("start_date"), "sprint.start_date", project, True),
+                    _date(raw.get("end_date"), "sprint.end_date", project, True), _text(raw.get("goal"), "sprint.goal", project))
+    if sprint.start_date > sprint.end_date:
+        raise RegistryError(f"{project}: the sprint ends before it starts")
+    return sprint
 
 
 class Registry:

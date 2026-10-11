@@ -98,7 +98,9 @@ Team focus. A team is a registry project the caller is a **member** of (`member:
 ```json
 {"teams": [{
   "project_id": "DBMIG", "name": "Database migration",
-  "goal": "...", "target_date": "2026-10-30", "leads": ["Maya"],
+  "goal": "...", "start_date": "2026-09-14", "target_date": "2026-10-30", "leads": ["Maya"],
+  "milestone": {"label": "Cutover", "date": "2026-10-27"},
+  "sprint": {"name": "Sprint 42", "start_date": "2026-10-05", "end_date": "2026-10-16", "goal": "...", "total": 5, "done": 1},
   "places": ["jira:DBMIG", "slack:C_DBMIG"],
   "issues": {"total": 2, "done": 0, "by_status": [{"status": "In Progress", "count": 1}],
              "items": [{"doc_id": "jira:DBMIG-142", "title": "...", "status": "In Progress", "assignee": "Maya", "mine": false, "url": "..."}]},
@@ -110,9 +112,10 @@ Rules:
 - **Every number is counted from documents the caller may open** (prefilter, then the live check), like everything in `/mywork`. `issues.total` is how many issues of the project they can open, not how many exist, so two members can see different totals and neither response hints at the other. Adding, editing or removing a document the caller cannot open changes nothing in their response (`evals/tests/test_team_leak.py`).
 - `places` follows `/v1/projects`: a private channel under the project is absent for a member who is not in it.
 - Someone who is a member of no project gets `{"teams": []}`, whether they can open nothing at all or see projects through public pages.
-- `goal`, `target_date` and `leads` come from the registry file (`goal`, `target_date`, `owners`), set by hand; `goal` and `target_date` may be `null`. `issues.items[].status` and `assignee` are read from the issue's text (`Status: <name>`, `Assignee: <display name>`), which is where the Jira connector writes them ([connector-interface](connector-interface.md)), and are `null` when the text has none; `done` counts Done, Closed and Resolved. `mine` is true when the assignee's name is the caller's display name, so two people with one display name would both be marked: it is a highlight, never an access decision. `updates` are the newest six documents in the project's places. `updates[].author` is a display name, or `null` when the Brain has none for that account.
+- `goal`, `start_date`, `target_date`, `milestone`, `leads` and the sprint's `name`, dates and `goal` come from the registry file, set by hand; any of them may be `null` (`sprint` and `milestone` as a whole). They are shown to every member of the project, including one who is only in its public channel, so the registry must say nothing there that only a restricted place holds.
+- **The sprint's numbers follow a rule, not Jira's sprint field**, which is not ingested: an issue is in the sprint when it has a status and is still open, or is done and was last changed on or after `sprint.start_date`. `sprint.total` and `sprint.done` are counted from the issues the caller may open, like `issues`; a member who can open none gets `0` and `0`. The UI works out "day 5 of 10" (working days) and the timeline from the dates and the viewer's own date. `issues.items[].status` and `assignee` are read from the issue's text (`Status: <name>`, `Assignee: <display name>`), which is where the Jira connector writes them ([connector-interface](connector-interface.md)), and are `null` when the text has none; `done` counts Done, Closed and Resolved. `mine` is true when the assignee's name is the caller's display name, so two people with one display name would both be marked: it is a highlight, never an access decision. `updates` are the newest six documents in the project's places. `updates[].author` is a display name, or `null` when the Brain has none for that account.
 - No model is involved, and nothing here is cached.
-- Not in it, because the sources do not carry the data yet: sprints, due dates, priorities and a timeline. Also not in it: the list of a team's people, which would reveal who is in a private channel. Assignees appear only on issues the caller can open.
+- Not in it, because the sources do not carry the data yet: Jira's own sprints, due dates and priorities, and on track / at risk. Also not in it: the list of a team's people, which would reveal who is in a private channel. Assignees appear only on issues the caller can open.
 
 ## `GET /v1/mywork`
 Personalized home for the logged-in user: assigned issues, projects, recent pages, channels, suggested questions, pending stale-answer alerts. Everything is fetched through the PDP: nothing the user cannot see.
@@ -166,7 +169,7 @@ Stale-answer alerts: answers the user received whose sources changed afterwards 
 Simulator admin endpoints (owned by A) to revoke a permission, restrict a page, edit a document, and add or remove hidden documents (for Leak-CI). Documented in `simulators/README.md`. The stub API has its own: `/sim/advance`, `/sim/reset`, `/sim/tamper`.
 
 ## Changelog
-- 0.2, 11 Oct: `GET /v1/team` (Team focus) with `assignee` and `mine` per issue, and optional `goal` and `target_date` per project in the registry file.
+- 0.2, 11 Oct: `GET /v1/team` (Team focus) with `assignee` and `mine` per issue, and optional `goal`, `start_date`, `target_date`, `milestone` and `sprint` per project in the registry file.
 - 0.2, 11 Oct: `GET /v1/projects` and `project_profile` in `/mywork` (T7).
 - 0.2, 11 Oct: `/leakci/latest` `status`, and `leaks: null` when no run exists; `/policy/versions` `history_kept: false` (fix F7).
 - 0.2, 11 Oct: `citations[].unverified`, `freshness.unverified_sources` and the `unverified` source status (fix F9).

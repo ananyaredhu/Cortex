@@ -114,7 +114,11 @@ export interface Team {
   project_id: string;
   name: string;
   goal: string | null;
-  target_date: string | null; // YYYY-MM-DD
+  start_date: string | null; // YYYY-MM-DD, like every date here; kept by hand in the registry
+  target_date: string | null;
+  milestone: { label: string; date: string } | null;
+  // total and done follow a rule (open, or finished since the sprint began), over issues the caller may open
+  sprint: { name: string; start_date: string; end_date: string; goal: string | null; total: number; done: number } | null;
   leads: string[];
   places: string[];
   issues: {

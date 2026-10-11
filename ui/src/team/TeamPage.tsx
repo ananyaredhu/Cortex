@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, Hash, SquareKanban } from "lucide-react";
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import type { Source, Team } from "../api/types";
@@ -9,15 +10,15 @@ import { PERSONAS } from "../auth/personas";
 import { Avatar } from "../components/Avatar";
 import { SourceGlyph } from "../components/SourceGlyph";
 import "../home/home.css";
+import { isoDate, shortDay as day, sprintDay } from "./dates";
 import "./team.css";
-
-const day = (iso: string) =>
-  new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${iso}T00:00:00Z`));
+import { Timeline } from "./Timeline";
 
 /**
  * Team focus: the projects the person is a member of, from /v1/team (ui/MOCKUP-DRIFT.md #24).
  * Every count is over documents this person may open, so two members of one project can see different numbers.
- * The mockup's sprint strip and timeline need Jira data that is not ingested yet.
+ * The timeline's dates and the sprint's name, dates and goal are kept by hand in the project registry; Jira's own sprint
+ * field is not ingested, so the sprint's numbers follow a rule the API states (docs/02-contracts/api.md).
  */
 
 // The board's columns, in this order; a status outside them gets its own column after these, and an issue with none
@@ -40,9 +41,11 @@ function split(issue: Issue): { key: string; title: string } {
   const key = shortId(issue.doc_id);
   return { key, title: issue.title.startsWith(`${key} `) ? issue.title.slice(key.length + 1) : issue.title };
 }
-export function TeamPage() {
+/** `today` is for tests; the page uses the viewer's own date. */
+export function TeamPage({ today }: { today?: string }) {
   const { persona } = usePersona();
   const navigate = useNavigate();
+  const now = useMemo(() => today ?? isoDate(new Date()), [today]);
   const team = useQuery({ queryKey: ["team", persona.id], queryFn: () => api(persona.id).team() });
   const teams = team.data?.teams;
 
@@ -63,10 +66,13 @@ export function TeamPage() {
       {team.isError && <p className="banner banner--error">{(team.error as Error).message}</p>}
       {teams && teams.length === 0 && <p className="muted">You are not part of a project yet.</p>}
 
+      {teams && <Timeline teams={teams} today={now} />}
+
       {teams?.map((t) => (
         <TeamCard
           key={t.project_id}
           team={t}
+          today={now}
           onAsk={() => navigate("/ask", { state: { ask: `What is the status of the ${t.name.toLowerCase()}, and what is blocking it?` } })}
         />
       ))}
@@ -74,7 +80,43 @@ export function TeamPage() {
   );
 }
 
-function TeamCard({ team: t, onAsk }: { team: Team; onAsk: () => void }) {
+function SprintStrip({ sprint, name, today }: { sprint: NonNullable<Team["sprint"]>; name: string; today: string }) {
+  const d = sprintDay(sprint, today);
+  const where = d.state === "before" ? `starts ${day(sprint.start_date)}` : d.state === "after" ? "ended" : `day ${d.day} of ${d.of}`;
+  return (
+    <div className="team__sprint">
+      <div className="team__sprint-what">
+        <span className="mono small muted">
+          {sprint.name} · {day(sprint.start_date)} – {day(sprint.end_date)} · {where}
+        </span>
+        {sprint.goal && <strong>{sprint.goal}</strong>}
+      </div>
+      {sprint.total > 0 && (
+        <div className="team__progress">
+          <div className="team__count">
+            <strong>
+              {sprint.done}/{sprint.total}
+            </strong>{" "}
+            sprint tickets done
+          </div>
+          <div
+            className="team__bar"
+            role="progressbar"
+            aria-label={`${name}: sprint tickets done`}
+            aria-valuemin={0}
+            aria-valuemax={sprint.total}
+            aria-valuenow={sprint.done}
+          >
+            <span style={{ width: `${(sprint.done / sprint.total) * 100}%` }} />
+            {d.of > 0 && <i style={{ left: `${(d.day / d.of) * 100}%` }} title="Time gone in the sprint" />}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TeamCard({ team: t, today, onAsk }: { team: Team; today: string; onAsk: () => void }) {
   const { total, done, by_status, items } = t.issues;
   const id = `team-${t.project_id}`;
   return (
@@ -95,31 +137,21 @@ function TeamCard({ team: t, onAsk }: { team: Team; onAsk: () => void }) {
       </header>
       {t.goal && <p className="team__goal">{t.goal}</p>}
 
+      {t.sprint && <SprintStrip sprint={t.sprint} name={t.name} today={today} />}
+
       {total > 0 && (
-        <div className="team__progress">
-          <div className="team__count">
-            <strong>
-              {done} of {total}
-            </strong>{" "}
-            tickets done
-            <span className="team__statuses">
-              {by_status.map((s) => (
-                <span key={s.status} className="home__status">
-                  {s.status} {s.count}
-                </span>
-              ))}
-            </span>
-          </div>
-          <div
-            className="team__bar"
-            role="progressbar"
-            aria-label={`${t.name}: tickets done`}
-            aria-valuemin={0}
-            aria-valuemax={total}
-            aria-valuenow={done}
-          >
-            <span style={{ width: `${(done / total) * 100}%` }} />
-          </div>
+        <div className="team__count">
+          <strong>
+            {done} of {total}
+          </strong>{" "}
+          tickets done in the project
+          <span className="team__statuses">
+            {by_status.map((s) => (
+              <span key={s.status} className="home__status">
+                {s.status} {s.count}
+              </span>
+            ))}
+          </span>
         </div>
       )}
 
