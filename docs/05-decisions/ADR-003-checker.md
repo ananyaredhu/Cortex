@@ -17,6 +17,7 @@ If support is missing at any layer: abstain or redact.
 - The claim check only ever sees authorized content, so a hosted model would be acceptable for layer 3 if CPU is too slow.
 - Time layers 2 and 3 on the deployment server's CPU on Day 3; use a 3B to 4B model if 8B is too slow.
 - Canary strings in restricted documents make the leak scan testable in Leak-CI.
+- **A gray band under the threshold (fix F21, 11 Oct).** Layer 2 under-scores a true claim against a short, informal Slack message (18 to 30 permille on real data, under the 0.05 threshold), which dropped the Slack half of scenario 1 in 3 of 5 runs. A claim scoring between `GROUNDING_FLOOR` (default 0.01) and the threshold is now kept and marked `confidence: "lower"`; under the floor it is dropped as before; a floor equal to the threshold restores the old behaviour. **The 0.01 floor is a judgement, not a measurement:** it sits under every observed false rejection and above the near-zero scores an invented claim should get, but the labeled set (40 pairs) has no distribution of invented claims at that scale. Re-measure with the bigger set (backlog T14) and move the floor if invented claims appear in the band. Trade-off accepted: a few more unsupported claims may be shown, labeled, in exchange for a reliable demo.
 
 ## Measured (check #2, 9 Oct, this laptop: i5-8250U, 4 cores, 8 GB, `python -m brain.checker.timing`)
 40 labeled pairs from fixture text (a sentence against its own document = supported, against another = unsupported).

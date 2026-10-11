@@ -87,6 +87,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .footnote { font-size: var(--fs-12); color: var(--text-muted); margin: var(--space-2) 0 0; }
 .chip { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px; border: var(--border-1); border-radius: var(--radius-pill); background: var(--surface-card); font-size: var(--fs-12); color: var(--text-body); }
 .chip:hover { border-color: var(--border-strong); }
+.chip--lower { height: 20px; margin: 0 4px; padding: 0 8px; font-size: var(--fs-11, 11px); background: var(--warning-soft); }
 .chip[aria-pressed="true"] { background: var(--surface-inverse); border-color: var(--surface-inverse); color: var(--text-on-inverse); }
 .chip--static { height: 22px; padding: 0 8px; cursor: default; }
 .chip--static:hover { border-color: var(--border-subtle); }

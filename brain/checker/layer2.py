@@ -5,8 +5,10 @@ model, or a natural-language-inference model where "entailment" stands for "supp
 the premises are the cited evidence (only authorized text, already in the packet), as the whole snippet and as short
 sentence windows, because NLI models are trained on short premises and under-score a claim against a long block
 (measured 9 Oct: true claims at 4 permille against a 600-character snippet, 990 against the right three sentences).
-A claim's score is its best over all windows of all its citations. Under the threshold it is dropped; if none
-survive, the answer abstains.
+A claim's score is its best over all windows of all its citations. At or above the threshold it stands. Between the floor and
+the threshold it is kept and marked `confidence: "lower"` (fix F21: the model under-scores a true claim against a short, informal
+Slack message, 18 to 30 permille on real data, and dropping it made scenario 1 lose its Slack half). Under the floor it is dropped;
+if none survive, the answer abstains. A floor equal to the threshold means no gray band.
 
 `CHECKER_MODEL` names the model (`none` disables the layer). Timings per candidate: `python -m brain.checker.timing`.
 """
@@ -37,10 +39,16 @@ class Layer2Result:
     skipped: bool = False
 
     @property
+    def lower_confidence(self) -> int:
+        return sum(c.get("confidence") == "lower" for c in self.claims)
+
+    @property
     def status(self) -> str:
         if self.skipped:
             return "skipped"
-        return "fail" if self.removed_claims else "pass"
+        if self.removed_claims:
+            return "fail"
+        return "lower_confidence" if self.lower_confidence else "pass"
 
 
 class FakeScorer:
@@ -119,8 +127,10 @@ def premises(text: str, max_chars: int = 1200) -> list[str]:
 
 
 def check_layer2(claims: list[dict], evidence_text: dict[str, str], scorer: GroundingScorer | None, *,
-                 threshold: float = 0.5, max_premise_chars: int = 1200) -> Layer2Result:
-    """Keep the claims the model finds supported by at least one window of one of their cited documents."""
+                 threshold: float = 0.5, floor: float | None = None, max_premise_chars: int = 1200) -> Layer2Result:
+    """Keep the claims the model finds supported by at least one window of one of their cited documents; keep, marked lower
+    confidence, those that score between `floor` and `threshold`."""
+    floor = threshold if floor is None else min(floor, threshold)
     if scorer is None or not claims:
         return Layer2Result(list(claims), 0, [], "none", skipped=True)
     pairs: list[tuple[str, str]] = []
@@ -135,7 +145,7 @@ def check_layer2(claims: list[dict], evidence_text: dict[str, str], scorer: Grou
     best = [0.0] * len(claims)
     for i, s in zip(owners, raw, strict=True):
         best[i] = max(best[i], s)
-    kept = [c for c, s in zip(claims, best, strict=True) if s >= threshold]
+    kept = [c if s >= threshold else {**c, "confidence": "lower"} for c, s in zip(claims, best, strict=True) if s >= floor]
     return Layer2Result(kept, len(claims) - len(kept), [int(round(s * 1000)) for s in best], scorer.model)
 
 
