@@ -27,13 +27,15 @@ export interface Citation {
   as_of: string;
   why_visible: string[];
   excerpt?: string; // 0.2
+  unverified?: boolean; // the live freshness check failed for this document
 }
 
-export type FreshnessStatus = "ok" | "stale" | "unavailable";
+export type FreshnessStatus = "ok" | "stale" | "unavailable" | "unverified";
 
 export interface Freshness {
   oldest_source_as_of: string | null;
   stale_refetched: number;
+  unverified_sources?: Source[]; // the live version check failed, so an indexed copy was served unchecked
   per_source?: Partial<Record<Source, { last_sync: string; status: FreshnessStatus }>>; // 0.2
 }
 

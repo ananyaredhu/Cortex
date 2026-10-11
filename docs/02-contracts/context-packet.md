@@ -63,6 +63,7 @@ Conversation memory entries are labeled with the intersection of their sources' 
 Context precision and recall on the golden set, citation precision, abstention correctness, and token cost per answer.
 
 ## Changelog
+- 0.1, 11 Oct: evidence `flags` may hold `freshness_unverified`: the live version check failed and the indexed copy was served (fix F9). It is also recorded in the audit event's `flags`.
 - 0.1, 11 Oct: sanitizer narrowed and extended (fix F6); sentences end at . ! ? 。！？ or a new line.
 - 0.1, 11 Oct: `task.standalone_question`: for a follow-up ("why?"), the question restated with the last turn's topic, which is also what retrieval searched for; `null` otherwise. The model is told to answer it. Found by running a follow-up against the real ADP agent, which abstained when given only the bare question.
 - 0.1, 11 Oct: `task.procedure` (the selected skill's procedure, from a reviewed file, or `null`) and `history` (the person's own earlier turns of this conversation, at most `memory_turns`, each re-checked against the person's current access: a turn whose cited documents they may no longer open is left out; `query` is the standalone search text the turn was run with). `history` says what a follow-up refers to and is never evidence: every claim still cites `evidence`.
