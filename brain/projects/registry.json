@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "note": "Company A's projects, seeded by hand (docs/company-a-seed.md has the story). Ids are the fixture IDs; the real runtime translates Slack and Drive ones through the seed manifests. member_tokens say who counts as part of a project (globs); visibility of a project or any part of it comes from the documents a person may open, never from this file.",
+  "projects": [
+    {"project_id": "DBMIG", "name": "Database migration",
+     "aliases": ["db migration", "database migration", "the migration", "our migration", "the cutover", "dbmig"],
+     "components": {"jira": ["DBMIG"], "slack": ["C_DBMIG", "C_DBMIGPRIV"]},
+     "member_tokens": ["role:DBMIG:*", "channel:C_DBMIG", "channel:C_DBMIGPRIV"],
+     "owners": ["maya@companya.com"]},
+    {"project_id": "PAYINC", "name": "Payment outage and incident response",
+     "aliases": ["payment outage", "payments outage", "payment incident", "payment incidents", "payinc", "payment service", "payment-service"],
+     "components": {"jira": ["PAYINC"], "slack": ["C_PAYINC"], "confluence": ["PAY"], "gdrive": ["folder-incidents"]},
+     "member_tokens": ["role:PAYINC:*", "channel:C_PAYINC", "group:gdrive:payments-eng", "group:confluence:payments-eng"],
+     "owners": ["maya@companya.com"]},
+    {"project_id": "AUTH", "name": "Auth service",
+     "aliases": ["auth service", "authentication service", "new auth service", "auth design", "auth-service"],
+     "components": {"slack": ["C_AUTH", "C_AUTHPRIV"], "confluence": ["ENG"]},
+     "member_tokens": ["channel:C_AUTH", "channel:C_AUTHPRIV"],
+     "owners": ["priya@companya.com"]},
+    {"project_id": "SEC", "name": "Security incidents",
+     "aliases": ["q3 breach", "security incident", "security incidents", "sec-17"],
+     "components": {"jira": ["SEC"], "confluence": ["SEC"]},
+     "member_tokens": ["group:confluence:security-team", "group:jira:security-team"],
+     "owners": ["dana@companya.com"]}
+  ]
+}

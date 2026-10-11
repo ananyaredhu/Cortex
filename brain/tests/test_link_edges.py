@@ -19,7 +19,8 @@ ONBOARDING = "contractor onboarding laptop repository access"
 
 
 def make(**settings):
-    return fixture_runtime(Settings(floor_latency_ms=0, **settings))
+    """These tests are about the link mechanism alone, so the project registry (which would also supply the DBMIG documents) is off."""
+    return fixture_runtime(Settings(floor_latency_ms=0, projects=False, **settings))
 
 
 def run(rt, who, question):

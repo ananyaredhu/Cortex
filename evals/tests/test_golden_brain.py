@@ -66,7 +66,8 @@ def test_a_link_from_a_visible_document_never_reaches_a_forbidden_one(runtime, c
     assert "SEC-17" not in dump and "q3-breach" not in dump and "CANARY-" not in dump
 
 
-def test_a_linked_document_is_reached_for_someone_who_may_open_it(client):
+def test_a_related_document_is_reached_for_someone_who_may_open_it(client):
+    """The Slack thread is reached from a question that names only the ticket, by link expansion and by the project registry. Which
+    mechanism does it is tested on its own (`brain/tests/test_link_edges.py`, `test_projects.py`)."""
     r = client.post("/v1/ask", json={"question": "DBMIG-142 status"}, headers=H("priya")).json()
-    linked = {c["doc_id"]: c["via_link_from"] for c in r["citations"]}
-    assert linked.get("slack:C_DBMIG/thread-1") == "jira:DBMIG-142"
+    assert "slack:C_DBMIG/thread-1" in {c["doc_id"] for c in r["citations"]}

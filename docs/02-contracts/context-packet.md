@@ -12,7 +12,7 @@ Context engineering is an explicit pipeline stage: select, compress, order and b
   "user_context": {
     "display_name": "Priya",
     "teams": ["payments-eng"],
-    "projects": ["DBMIG", "PAY"],
+    "projects": ["Database migration", "Payment outage and incident response"],
     "recent_focus": ["DBMIG"],
     "glossary_hits": {"our migration": "DBMIG"}
   },
@@ -20,6 +20,7 @@ Context engineering is an explicit pipeline stage: select, compress, order and b
     "question": "What's the status of the DB migration ...?",
     "skill": "status-and-blockers",
     "standalone_question": null,
+    "projects": ["Database migration"],
     "procedure": "# Procedure\n1. ...",
     "output_schema": "claims_with_citations_v1"
   },
@@ -63,6 +64,7 @@ Conversation memory entries are labeled with the intersection of their sources' 
 Context precision and recall on the golden set, citation precision, abstention correctness, and token cost per answer.
 
 ## Changelog
+- 0.1, 11 Oct: `task.projects` (names of the projects the question names, from the registry, only those the asker may see) and `user_context.projects` now holds the names of the projects the asker is a member of. Names only: never a place, a channel or a document (T7).
 - 0.1, 11 Oct: evidence `flags` may hold `freshness_unverified`: the live version check failed and the indexed copy was served (fix F9). It is also recorded in the audit event's `flags`.
 - 0.1, 11 Oct: sanitizer narrowed and extended (fix F6); sentences end at . ! ? 。！？ or a new line.
 - 0.1, 11 Oct: `task.standalone_question`: for a follow-up ("why?"), the question restated with the last turn's topic, which is also what retrieval searched for; `null` otherwise. The model is told to answer it. Found by running a follow-up against the real ADP agent, which abstained when given only the bare question.

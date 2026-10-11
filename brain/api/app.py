@@ -164,9 +164,15 @@ def create_app(runtime: Runtime) -> FastAPI:
             "channels": sorted({d.parent_id for d in vis if d.source == "slack" and d.parent_id}),
             "recent_pages": [{"doc_id": d.doc_id, "title": d.title, "updated_at": d.updated_at, "url": d.url}
                              for d in vis if d.source in ("confluence", "gdrive")][:5],
+            "project_profile": runtime.brain.project_profile(p),
             "suggested_questions": suggestions.get(p.email, []),
             "alerts": runtime.brain.alerts(p),
         }
+
+    @app.get("/v1/projects")
+    def projects(p: Current):
+        """The caller's projects (T7): only those, and only the places in them, that they may open something in."""
+        return {"projects": runtime.brain.project_profile(p)}
 
     @app.get("/v1/explain-access")
     def explain_access(doc_id: str, p: Current):

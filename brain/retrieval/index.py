@@ -48,6 +48,9 @@ class IndexReader(Protocol):
     def chunks_of(self, doc_id: str) -> list[ChunkRow]: ...
     def documents_visible(self, tokens: list[str], source: str | None = None, limit: int = 200) -> list[DocRow]: ...
     def documents_hidden(self, tokens: list[str]) -> list[DocRow]: ...
+    def parents_visible(self, tokens: list[str]) -> set[str]: ...
+    def documents_under(self, parents: list[str], tokens: list[str], limit: int = 10) -> list[DocRow]: ...
+    def documents_all(self) -> list[DocRow]: ...
 
 
 def _stem(word: str) -> str:
@@ -101,6 +104,20 @@ class MemoryIndex:
         seen = {c.doc_id for c in self._rows(source, tokens)}
         rows = [self.document(d) for d in sorted(seen)]
         return sorted([r for r in rows if r], key=lambda r: r.updated_at or "", reverse=True)[:limit]
+
+    def parents_visible(self, tokens: list[str]) -> set[str]:
+        """The containers (`jira:DBMIG`, `slack:C_DBMIG`, ...) holding at least one document the tokens reach."""
+        return {r.parent_id for r in self.documents_visible(tokens, limit=10_000) if r.parent_id}
+
+    def documents_under(self, parents: list[str], tokens: list[str], limit: int = 10) -> list[DocRow]:
+        """Documents in the given containers that the tokens reach, newest first."""
+        wanted = set(parents)
+        return [r for r in self.documents_visible(tokens, limit=10_000) if r.parent_id in wanted][:limit]
+
+    def documents_all(self) -> list[DocRow]:
+        """Every live document, for administrators' tools. Nothing the asker-facing code calls."""
+        rows = [self.document(d) for d in sorted(self._store.documents)]
+        return [r for r in rows if r and not r.deleted]
 
     def documents_hidden(self, tokens: list[str]) -> list[DocRow]:
         """Every live document no chunk of which carries one of `tokens`: what the prefilter keeps from the asker (fix F5)."""
@@ -184,6 +201,25 @@ class PostgresIndex:
             " AND EXISTS (SELECT 1 FROM chunks c WHERE c.doc_id = d.doc_id AND c.acl_tokens && %(tokens)s::text[])"
             " ORDER BY updated_at DESC NULLS LAST LIMIT %(limit)s",
             {"source": source, "tokens": list(tokens), "limit": limit}).fetchall()
+        return [self._doc(r) for r in rows]
+
+    def parents_visible(self, tokens: list[str]) -> set[str]:
+        rows = self._conn.execute(
+            "SELECT DISTINCT parent_id FROM documents d WHERE NOT deleted AND parent_id IS NOT NULL AND EXISTS"
+            " (SELECT 1 FROM chunks c WHERE c.doc_id = d.doc_id AND c.acl_tokens && %(tokens)s::text[])",
+            {"tokens": list(tokens)}).fetchall()
+        return {r[0] for r in rows}
+
+    def documents_under(self, parents: list[str], tokens: list[str], limit: int = 10) -> list[DocRow]:
+        rows = self._conn.execute(
+            f"SELECT {DOC_COLUMNS} FROM documents d WHERE NOT deleted AND parent_id = ANY(%(parents)s::text[]) AND EXISTS"
+            " (SELECT 1 FROM chunks c WHERE c.doc_id = d.doc_id AND c.acl_tokens && %(tokens)s::text[])"
+            " ORDER BY updated_at DESC NULLS LAST LIMIT %(limit)s",
+            {"parents": list(parents), "tokens": list(tokens), "limit": limit}).fetchall()
+        return [self._doc(r) for r in rows]
+
+    def documents_all(self) -> list[DocRow]:
+        rows = self._conn.execute(f"SELECT {DOC_COLUMNS} FROM documents WHERE NOT deleted ORDER BY doc_id").fetchall()
         return [self._doc(r) for r in rows]
 
     def documents_hidden(self, tokens: list[str]) -> list[DocRow]:

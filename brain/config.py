@@ -47,6 +47,7 @@ class Settings:
     baseline_interval_s: float = 1800.0       # how often every known person's token set is re-recorded (time-travel history)
     decision_ttl_s: float = 15.0
     floor_latency_ms: int = 300               # every /ask takes at least this long: uniform timing
+    projects: bool = True                     # resolve project names in a question to the places that belong to them (brain/projects)
     skills: bool = True                       # route a question to a skill (brain/skills); False = the default procedure only
     memory_turns: int = 3                     # earlier turns of a conversation a follow-up may use; 0 = no memory
     candidates: int = 8                       # documents retrieved before the just-in-time check

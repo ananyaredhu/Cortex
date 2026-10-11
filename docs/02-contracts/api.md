@@ -90,6 +90,9 @@ Rules:
 - An answer is a derived artifact ([acl-model](acl-model.md), labels): it is shown again only if the caller may still open **every** document it cited, by its stored label and a live check. Otherwise `answer` is `null`, `citations` is `[]` and `withheld` is `true`; the question stays. Nothing in a withheld turn names the document that was revoked.
 - Turns carry what the log holds: no `claims`, `freshness`, `coverage` or `grounding`. The UI renders a reopened answer as plain text with its citations.
 
+## `GET /v1/projects` *(0.2, 11 Oct, T7)*
+The caller's projects from the project registry (`brain/projects/registry.json`): `{"projects": [{"project_id", "name", "member", "places"}]}`. `places` are the containers (`jira:DBMIG`, `slack:C_DBMIG`, `confluence:PAY`, `gdrive:folder-incidents`) the caller may open something in; a project none of whose places they may open is absent, and so is any place they cannot open (a private channel under a project they can see). `member` is true when the caller holds one of the project's member tokens, so seeing a project through public pages does not make someone part of it. Another person's projects are never returned. Also returned as `project_profile` in `/mywork`.
+
 ## `GET /v1/mywork`
 Personalized home for the logged-in user: assigned issues, projects, recent pages, channels, suggested questions, pending stale-answer alerts. Everything is fetched through the PDP: nothing the user cannot see.
 ```json
@@ -142,6 +145,7 @@ Stale-answer alerts: answers the user received whose sources changed afterwards 
 Simulator admin endpoints (owned by A) to revoke a permission, restrict a page, edit a document, and add or remove hidden documents (for Leak-CI). Documented in `simulators/README.md`. The stub API has its own: `/sim/advance`, `/sim/reset`, `/sim/tamper`.
 
 ## Changelog
+- 0.2, 11 Oct: `GET /v1/projects` and `project_profile` in `/mywork` (T7).
 - 0.2, 11 Oct: `/leakci/latest` `status`, and `leaks: null` when no run exists; `/policy/versions` `history_kept: false` (fix F7).
 - 0.2, 11 Oct: `citations[].unverified`, `freshness.unverified_sources` and the `unverified` source status (fix F9).
 - 0.2, 11 Oct: `claims[].confidence: "lower"` and `grounding.lower_confidence` (fix F21).
