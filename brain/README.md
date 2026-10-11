@@ -13,7 +13,7 @@ python -m brain.timing      # revocation-to-enforcement timing, B's stage on top
 Auth is `Authorization: Bearer dev:<persona>` while `BRAIN_DEV_AUTH` is not `0`, or a JWT (HS256, `JWT_SIGNING_KEY`,
 claims `sub`, `email`, `roles`, `aud`). The UI switches from the stub to this with `API_TARGET`.
 
-bge-m3 loads at start-up (about 30 s warm, several minutes the first time). Nothing answers before it has.
+bge-m3 loads at start-up (about 30 s warm, several minutes the first time). Nothing answers before it has. Models are cached in `HF_HOME` (about 5 GB for bge-m3 and the checker): point it at any folder with that much free space, for example `HF_HOME=/some/big/disk/hf` in `.env`; empty means the Hugging Face default under your user folder.
 
 ## What a question goes through (`pipeline/graph.py`, one LangGraph node each)
 | Node | Stage shown in the UI | What it does | Plane |
