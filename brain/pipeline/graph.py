@@ -25,17 +25,20 @@ from brain.checker import CheckResult, GroundingScorer, Layer2Result, check, che
 from brain.checker.layer2 import rebuild_answer
 from brain.config import ABSTAIN, POLICY_VERSION, REFUSAL, SOURCES, STAGES, UNAVAILABLE, Settings
 from brain.gateway.models import Generated, Generator
+from brain.pipeline.rewrite import rewrite_query
 from brain.policy.identity import AskerIdentity, IdentityResolver
 from brain.policy.labels import acl_label, may_serve
 from brain.policy.leakscan import DeniedDoc
 from brain.policy.pdp import PDP, Decision, hash_denied, source_of
 from brain.retrieval import Candidate, IndexReader, hybrid_search, query_terms
+from brain.skills import Registry, Skill
 from connectors.base import Connector, DocumentNotFound
 from connectors.ingestion.embedding import Embedder
 from connectors.ingestion.store import Store
 
 StageCallback = Callable[[str, str], None]        # (stage, "start" | "done")
-NODE_STAGE = {"identity": "retrieve", "retrieve": "retrieve", "authorize": "authorize", "expand": "authorize",
+NODE_STAGE = {"identity": "retrieve", "understand": "retrieve", "retrieve": "retrieve", "authorize": "authorize",
+              "expand": "authorize",
               "freshness": "verify_live",
               "generate": "generate", "check": "check", "finalize": "check", "audit": "check"}
 STALE_AFTER_S = 300          # a source whose last successful pass is older than this is reported "stale"
@@ -68,6 +71,10 @@ class State(TypedDict, total=False):
     request: AskRequest
     started: float
     asker: AskerIdentity
+    history: list[dict]             # the person's earlier turns in this conversation, re-checked, oldest first
+    search_query: str               # what retrieval looks for: the question, or a follow-up rewritten with the last turn
+    rewritten: bool
+    skill: Skill | None
     searched: list[str]
     unavailable: list[str]
     terms: list[str]
@@ -95,7 +102,8 @@ class Brain:
     def __init__(self, settings: Settings, connectors: Mapping[str, Connector], index: IndexReader, store: Store | None,
                  embedder: Embedder | None, generator: Generator, audit: AuditStore, *,
                  resolver: IdentityResolver | None = None, pdp: PDP | None = None,
-                 scorer: GroundingScorer | None = None, link_resolver: Callable[[str], str] | None = None) -> None:
+                 scorer: GroundingScorer | None = None, link_resolver: Callable[[str], str] | None = None,
+                 skills: Registry | None = None) -> None:
         self.settings = settings
         self.connectors = dict(connectors)
         self.index = index
@@ -104,6 +112,7 @@ class Brain:
         self.generator = generator
         self.audit = audit
         self.scorer = scorer
+        self.skills = skills if skills is not None else Registry.load()
         self.link_resolver = link_resolver or (lambda doc_id: doc_id)   # stored link -> the ID the index and connectors use
         self.resolver = resolver or IdentityResolver(self.connectors, ttl_s=settings.identity_ttl_s)
         self.pdp = pdp or PDP(self.connectors, policy_version=POLICY_VERSION, ttl_s=settings.decision_ttl_s)
@@ -146,9 +155,9 @@ class Brain:
     # -- graph ----------------------------------------------------------------------------------
     def _build(self):
         g = StateGraph(State)
-        nodes = [("identity", self._identity), ("retrieve", self._retrieve), ("authorize", self._authorize),
-                 ("expand", self._expand), ("freshness", self._freshness), ("generate", self._generate), ("check", self._check),
-                 ("finalize", self._finalize), ("audit", self._audit)]
+        nodes = [("identity", self._identity), ("understand", self._understand), ("retrieve", self._retrieve),
+                 ("authorize", self._authorize), ("expand", self._expand), ("freshness", self._freshness),
+                 ("generate", self._generate), ("check", self._check), ("finalize", self._finalize), ("audit", self._audit)]
         for name, fn in nodes:
             g.add_node(name, self._staged(name, fn))
         g.add_edge(START, nodes[0][0])
@@ -187,20 +196,47 @@ class Brain:
     def _identity(self, state: State) -> dict:
         return {"asker": self.resolver.resolve(state["principal"].email)}
 
+    def _understand(self, state: State) -> dict:
+        """The router and the rewrite (backlog T5, T6): which skill applies, and what a follow-up is really asking for."""
+        req, p = state["request"], state["principal"]
+        history = self._history(p, req.conversation_id)
+        query, rewritten = rewrite_query(req.question, history)
+        skill = self.skills.select(query, p.roles, hint=req.skill_hint) if self.settings.skills else None
+        return {"history": history, "search_query": query, "rewritten": rewritten, "skill": skill}
+
+    def _history(self, principal: Principal, conversation_id: str | None) -> list[dict]:
+        """The last few answered turns of the caller's own conversation, as memory for a follow-up.
+
+        Memory is a derived artifact: `conversation()` shows an answer again only if the asker may still open every
+        document it cited (its ACL label and a live PDP check), so a turn whose source was revoked comes back withheld and is
+        dropped here. A refused, abstained or failed turn carries no answer worth remembering. Someone else's conversation
+        and a nonexistent one look alike: no history."""
+        if not conversation_id or not self.settings.memory_turns:
+            return []
+        conversation = self.conversation(principal, conversation_id)
+        turns = [t for t in (conversation or {}).get("turns", [])
+                 if not t["withheld"] and t["answer"] and not (t["refused"] or t["abstained"] or t["unavailable"])]
+        out: list[dict] = []
+        for t in turns[-self.settings.memory_turns:]:
+            standalone, _ = rewrite_query(t["question"], out)          # a follow-up turn keeps the topic it was searched under
+            out.append({"question": t["question"], "query": standalone, "answer": packetlib.sanitize(t["answer"])[0][:800]})
+        return out
+
     def _retrieve(self, state: State) -> dict:
         req, asker = state["request"], state["asker"]
-        wanted = [s for s in self.settings.sources if not req.sources or s in req.sources]
+        skill = state.get("skill")
+        wanted = [s for s in self.settings.sources if (not req.sources or s in req.sources) and (not skill or s in skill.sources)]
         unavailable = [s for s in wanted if s in asker.unavailable]
         searched = [s for s in wanted if s in asker.identities and s not in unavailable]
-        terms = query_terms(req.question)
+        terms = query_terms(state["search_query"])
         vector = model = None
         if self.embedder is not None and self.embedder.model not in ("none",):
             try:
-                vector = self.embedder.embed([req.question])[0]
+                vector = self.embedder.embed([state["search_query"]])[0]
                 model = self.embedder.model
             except Exception:                        # noqa: BLE001 - the keyword leg still runs
                 vector = None
-        candidates = hybrid_search(self.index, req.question, asker.tokens, searched, vector=vector, model=model,
+        candidates = hybrid_search(self.index, state["search_query"], asker.tokens, searched, vector=vector, model=model,
                                    candidates=self.settings.candidates, max_distance=self.settings.max_vector_distance)
         return {"searched": searched, "unavailable": unavailable, "terms": terms, "candidates": candidates}
 
@@ -310,9 +346,13 @@ class Brain:
     def _generate(self, state: State) -> dict:
         p, asker = state["principal"], state["asker"]
         user_context = {"display_name": p.display_name or p.email, "sources": list(asker.sources())}
+        skill = state.get("skill")
         pkt = packetlib.build_packet(state["request_id"], user_context, state["request"].question,
-                                     state["request"].skill_hint, state["evidence"],
-                                     per_source_quota=self.settings.per_source_quota, max_evidence=self.settings.max_evidence)
+                                     skill.name if skill else None, state["evidence"],
+                                     per_source_quota=self.settings.per_source_quota,
+                                     max_evidence=skill.max_evidence if skill else self.settings.max_evidence,
+                                     procedure=skill.procedure if skill else None, history=state.get("history"),
+                                     standalone=state["search_query"] if state.get("rewritten") else None)
         flags = sorted({f for e in pkt["evidence"] for f in e["flags"]})
         return {"packet": pkt, "generated": self.generator.generate(pkt), "flags": flags}
 
@@ -329,6 +369,7 @@ class Brain:
 
     def _finalize(self, state: State) -> dict:
         req, checked, pkt = state["request"], state["checked"], state["packet"]
+        skill = state.get("skill")
         proof = {d.doc_id: list(d.proof_path) for d in state["decisions"] if d.allowed}
         refused = not pkt["evidence"]
         # Fix F11: a model failure is not "no source supports an answer". It needs evidence to have been sent, so a
@@ -356,7 +397,7 @@ class Brain:
             "citations": citations, "refused": refused, "abstained": abstained, "generator_unavailable": unavailable,
             "freshness": {"oldest_source_as_of": min((c["as_of"] for c in citations if c["as_of"]), default=None),
                           "stale_refetched": state["stale_refetched"], "per_source": self._per_source(state["unavailable"])},
-            "skill": req.skill_hint,
+            "skill": skill.name if skill else None,
             "coverage": {s: {"searched": s in state["searched"], "shown": sum(c["source"] == s for c in citations)}
                          for s in SOURCES},
             "grounding": None if (refused or abstained or unavailable) else checked.grounding,
@@ -385,13 +426,16 @@ class Brain:
 
     def _audit(self, state: State) -> dict:
         p, req, resp, checked = state["principal"], state["request"], state["response"], state["checked"]
+        skill = state.get("skill")
         salt = self.settings.denied_id_salt
         cited = [c["doc_id"] for c in resp["citations"]]
         label = acl_label(e["acl_label"] for e in state["packet"]["evidence"] if e["doc_id"] in cited)
         event = {
             "request_id": state["request_id"], "event_type": "ask", "conversation_id": resp["conversation_id"],
             "actor": {"user_id": p.email, "roles": list(p.roles), "client": p.client},
-            "query": {"text": req.question, "skill": req.skill_hint},
+            "query": {"text": req.question, "skill": skill.name if skill else None,
+                      "skill_version": skill.version if skill else None, "skill_sha256": skill.sha256 if skill else None,
+                      "rewritten": state["search_query"] if state.get("rewritten") else None},
             "decisions": [d.audit_view(salt) for d in state["decisions"]],
             "answer": {"text": resp["answer"], "sha256": sha256_text(resp["answer"]), "citations": cited,
                        "refused": resp["refused"], "abstained": resp["abstained"],

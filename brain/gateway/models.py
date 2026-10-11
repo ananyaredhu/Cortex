@@ -17,6 +17,24 @@ If the evidence does not support an answer, return no claims. Respond with JSON 
 {"answer": "<short answer in prose>", "claims": [{"text": "<one claim>", "citations": ["<doc_id>", ...]}]}"""
 
 
+def system_prompt(packet: dict) -> str:
+    """The fixed instructions, then the skill's procedure and a note on the earlier turns when the packet has them.
+
+    The procedure comes from a reviewed file in the repo, never from a document. `history` is the person's own earlier turns,
+    already re-checked: it says what a follow-up refers to and is never evidence. Every claim still cites packet evidence."""
+    task = packet.get("task") or {}
+    text = SYSTEM_PROMPT
+    if task.get("procedure"):
+        text += f"\n\nProcedure for this question (skill {task.get('skill')}):\n{task['procedure']}"
+    if task.get("standalone_question"):
+        text += ("\n\nThe question is a follow-up. `task.standalone_question` restates it with the earlier turns: answer that "
+                 "question, using only the evidence.")
+    if packet.get("history"):
+        text += ("\n\n`history` holds the earlier turns of this conversation. Use it only to understand what the question refers "
+                 "to. It is not evidence: cite only evidence from this packet.")
+    return text
+
+
 @dataclass
 class Generated:
     answer: str
@@ -58,7 +76,7 @@ class OpenAICompatibleGenerator:
         if not packet["evidence"]:
             return Generated("", [], abstained=True, model=self.model)
         body = {"model": self.model, "temperature": 0,
-                "messages": [{"role": "system", "content": SYSTEM_PROMPT},
+                "messages": [{"role": "system", "content": system_prompt(packet)},
                              {"role": "user", "content": json.dumps(packet, ensure_ascii=False)}],
                 "response_format": {"type": "json_object"}}
         try:
