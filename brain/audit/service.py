@@ -34,8 +34,14 @@ class AuditService:
         key (`signer_pinned`: true). Without one each checkpoint is checked against the key it carries, which proves the
         chain was not edited but not who signed it, so a restart no longer looks like tampering (fix F3)."""
         pinned = getattr(self._store, "pinned_public_key_hex", None)
-        out = chain.verify(self._store.all(), public_key_hex=pinned).as_json()
+        events = self._store.all()
+        result = chain.verify(events, public_key_hex=pinned)
+        anchor = getattr(self._store, "anchor", None)
+        if result.ok and anchor is not None:             # the log is consistent with itself; is it all still there? (fix F4)
+            result = chain.check_head(events, anchor.latest(), public_key_hex=pinned) or result
+        out = result.as_json()
         out["signer_pinned"] = pinned is not None
+        out["head_anchored"] = anchor is not None
         return out
 
     # -- query ----------------------------------------------------------------------------------
