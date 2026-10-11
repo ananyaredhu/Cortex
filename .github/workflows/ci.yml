@@ -8,6 +8,25 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # Postgres with pgvector, so the database tests run in CI instead of being skipped (fix F8). Each test makes its own throwaway
+    # schema from db/init.sql, so nothing here needs seeding.
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: brain
+          POSTGRES_PASSWORD: brain
+          POSTGRES_DB: brain
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U brain"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://brain:brain@localhost:5432/brain
+      REQUIRE_DATABASE: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
