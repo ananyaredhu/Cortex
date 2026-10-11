@@ -20,7 +20,7 @@ Most AI assistants copy data in once and check permissions only then. If someone
 | One question, all sources | Finds answers across all four tools and cites where they came from |
 | Fresh | Edits appear within minutes, never an out-of-date copy |
 | Private by default | You only get what you may see, and hidden things are never confirmed to exist |
-| Instant revocation | Lose access, and the very next question already reflects it |
+| Fast revocation | Lose access, and the next question after the system notices already reflects it: within a second once it has noticed, and within a minute at the very worst, even if it has not yet |
 | A diary nobody can secretly edit | Compliance officers can ask what any person accessed and trust the answer |
 
 ## How it works: a bank vault with a guard
