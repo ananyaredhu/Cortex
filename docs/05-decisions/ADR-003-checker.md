@@ -14,6 +14,7 @@ If support is missing at any layer: abstain or redact.
 
 ## Consequences
 - The denied-set scan is **always local**; denied content is never sent to any model or third party.
+- **What "denied set" means (fix F5, 11 Oct):** every live document the asker's tokens do not reach (the ones the prefilter keeps out of retrieval), plus any candidate the live check refused. Before the fix only refused candidates were compared, a set that is almost always empty, so "clean" overstated what was checked. The log now records `checks.leak_scan_docs`. Entries are prepared once per document version (shingles and canaries) and reused. A test with a generator that leaks a canary through an allowed citation proves the scan catches it, and a negative control proves it would not have before.
 - The claim check only ever sees authorized content, so a hosted model would be acceptable for layer 3 if CPU is too slow.
 - Time layers 2 and 3 on the deployment server's CPU on Day 3; use a 3B to 4B model if 8B is too slow.
 - Canary strings in restricted documents make the leak scan testable in Leak-CI.

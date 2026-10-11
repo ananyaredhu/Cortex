@@ -28,7 +28,7 @@ from brain.gateway.models import Generated, Generator
 from brain.pipeline.rewrite import rewrite_query
 from brain.policy.identity import AskerIdentity, IdentityResolver
 from brain.policy.labels import acl_label, may_serve
-from brain.policy.leakscan import DeniedDoc
+from brain.policy.leakscan import DeniedDoc, prepare
 from brain.policy.pdp import PDP, Decision, hash_denied, source_of
 from brain.retrieval import Candidate, IndexReader, hybrid_search, query_terms
 from brain.skills import Registry, Skill
@@ -119,6 +119,7 @@ class Brain:
         self.answers: dict[str, Answered] = {}
         self._lock = threading.Lock()
         self._identity_seen: dict[str, frozenset[str]] = {}
+        self._leak_cache: dict[tuple[str, str], DeniedDoc] = {}      # prepared denied-set entries, by document and version
         for event in audit.all():                                 # the last snapshot per person survives a restart
             if event.get("event_type") == "identity_snapshot":
                 self._identity_seen[event["identity"]["user"]] = frozenset(event["identity"]["tokens"])
@@ -246,14 +247,25 @@ class Brain:
         decisions = self.pdp.check_many(asker, [(c.doc_id, versions[c.doc_id]) for c in state["candidates"]])
         allowed_ids = {d.doc_id for d in decisions if d.allowed}
         allowed = [c for c in state["candidates"] if c.doc_id in allowed_ids]
-        denied_docs = []
-        for c in state["candidates"]:
-            if c.doc_id in allowed_ids:
-                continue
-            row = self.index.document(c.doc_id)
-            text = " ".join(ch.text for ch in self.index.chunks_of(c.doc_id))
-            denied_docs.append(DeniedDoc(c.doc_id, row.title if row else "", text))
-        return {"decisions": decisions, "allowed": allowed, "denied_docs": denied_docs}
+        return {"decisions": decisions, "allowed": allowed,
+                "denied_docs": self._denied_set(asker, [c.doc_id for c in state["candidates"] if c.doc_id not in allowed_ids])}
+
+    def _denied_set(self, asker: AskerIdentity, denied_candidates: list[str]) -> list[DeniedDoc]:
+        """What the leak scan compares an answer with (fix F5): every live document the asker's tokens do not reach, the
+        very ones the prefilter kept out of retrieval, plus any candidate the live check refused. Scanning only the
+        refused candidates compared answers with almost nothing, because the prefilter removes forbidden documents first."""
+        wanted = {d.doc_id: d for d in self.index.documents_hidden(sorted(asker.tokens))}
+        for doc_id in denied_candidates:
+            if doc_id not in wanted and (row := self.index.document(doc_id)) is not None:
+                wanted[doc_id] = row
+        out = []
+        for doc_id, row in wanted.items():
+            key = (doc_id, row.version)
+            if key not in self._leak_cache:
+                text = " ".join(ch.text for ch in self.index.chunks_of(doc_id))
+                self._leak_cache[key] = prepare(DeniedDoc(doc_id, row.title, text))
+            out.append(self._leak_cache[key])
+        return out
 
     def _expand(self, state: State) -> dict:
         """Follow the stored links of the allowed hits, one hop (backlog T4).
@@ -440,7 +452,8 @@ class Brain:
             "answer": {"text": resp["answer"], "sha256": sha256_text(resp["answer"]), "citations": cited,
                        "refused": resp["refused"], "abstained": resp["abstained"],
                        "unavailable": resp["generator_unavailable"], "acl_label": label},
-            "checks": {**checked.status, "generator": "unavailable" if resp["generator_unavailable"] else "ok",
+            "checks": {**checked.status, "leak_scan_docs": len(state["denied_docs"]),
+                       "generator": "unavailable" if resp["generator_unavailable"] else "ok",
                        "grounding_model": state["grounded"].status,
                        "grounding_scores": state["grounded"].scores,
                        "leak_hits": [hash_denied(d, salt) for d in checked.leak_hits]},
