@@ -61,7 +61,8 @@ def order_for_attention(items: list[Evidence]) -> list[Evidence]:
 
 
 def build_packet(request_id: str, user_context: dict, question: str, skill: str | None, evidence: list[Evidence], *,
-                 per_source_quota: int = 3, max_evidence: int = 5, max_chars: int = 24_000) -> dict:
+                 per_source_quota: int = 3, max_evidence: int = 5, max_chars: int = 24_000, procedure: str | None = None,
+                 history: list[dict] | None = None, standalone: str | None = None) -> dict:
     kept: list[Evidence] = []
     seen_text: set[str] = set()
     per_source: dict[str, int] = {}
@@ -85,7 +86,9 @@ def build_packet(request_id: str, user_context: dict, question: str, skill: str 
     return {
         "request_id": request_id,
         "user_context": user_context,
-        "task": {"question": question, "skill": skill, "output_schema": "claims_with_citations_v1"},
+        "task": {"question": question, "standalone_question": standalone, "skill": skill, "procedure": procedure,
+                 "output_schema": "claims_with_citations_v1"},
+        "history": history or [],
         "evidence": [{"chunk_id": e.chunk_id, "doc_id": e.doc_id, "source": e.source, "title": e.title, "url": e.url,
                       "text": e.text, "as_of": e.as_of, "acl_label": e.acl_label, "flags": e.flags,
                       "via_link_from": e.via_link_from} for e in final],

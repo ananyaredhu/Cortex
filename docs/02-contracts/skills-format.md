@@ -1,6 +1,6 @@
 # Runtime skills format
 
-version: 0.1 (draft, freezes Day 3)
+version: 0.2 (built in `brain/skills/`, 11 Oct)
 Owner: Workstream B. Consumers: B (router and loader), C (admin view).
 
 A **skill** makes the agent specific to a task: a procedure, an output format and an allowlist of tools. Skills are instructions only. **A skill never carries authority**: it cannot widen access, add tools beyond its allowlist, or change policy.
@@ -25,7 +25,8 @@ triggers: ["root cause", "outage", "incident", "postmortem"]
 sources: [jira, slack, confluence, gdrive]
 tools_allowlist: [search, get_source, explain_access]
 output_schema: claims_with_citations_v1
-max_evidence: 12
+max_evidence: 8
+surface: ask
 ---
 # Procedure
 1. Identify the incident from the question and the user's recent focus.
@@ -37,7 +38,13 @@ max_evidence: 12
 - Never infer the existence of content you were not given.
 ```
 
+Optional frontmatter keys: `surface` (`ask`, the default, or `audit`) and `roles` (the roles allowed to use it; empty means everyone). `sources` narrows where the Brain searches for a question under that skill; `max_evidence` (1 to 12) sets how much evidence reaches the model; `tools_allowlist` is recorded for the clients that use tools (the Brain's own pipeline calls none).
+
 ## Loading and routing
+- **As built (0.2):** `brain.skills.Registry.load()` reads every `brain/skills/<name>/SKILL.md` once at start-up and refuses a file that is malformed, names a source or tool that does not exist, has the wrong `output_schema` or a `max_evidence` outside 1 to 12. Skills are frozen objects, never written at run time. Each skill's `sha256` covers every file in its folder.
+- **Routing, first version:** the skill whose `triggers` appear most often in the (rewritten) question wins; no match means the default procedure. An explicit `skill_hint` that names a usable skill wins; a hint for a skill of another surface or role is ignored, not obeyed. `audit-inquiry` is `surface: audit, roles: [compliance]` and is used only by the audit agent, never by `ask`. A model router is not built.
+- **What a skill changes:** which sources are searched, how many pieces of evidence go to the model, and a `procedure` appended to the model's system prompt. Permission checks, the checker and the refusal rules are untouched, so a skill cannot make anything visible that was not.
+- **Audited:** an `ask` event records `query.skill`, `query.skill_version` and `query.skill_sha256`.
 - The router (small model) picks a skill from `triggers` and `description`, or none (default procedure).
 - The loader reads the skill and injects its procedure into the system prompt. Output must conform to `output_schema`.
 - Skills are **versioned and reviewed** like code (PR required). A skill is a prompt-injection surface, so skill files are never writable at runtime and are pinned by hash in the audit log (`skill`, `skill_version`).
@@ -51,4 +58,5 @@ max_evidence: 12
 | `audit-inquiry` | Scenario 5 (what did user X access); compliance role only |
 
 ## Changelog
+- 0.2, 11 Oct: built. `surface` and `roles` keys; validation, hashing and trigger routing as above.
 - 0.1: first draft.
