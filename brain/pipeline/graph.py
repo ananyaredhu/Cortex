@@ -30,6 +30,8 @@ from brain.policy.identity import AskerIdentity, IdentityResolver
 from brain.policy.labels import acl_label, may_serve
 from brain.policy.leakscan import DeniedDoc, prepare
 from brain.policy.pdp import PDP, Decision, hash_denied, source_of
+from brain.projects import EXTRA_CANDIDATES, PROJECT_BOOST, ProjectView
+from brain.projects import Registry as ProjectRegistry
 from brain.retrieval import Candidate, IndexReader, hybrid_search, query_terms
 from brain.skills import Registry, Skill
 from connectors.base import Connector, DocumentNotFound
@@ -64,6 +66,8 @@ class State(TypedDict, total=False):
     search_query: str               # what retrieval looks for: the question, or a follow-up rewritten with the last turn
     rewritten: bool
     skill: Skill | None
+    profile: list[ProjectView]      # the projects this person may see, with only the places they may open something in
+    resolved: list[ProjectView]     # the ones the question names ("our migration")
     searched: list[str]
     unavailable: list[str]
     terms: list[str]
@@ -92,7 +96,8 @@ class Brain:
                  embedder: Embedder | None, generator: Generator, audit: AuditStore, *,
                  resolver: IdentityResolver | None = None, pdp: PDP | None = None,
                  scorer: GroundingScorer | None = None, link_resolver: Callable[[str], str] | None = None,
-                 skills: Registry | None = None) -> None:
+                 skills: Registry | None = None, projects: ProjectRegistry | None = None,
+                 container_resolver: Callable[[str], str] | None = None, token_resolver: Callable[[str], str] | None = None) -> None:
         self.settings = settings
         self.connectors = dict(connectors)
         self.index = index
@@ -102,6 +107,9 @@ class Brain:
         self.audit = audit
         self.scorer = scorer
         self.skills = skills if skills is not None else Registry.load()
+        self.projects = projects if projects is not None else ProjectRegistry.load()
+        self.container_resolver = container_resolver or (lambda x: x)       # registry container IDs -> the platforms' real ones
+        self.token_resolver = token_resolver or (lambda x: x)
         self.link_resolver = link_resolver or (lambda doc_id: doc_id)   # stored link -> the ID the index and connectors use
         self.resolver = resolver or IdentityResolver(self.connectors, ttl_s=settings.identity_ttl_s)
         self.pdp = pdp or PDP(self.connectors, policy_version=POLICY_VERSION, ttl_s=settings.decision_ttl_s)
@@ -191,7 +199,15 @@ class Brain:
         history = self._history(p, req.conversation_id)
         query, rewritten = rewrite_query(req.question, history)
         skill = self.skills.select(query, p.roles, hint=req.skill_hint) if self.settings.skills else None
-        return {"history": history, "search_query": query, "rewritten": rewritten, "skill": skill}
+        profile = self._project_views(state["asker"]) if self.settings.projects else []
+        resolved = self.projects.resolve(query, profile)
+        return {"history": history, "search_query": query, "rewritten": rewritten, "skill": skill, "profile": profile,
+                "resolved": resolved}
+
+    def _project_views(self, asker: AskerIdentity) -> list[ProjectView]:
+        """The registry as this person may see it: a project and each place under it only if they may open something there."""
+        return self.projects.views(asker.tokens, self.index.parents_visible(sorted(asker.tokens)),
+                                   container=self.container_resolver, token=self.token_resolver)
 
     def _history(self, principal: Principal, conversation_id: str | None) -> list[dict]:
         """The last few answered turns of the caller's own conversation, as memory for a follow-up.
@@ -227,7 +243,30 @@ class Brain:
                 vector = None
         candidates = hybrid_search(self.index, state["search_query"], asker.tokens, searched, vector=vector, model=model,
                                    candidates=self.settings.candidates, max_distance=self.settings.max_vector_distance)
-        return {"searched": searched, "unavailable": unavailable, "terms": terms, "candidates": candidates}
+        return {"searched": searched, "unavailable": unavailable, "terms": terms,
+                "candidates": self._with_projects(candidates, state.get("resolved") or [], asker, searched)}
+
+    def _with_projects(self, candidates: list[Candidate], resolved: list[ProjectView], asker: AskerIdentity,
+                       searched: list[str]) -> list[Candidate]:
+        """A question that names a project (T7): raise the rank of documents inside it and add a few it missed. Boost, never
+        filter: nothing is removed, and everything added goes through the live permission check like any hit."""
+        if not resolved:
+            return candidates
+        places = {self.container_resolver(c) for v in resolved for c in v.places}
+        for cand in candidates:
+            row = self.index.document(cand.doc_id)
+            if row is not None and row.parent_id in places:
+                cand.score += PROJECT_BOOST
+        have = {c.doc_id for c in candidates}
+        floor = min((c.score for c in candidates), default=PROJECT_BOOST)
+        for row in self.index.documents_under(sorted(places), sorted(asker.tokens), EXTRA_CANDIDATES + len(have)):
+            if row.doc_id in have or source_of(row.doc_id) not in searched or len(have) >= len(candidates) + EXTRA_CANDIDATES:
+                continue
+            chunks = [c.chunk_id for c in self.index.chunks_of(row.doc_id)][:2]
+            if chunks:
+                candidates.append(Candidate(row.doc_id, source_of(row.doc_id), floor * 0.5, chunks))
+                have.add(row.doc_id)
+        return sorted(candidates, key=lambda c: (-c.score, c.doc_id))
 
     def _authorize(self, state: State) -> dict:
         asker = state["asker"]
@@ -348,13 +387,15 @@ class Brain:
 
     def _generate(self, state: State) -> dict:
         p, asker = state["principal"], state["asker"]
-        user_context = {"display_name": p.display_name or p.email, "sources": list(asker.sources())}
+        user_context = {"display_name": p.display_name or p.email, "sources": list(asker.sources()),
+                        "projects": [v.project.name for v in state.get("profile", []) if v.member]}
         skill = state.get("skill")
         pkt = packetlib.build_packet(state["request_id"], user_context, state["request"].question,
                                      skill.name if skill else None, state["evidence"],
                                      per_source_quota=self.settings.per_source_quota,
                                      max_evidence=skill.max_evidence if skill else self.settings.max_evidence,
                                      procedure=skill.procedure if skill else None, history=state.get("history"),
+                                     projects=[v.project.name for v in state.get("resolved", [])],
                                      standalone=state["search_query"] if state.get("rewritten") else None)
         flags = sorted({f for e in pkt["evidence"] for f in e["flags"]})
         return {"packet": pkt, "generated": self.generator.generate(pkt), "flags": flags}
@@ -443,7 +484,8 @@ class Brain:
             "actor": {"user_id": p.email, "roles": list(p.roles), "client": p.client},
             "query": {"text": req.question, "skill": skill.name if skill else None,
                       "skill_version": skill.version if skill else None, "skill_sha256": skill.sha256 if skill else None,
-                      "rewritten": state["search_query"] if state.get("rewritten") else None},
+                      "rewritten": state["search_query"] if state.get("rewritten") else None,
+                      "projects": [v.project.project_id for v in state.get("resolved", [])]},
             "decisions": [d.audit_view(salt) for d in state["decisions"]],
             "answer": {"text": resp["answer"], "sha256": sha256_text(resp["answer"]), "citations": cited,
                        "refused": resp["refused"], "abstained": resp["abstained"],
@@ -557,6 +599,10 @@ class Brain:
         self._log_tool(principal, "get_source", f"get_source {'allowed' if result else 'refused'}", [decision], {}, started)
         self._pad(started)
         return result
+
+    def project_profile(self, principal: Principal) -> list[dict]:
+        """The caller's projects (T7), for `/v1/projects` and My Work: only what they may open something in."""
+        return [v.as_json() for v in self._project_views(self.resolver.resolve(principal.email))]
 
     def visible_documents(self, principal: Principal, source: str | None = None, limit: int = 100) -> list:
         """Index rows the person may read right now: prefilter, then the live check on each."""

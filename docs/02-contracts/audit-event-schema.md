@@ -80,6 +80,7 @@ Audit queries (natural language or structured) are read-only and run **under RBA
 `ask` events carry `conversation_id` (the one returned by `/ask`). The Brain keeps no other record of conversations: `/v1/conversations` and `/v1/conversations/{id}` are rebuilt from these events, under the same ownership rule (only the asker's own events), so history survives a restart.
 
 ## Changelog
+- 0.1, 11 Oct: `query.projects` (ids of the registry projects the question named, among those the asker may see) (T7).
 - 0.1, 11 Oct: `checks.grounding_lower_confidence` (claims kept between the grounding floor and threshold) and the `lower_confidence` value of `checks.grounding_model` (fix F21).
 - 0.1, 11 Oct: `checks.leak_scan_docs`: how many documents the leak scan compared the answer with (fix F5). "clean" means clean against that many.
 - 0.1, 11 Oct: `/verify` compares the log with a signed head kept outside the database (fix F4).
