@@ -315,7 +315,7 @@ class SlackConnector:
             def answer(future: Future):
                 return future.result(timeout=max(0.0, deadline - time.monotonic()))   # raises on error or when out of time
 
-            if channel_id.startswith("D"):
+            if channel_id.startswith("D") or channel_id in self._dms:    # a group DM seen before: skip asking the bot
                 return self._check_dm(identity, channel_id, ts, answer) or deny
             asked_channel = ask("conversations.info", channel=channel_id)
             asked_root = self._pool.submit(self._root, channel_id, ts, retry=False)
@@ -362,17 +362,21 @@ class SlackConnector:
         asked_channel = self._pool.submit(grant.client.call, "conversations.info", retry=False, channel=channel_id)
         asked_root = self._pool.submit(self._root, channel_id, ts, retry=False, client=grant.client)
         asked_user = self._pool.submit(self._client.call, "users.info", retry=False, user=identity.platform_user_id)
+        # Who is in it, asked now so a group DM does not wait for a second round. A DM names its other person itself.
+        asked_members = None if channel_id.startswith("D") else self._pool.submit(
+            lambda: list(grant.client.pages("conversations.members", "members", retry=False, channel=channel_id, limit=200)))
 
         if answer(asked_me).get("user_id") != grant.user_id:      # the stored token is someone else's
             return None
         channel = answer(asked_channel)["channel"]
         if not (channel.get("is_im") or channel.get("is_mpim")) or not answer(asked_root):
             return None
+        members = None if channel.get("is_im") or asked_members is None else set(answer(asked_members))
         user = answer(asked_user)["user"]
         canonical = self._identities.canonical_email(self.source, (user.get("profile") or {}).get("email") or "")
         if not _is_person(user) or canonical is None or canonical != identity.email.strip().lower() or canonical != grant.email:
             return None
-        participants = answer(self._pool.submit(self._participants, grant, channel, retry=False))
+        participants = answer(self._pool.submit(self._participants, grant, channel, retry=False, members=members))
         if participants is None or canonical not in participants:
             return None
         return AccessDecision(True, [f"user:{canonical}"], _now(), _dm_acl(channel_id, participants).snapshot_hash, self._policy_version)
@@ -442,13 +446,15 @@ class SlackConnector:
         return None
 
     def _participants(self, grant: UserGrant, channel: dict, *, retry: bool = True,
-                      authorized: dict[str, str] | None = None) -> list[str] | None:
+                      authorized: dict[str, str] | None = None, members: set[str] | None = None) -> list[str] | None:
         """Canonical emails of everyone in the DM `channel`, read with `grant`. None unless every one of them
         has authorized: a bot, Slackbot, an unmapped account or a person who has not agreed makes it no document.
         `authorized` is {Slack user id: canonical email}; by default, everyone with a stored token."""
         if authorized is None:
             authorized = {g.user_id: g.email for g in self._users.all()}
-        if channel.get("is_im"):
+        if members is not None:
+            pass                                    # the caller already asked Slack who is in it
+        elif channel.get("is_im"):
             members = {grant.user_id, str(channel.get("user") or "")}
         else:
             members = set(grant.client.pages("conversations.members", "members", retry=retry, channel=channel["id"], limit=200))

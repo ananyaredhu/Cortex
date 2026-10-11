@@ -267,10 +267,13 @@ def test_the_consent_page_asks_for_the_four_read_scopes_as_the_user_and_nothing_
 
 
 def test_the_pasted_address_must_answer_this_request():
-    assert code_from("https://localhost/slack/oauth?code=abc&state=s1", "s1") == "abc"
-    for address in ("https://localhost/slack/oauth?code=abc&state=other", "https://localhost/slack/oauth?state=s1",
-                    "https://localhost/slack/oauth?error=access_denied&state=s1", "abc"):
-        with pytest.raises(SystemExit):
+    assert code_from(" https://localhost/slack/oauth?code=abc&state=s1\n", "s1") == "abc"
+    assert code_from("\x16abc.def-123", "s1") == "abc.def-123"       # a bare code, with a stray control character
+    for address, why in (("https://localhost/slack/oauth?code=abc&state=other", "earlier run"),
+                         ("https://localhost/slack/oauth?state=s1", "no `code=`"),
+                         ("https://localhost/slack/oauth?error=access_denied&state=s1", "access_denied"),
+                         ("\x16", "Nothing arrived")):
+        with pytest.raises(SystemExit, match=why):
             code_from(address, "s1")
 
 
