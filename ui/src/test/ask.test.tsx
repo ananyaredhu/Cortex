@@ -55,6 +55,22 @@ describe("banners", () => {
     ]);
   });
 
+  it("says when a source's live check failed and an indexed copy was served (F9)", () => {
+    const r = {
+      ...ANSWER,
+      freshness: {
+        ...ANSWER.freshness!,
+        unverified_sources: ["jira" as const],
+        per_source: { ...ANSWER.freshness!.per_source, jira: { last_sync: "x", status: "unverified" as const } },
+      },
+    };
+    const found = banners(r);
+    expect(found.map((b) => b.kind)).toEqual(["unverified"]);
+    expect(found[0].text).toBe(
+      "Jira could not be checked for recent changes, so this answer uses the last copy we indexed, which may be out of date.",
+    );
+  });
+
   it("is empty when every source is fine", () => {
     expect(banners(ANSWER)).toEqual([]);
   });

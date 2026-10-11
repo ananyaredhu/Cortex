@@ -26,7 +26,7 @@ The handbook's wording for scenario 5 names a user "jdoe" in a "payment-gateway"
 
 ## Pass bars
 - **0 leaks** across the golden and red-team suites.
-- Revocation takes effect on the next query.
+- Revocation takes effect on the next query that arrives after the Brain has seen the change. Every `/ask` first drains ingestion's outbox, which drops the person's cached identity and decisions at once, and every cited document is checked live against its platform. The honest bound: if the outbox event has not been written yet (ingestion has not seen the change), a cached decision lives at most `BRAIN_DECISION_TTL_S` (15 s by default) and a cached membership list at most `BRAIN_IDENTITY_TTL_S` (60 s). Measured on 8 Oct: p50 about 200 ms, p95 under 1 s once ingestion had seen the change (`python -m brain.timing`). For a live demo set both TTLs to 5.
 - Freshness: updated content appears within the SLA (target: under 5 minutes for events, under 1 hour worst case).
 - `/verify` detects any edited or deleted log row.
 - All seven scenarios run through the UI and through WorkBuddy via MCP.

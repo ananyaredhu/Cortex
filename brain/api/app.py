@@ -231,14 +231,19 @@ def create_app(runtime: Runtime) -> FastAPI:
         try:
             board = json.loads(path.read_text(encoding="utf8"))
         except (OSError, ValueError):
-            return {"as_of": _now(), "cases": 0, "leaks": 0, "suites": [], "note": "no Leak-CI run recorded yet"}
-        return {k: board.get(k) for k in ("as_of", "cases", "leaks", "suites", "target")}
+            # Fix F7: nothing ran, so there is no "0 leaks" to show: `leaks` is null and `status` says so.
+            return {"as_of": None, "cases": 0, "leaks": None, "suites": [], "status": "not_run", "note": "no Leak-CI run recorded yet"}
+        out = {k: board.get(k) for k in ("as_of", "cases", "leaks", "suites", "target")}
+        out["status"] = "not_run" if not board.get("cases") else "leaks" if board.get("leaks") else "ok"
+        return out
 
     @app.get("/v1/policy/versions")
     def policy_versions(p: Current):
         require(p, ADMIN_ROLES)
+        # One entry: the version this build enforces. The Brain keeps no history of earlier versions; `created_at` is the
+        # version's own date, and `pr_url` stays null until policy changes are tracked outside git (fix F7).
         return {"versions": [{"policy_version": POLICY_VERSION, "author": "ws-b", "created_at": "2026-10-08T00:00:00Z",
-                              "pr_url": None}], "active": POLICY_VERSION}
+                              "pr_url": None}], "active": POLICY_VERSION, "history_kept": False}
 
     @app.post("/v1/policy/evaluate")
     def policy_evaluate(body: EvaluateBody, p: Current):
@@ -256,6 +261,12 @@ def create_app(runtime: Runtime) -> FastAPI:
                 raise HTTPException(404, "not available")
             runtime.tamper(seq)
             return {"tampered": seq}
+
+        @app.post("/sim/truncate")
+        def sim_truncate(keep: int):
+            """Demo of fix F4: delete the newest audit events as an insider with database access could; /verify must notice."""
+            runtime.audit_store.truncate(max(keep, 0))
+            return {"kept": max(keep, 0)}
 
         @app.post("/sim/advance")
         def sim_advance(body: AdvanceBody):
