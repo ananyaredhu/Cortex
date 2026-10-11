@@ -26,6 +26,8 @@ def database_up() -> bool:
     try:
         _connect().close()
     except psycopg.OperationalError:
+        if os.environ.get("REQUIRE_DATABASE") == "1":      # CI: a missing database is a failure, not about 50 silent skips (F8)
+            pytest.fail("REQUIRE_DATABASE=1 but Postgres is not reachable")
         return False
     return True
 

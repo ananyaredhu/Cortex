@@ -91,6 +91,7 @@ own embedding backend: see the notes at the top of `evals/leakci.py` before tryi
 - **Restart one service:** `docker compose restart brain`. Restarting a simulator puts its seeded data back;
   ingestion notices and crawls again.
 - **Back up the audit log and index:** `docker compose exec db pg_dump -U brain brain | gzip > brain-$(date +%F).sql.gz`.
+- **Audit head (fix F4):** the Brain writes the signed head of the audit log to `AUDIT_HEAD_PATH` on every event (the `audit-head` volume, apart from the database volume). `/verify` compares the log with it, so deleting the newest events from Postgres is reported. The volume protects against someone with database access, not against root on the host: for more, ship that file to somewhere write-once. Keep it with the signing key: if the volume is lost, set `AUDIT_HEAD_ADOPT=1` for one start to record the current head, then remove it.
 - **Keep `AUDIT_SIGNING_KEY` unchanged:** a new key cannot sign for checkpoints made with the old one.
 - **Never** `docker compose down -v` on the server: `-v` deletes the database, the audit log included.
 

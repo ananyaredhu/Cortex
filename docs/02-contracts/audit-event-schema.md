@@ -44,7 +44,7 @@ The log must be **tamper-evident**, **complete** (who, what, retrieved IDs, fina
     "acl_label": ["user:priya@companya.com"]
   },
   "links_followed": [{"doc_id": "slack:C_DBMIG/thread-1", "via_link_from": "jira:DBMIG-142"}],
-  "checks": {"deterministic": "pass", "generator": "ok", "grounding_model": "pass", "leak_scan": "clean"},
+  "checks": {"deterministic": "pass", "generator": "ok", "grounding_model": "pass", "leak_scan": "clean", "leak_scan_docs": 14},
   "models": {"generator": "deepseek-v3", "checker": "minicheck-...", "embedding": "bge-m3@1"},
   "latency_ms": 2310,
   "prev_hash": "sha256:...",
@@ -69,7 +69,9 @@ When a person's token set (`user:<email>` plus every group, channel and role fro
 Each decision stores `acl_snapshot_hash`, `policy_version` and `doc_version` so an auditor can re-evaluate "was this decision correct at that time?". Together with ACL snapshots stored with validity intervals (bi-temporal), this supports time-travel queries ("what could jdoe see on 12 Oct?").
 
 ## `/verify`
-`GET /v1/audit/verify` returns `{ok: true, checked: N, checkpoints: M}` or `{ok: false, first_broken_seq: K, reason: "..."}`. Must be fast enough to demo live.
+`GET /v1/audit/verify` returns `{ok: true, checked: N, checkpoints: M, signer_pinned, head_anchored}` or `{ok: false, first_broken_seq: K, reason: "..."}`. Must be fast enough to demo live.
+
+Two checks. The chain: every event's hash and `prev_hash`, and every checkpoint's signature. And, when an anchor is configured (`AUDIT_HEAD_PATH`, required in production), **the log against the last signed head the anchor recorded** (fix F4): on every append the store signs `seq:hash` of the new head and appends it to a file outside the database. A log that ends before that head ("the newest events were deleted"), an event at that position that differs ("history was replaced"), a head whose signature does not verify, or events with no head on record all report `ok: false`. An anchor that is behind the log is fine: a crash between the commit and the write can leave it so. `head_anchored: false` means nothing outside the database was compared. `AUDIT_HEAD_ADOPT=1` records the current head once, for an anchor added to an existing log.
 
 ## Querying
 Audit queries (natural language or structured) are read-only and run **under RBAC**: only the compliance role can query other users' history. Querying the audit log is itself logged (`audit_query`). Sensitive lookups may require a two-person approval (stretch).
@@ -79,6 +81,8 @@ Audit queries (natural language or structured) are read-only and run **under RBA
 
 ## Changelog
 - 0.1, 11 Oct: `checks.grounding_lower_confidence` (claims kept between the grounding floor and threshold) and the `lower_confidence` value of `checks.grounding_model` (fix F21).
+- 0.1, 11 Oct: `checks.leak_scan_docs`: how many documents the leak scan compared the answer with (fix F5). "clean" means clean against that many.
+- 0.1, 11 Oct: `/verify` compares the log with a signed head kept outside the database (fix F4).
 - 0.1, 11 Oct: `query.skill_version`, `query.skill_sha256` (the skill file pinned by hash) and `query.rewritten` (the standalone search text, set only when a follow-up was rewritten; `query.text` stays what the person typed).
 - 0.1, 10 Oct: `identity_snapshot` events (time-travel queries).
 - 0.1, 10 Oct: `links_followed` on `ask` events (documents added through stored links, each with the allowed document that linked to it). Denied link targets appear only as hashed entries in `decisions`.

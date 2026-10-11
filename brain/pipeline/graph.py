@@ -11,7 +11,7 @@ import time
 import uuid
 from collections.abc import Callable, Mapping
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, TypedDict
 
@@ -28,7 +28,7 @@ from brain.gateway.models import Generated, Generator
 from brain.pipeline.rewrite import rewrite_query
 from brain.policy.identity import AskerIdentity, IdentityResolver
 from brain.policy.labels import acl_label, may_serve
-from brain.policy.leakscan import DeniedDoc
+from brain.policy.leakscan import DeniedDoc, prepare
 from brain.policy.pdp import PDP, Decision, hash_denied, source_of
 from brain.retrieval import Candidate, IndexReader, hybrid_search, query_terms
 from brain.skills import Registry, Skill
@@ -41,6 +41,7 @@ NODE_STAGE = {"identity": "retrieve", "understand": "retrieve", "retrieve": "ret
               "expand": "authorize",
               "freshness": "verify_live",
               "generate": "generate", "check": "check", "finalize": "check", "audit": "check"}
+UNVERIFIED = "freshness_unverified"      # evidence whose live version check failed; the indexed copy was served
 STALE_AFTER_S = 300          # a source whose last successful pass is older than this is reported "stale"
 
 
@@ -51,18 +52,6 @@ class AskRequest:
     skill_hint: str | None = None
     sources: list[str] | None = None
     time_range: str | None = None
-
-
-@dataclass
-class Answered:
-    """What we remember about an answer: enough for alerts, replay and conversations, labeled by its sources."""
-    request_id: str
-    email: str
-    question: str
-    conversation_id: str
-    asked_at: str
-    doc_versions: dict[str, str | None]
-    label: list[list[str]] = field(default_factory=list)
 
 
 class State(TypedDict, total=False):
@@ -116,9 +105,9 @@ class Brain:
         self.link_resolver = link_resolver or (lambda doc_id: doc_id)   # stored link -> the ID the index and connectors use
         self.resolver = resolver or IdentityResolver(self.connectors, ttl_s=settings.identity_ttl_s)
         self.pdp = pdp or PDP(self.connectors, policy_version=POLICY_VERSION, ttl_s=settings.decision_ttl_s)
-        self.answers: dict[str, Answered] = {}
         self._lock = threading.Lock()
         self._identity_seen: dict[str, frozenset[str]] = {}
+        self._leak_cache: dict[tuple[str, str], DeniedDoc] = {}      # prepared denied-set entries, by document and version
         for event in audit.all():                                 # the last snapshot per person survives a restart
             if event.get("event_type") == "identity_snapshot":
                 self._identity_seen[event["identity"]["user"]] = frozenset(event["identity"]["tokens"])
@@ -246,14 +235,25 @@ class Brain:
         decisions = self.pdp.check_many(asker, [(c.doc_id, versions[c.doc_id]) for c in state["candidates"]])
         allowed_ids = {d.doc_id for d in decisions if d.allowed}
         allowed = [c for c in state["candidates"] if c.doc_id in allowed_ids]
-        denied_docs = []
-        for c in state["candidates"]:
-            if c.doc_id in allowed_ids:
-                continue
-            row = self.index.document(c.doc_id)
-            text = " ".join(ch.text for ch in self.index.chunks_of(c.doc_id))
-            denied_docs.append(DeniedDoc(c.doc_id, row.title if row else "", text))
-        return {"decisions": decisions, "allowed": allowed, "denied_docs": denied_docs}
+        return {"decisions": decisions, "allowed": allowed,
+                "denied_docs": self._denied_set(asker, [c.doc_id for c in state["candidates"] if c.doc_id not in allowed_ids])}
+
+    def _denied_set(self, asker: AskerIdentity, denied_candidates: list[str]) -> list[DeniedDoc]:
+        """What the leak scan compares an answer with (fix F5): every live document the asker's tokens do not reach, the
+        very ones the prefilter kept out of retrieval, plus any candidate the live check refused. Scanning only the
+        refused candidates compared answers with almost nothing, because the prefilter removes forbidden documents first."""
+        wanted = {d.doc_id: d for d in self.index.documents_hidden(sorted(asker.tokens))}
+        for doc_id in denied_candidates:
+            if doc_id not in wanted and (row := self.index.document(doc_id)) is not None:
+                wanted[doc_id] = row
+        out = []
+        for doc_id, row in wanted.items():
+            key = (doc_id, row.version)
+            if key not in self._leak_cache:
+                text = " ".join(ch.text for ch in self.index.chunks_of(doc_id))
+                self._leak_cache[key] = prepare(DeniedDoc(doc_id, row.title, text))
+            out.append(self._leak_cache[key])
+        return out
 
     def _expand(self, state: State) -> dict:
         """Follow the stored links of the allowed hits, one hop (backlog T4).
@@ -320,6 +320,7 @@ class Brain:
             text_by_chunk = {c.chunk_id: c.text for c in chunks}
             title, url, as_of, tokens = row.title, row.url, row.updated_at, chunks[0].acl_tokens
             refetched = 0
+            unverified = False
             try:
                 if connector is not None and connector.version(cand.doc_id) != chunks[0].source_version:
                     doc = connector.fetch(cand.doc_id)
@@ -329,12 +330,14 @@ class Brain:
                     refetched = 1
             except DocumentNotFound:
                 return None, 0
-            except Exception:                        # noqa: BLE001 - keep the indexed copy, which the PDP allowed
-                pass
+            except Exception:                        # noqa: BLE001 - keep the indexed copy, which the PDP allowed, but say so (fix F9)
+                unverified = True
             best = [cid for cid in cand.chunk_ids if cid in text_by_chunk] or [chunks[0].chunk_id]
             text = " ".join(text_by_chunk[cid] for cid in best[:2])
             ev = packetlib.make_evidence(best[0], cand.doc_id, cand.source, title, url, text, as_of, tokens, terms, cand.score,
                                          state.get("linked", {}).get(cand.doc_id))
+            if unverified:
+                ev.flags.append(UNVERIFIED)
             return ev, refetched
 
         for ev, refetched in self._pool.map(one, state["allowed"]):
@@ -382,8 +385,9 @@ class Brain:
         excerpts = {e.doc_id: e.raw for e in state["evidence"]}
         citations = [{"doc_id": d, "title": by_id[d]["title"], "url": by_id[d]["url"], "source": by_id[d]["source"],
                       "as_of": by_id[d]["as_of"], "why_visible": proof.get(d, []), "excerpt": excerpts.get(d, "")[:280],
-                      "via_link_from": by_id[d]["via_link_from"]}
+                      "via_link_from": by_id[d]["via_link_from"], "unverified": UNVERIFIED in by_id[d]["flags"]}
                      for d in by_id if d in shown_ids]
+        unverified_sources = sorted({c["source"] for c in citations if c["unverified"]})
         if refused:
             answer, claims = REFUSAL, []
         elif unavailable:
@@ -397,7 +401,8 @@ class Brain:
             "request_id": state["request_id"], "conversation_id": conversation_id, "answer": answer, "claims": claims,
             "citations": citations, "refused": refused, "abstained": abstained, "generator_unavailable": unavailable,
             "freshness": {"oldest_source_as_of": min((c["as_of"] for c in citations if c["as_of"]), default=None),
-                          "stale_refetched": state["stale_refetched"], "per_source": self._per_source(state["unavailable"])},
+                          "stale_refetched": state["stale_refetched"], "unverified_sources": unverified_sources,
+                          "per_source": self._per_source(state["unavailable"], unverified_sources)},
             "skill": skill.name if skill else None,
             "coverage": {s: {"searched": s in state["searched"], "shown": sum(c["source"] == s for c in citations)}
                          for s in SOURCES},
@@ -406,7 +411,7 @@ class Brain:
         }
         return {"response": response}
 
-    def _per_source(self, unavailable: list[str]) -> dict:
+    def _per_source(self, unavailable: list[str], unverified: list[str] = ()) -> dict:
         runs = {r.source: r for r in (self.store.runs() if self.store is not None else [])}
         now = datetime.now(UTC)
         out = {}
@@ -416,6 +421,8 @@ class Brain:
             status = "ok"
             if s in unavailable:
                 status = "unavailable"
+            elif s in unverified:                    # its live version check failed: an indexed copy was served unchecked (F9)
+                status = "unverified"
             elif last:
                 try:
                     age = (now - datetime.fromisoformat(last.replace("Z", "+00:00"))).total_seconds()
@@ -441,7 +448,8 @@ class Brain:
             "answer": {"text": resp["answer"], "sha256": sha256_text(resp["answer"]), "citations": cited,
                        "refused": resp["refused"], "abstained": resp["abstained"],
                        "unavailable": resp["generator_unavailable"], "acl_label": label},
-            "checks": {**checked.status, "generator": "unavailable" if resp["generator_unavailable"] else "ok",
+            "checks": {**checked.status, "leak_scan_docs": len(state["denied_docs"]),
+                       "generator": "unavailable" if resp["generator_unavailable"] else "ok",
                        "grounding_model": state["grounded"].status,
                        "grounding_scores": state["grounded"].scores,
                        "grounding_lower_confidence": state["grounded"].lower_confidence,
@@ -453,10 +461,6 @@ class Brain:
             "latency_ms": int((time.monotonic() - state["started"]) * 1000),
         }
         self.audit.append(event)
-        versions = {d.doc_id: d.doc_version for d in state["decisions"] if d.allowed and d.doc_id in cited}
-        with self._lock:
-            self.answers[state["request_id"]] = Answered(state["request_id"], p.email, req.question,
-                                                         resp["conversation_id"], utc_now(), versions, label)
         return {}
 
     # -- other front-door operations, all through the PDP ---------------------------------------
@@ -563,20 +567,24 @@ class Brain:
         return [r for r in rows if r.doc_id in ok]
 
     def alerts(self, principal: Principal) -> list[dict]:
-        """Answers whose cited documents changed since, for documents the person may still see."""
+        """Answers whose cited documents changed since, for documents the person may still see.
+
+        Rebuilt from the person's own `ask` events, which record the version of every document each answer cited, so alerts
+        survive a restart (fix F16)."""
         out = []
         asker = self.resolver.resolve(principal.email)
-        with self._lock:
-            mine = [a for a in self.answers.values() if a.email == principal.email]
-        for a in mine:
-            for doc_id, then in a.doc_versions.items():
+        for event in self._asks(principal.email):
+            cited = set((event.get("answer") or {}).get("citations", []))
+            versions = {d["doc_id"]: d.get("doc_version") for d in event.get("decisions", [])
+                        if d.get("allowed") and d.get("doc_id") in cited}
+            for doc_id, then in versions.items():
                 row = self.index.document(doc_id)
                 now_version = self._indexed_version(doc_id)
                 if row is None or now_version is None or now_version == then:
                     continue
                 if not self.pdp.check(asker, doc_id, now_version).allowed:
                     continue
-                out.append({"request_id": a.request_id, "question": a.question, "changed_doc": doc_id,
+                out.append({"request_id": event["request_id"], "question": event["query"]["text"], "changed_doc": doc_id,
                             "changed_title": row.title, "changed_at": row.updated_at,
                             "summary": f"{row.title} changed after your answer"})
         return out

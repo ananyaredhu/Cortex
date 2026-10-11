@@ -32,7 +32,7 @@ export function uncitedClaims(r: AskResponse): string[] {
   return r.claims.filter((c) => !c.citations.some((id) => ids.has(id))).map((c) => c.text);
 }
 
-export type Banner = { kind: "error" | "stale" | "unavailable"; text: string };
+export type Banner = { kind: "error" | "stale" | "unavailable" | "unverified"; text: string };
 
 /** Banners above the answer: the answer service being down, sources that could not be read, and searched sources
  *  behind their sync target. "Unavailable" is a failure of the service, not a verdict on the sources, so it is told
@@ -50,6 +50,13 @@ export function banners(r: AskResponse): Banner[] {
     out.push({
       kind: "error",
       text: `${listOf(down)} couldn't be reached, so this answer comes from the other sources only.`,
+    });
+  }
+  const unverified = r.freshness?.unverified_sources ?? [];
+  if (unverified.length) {
+    out.push({
+      kind: "unverified",
+      text: `${listOf(unverified)} could not be checked for recent changes, so this answer uses the last copy we indexed, which may be out of date.`,
     });
   }
   const stale = Object.entries(r.freshness?.per_source ?? {})
