@@ -39,12 +39,24 @@ def consent_url(client_id: str, redirect_uri: str, state: str, team: str = "") -
 
 
 def code_from(address: str, state: str) -> str:
-    """The one-time code in the address Slack sent the browser to. Exits when it is not the answer to our request."""
-    query = parse_qs(urlparse(address.strip()).query)
+    """The one-time code in the address Slack sent the browser to. Exits, saying what was wrong without showing
+    what was pasted, when it is not the answer to our request. A bare code is accepted too: whoever it belongs
+    to is checked against the identity map before anything is saved."""
+    pasted = "".join(ch for ch in address if ch.isprintable()).strip().strip("'\"")
+    if not pasted:
+        raise SystemExit("Nothing arrived. In this terminal Ctrl+V may not paste into a hidden prompt: paste with a "
+                         "right-click (or Shift+Insert), then press Enter. Start again.")
+    if "?" not in pasted and "=" not in pasted and "/" not in pasted:
+        return pasted                                   # just the code
+    query = parse_qs(urlparse(pasted).query)
     if query.get("error"):
         raise SystemExit(f"Slack said: {query['error'][0]}. Nothing was saved.")
-    if query.get("state", [""])[0] != state or not query.get("code"):
-        raise SystemExit("That address is not the answer to this request (no code, or it belongs to another run). Start again.")
+    if not query.get("code"):
+        raise SystemExit(f"What arrived ({len(pasted)} characters) has no `code=` in it. Copy the address from the address bar "
+                         "after clicking Allow, when it begins with your redirect URL and contains `?code=`. Start again.")
+    if query.get("state", [""])[0] != state:
+        raise SystemExit("That address has a code, but it is from an earlier run of this tool (or its end was cut off). "
+                         "Each run needs the address from its own approval. Start again.")
     return query["code"][0]
 
 

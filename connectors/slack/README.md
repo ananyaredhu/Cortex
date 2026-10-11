@@ -89,6 +89,19 @@ It saves `token-slack-<persona>.json` here (gitignored; `SLACK_USER_TOKENS_DIR` 
 refuses to save when a different account or workspace signed in than the identity map lists. Ingestion and the
 Brain both read the files and notice new ones without a restart.
 
+Run on the real workspace, 11 Oct, with Priya, Dana, Maya and Jordan authorized and three seeded conversations
+(Priya and Dana; Priya and Maya; a group DM of Priya, Dana and Maya), each holding a fact found nowhere else:
+- A scan of the whole workspace took about 8.5 s with no rate limiting and found the three threads; ingestion
+  indexed them with `user:` tokens only, and `check_index` still matches the fixtures.
+- Live `check_access`: every participant allowed, everyone else denied (Jordan, who authorized but is in none of
+  them, included). About 250 to 430 ms each. The first check of a group DM in a process took about 1.2 s, because
+  the bot is asked first; after that the connector knows it is a DM.
+- Through the Brain (`/v1/ask`, Slack as the only source), each of the three facts was asked for as all five
+  personas: participants got the fact with the DM cited, and nobody else's response contained it or cited the DM.
+- A group DM's ID began with `C`, like a channel's.
+- **Not run on real Slack yet:** withdrawing (removing the app as a persona, which then needs authorizing again)
+  and DM events through Socket Mode. Both are covered by the tests on the in-memory Slack only.
+
 Limits: each person's token is asked twice per scan plus once per DM they are in, so a scan grows with the number
 of DMs. On a free workspace Slack hides messages older than 90 days, from DMs too. A DM thread is usually a single
 message, so DMs make many small documents.
