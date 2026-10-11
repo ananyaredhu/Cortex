@@ -81,6 +81,21 @@ def test_hidden_listing_is_the_complement_of_visible(index):
     assert len(index.documents_hidden([])) == len(DATA["documents"])               # no tokens: everything is hidden
 
 
+def test_container_listings_for_the_project_registry(index):
+    """`parents_visible`, `documents_under` and `documents_all` (T7) agree with `documents_visible` on both stores."""
+    for who in ("sam", "priya", "maya", "dana"):
+        visible = index.documents_visible(TOKENS[who])
+        assert index.parents_visible(TOKENS[who]) == {d.parent_id for d in visible if d.parent_id}
+    assert "slack:C_DBMIGPRIV" in index.parents_visible(TOKENS["maya"])
+    assert "slack:C_DBMIGPRIV" not in index.parents_visible(TOKENS["priya"])
+    assert index.parents_visible([]) == set()
+    under = index.documents_under(["jira:DBMIG", "slack:C_DBMIGPRIV"], TOKENS["priya"], 10)
+    assert {d.doc_id for d in under} == {"jira:DBMIG-142", "jira:DBMIG-150"}                  # the private channel is not hers
+    assert len(index.documents_under(["jira:DBMIG"], TOKENS["priya"], 1)) == 1
+    assert index.documents_under(["jira:DBMIG"], [], 10) == []
+    assert {d.doc_id for d in index.documents_all()} == {d["doc_id"] for d in DATA["documents"]}
+
+
 def test_concurrent_searches_share_one_connection_safely(index):
     """Request threads share one index connection (the split-screen asks as three people at once). Two vector
     legs entering a transaction block together was OutOfOrderTransactionNesting on Postgres."""
