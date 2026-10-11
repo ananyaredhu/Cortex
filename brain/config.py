@@ -41,6 +41,8 @@ class Settings:
     denied_id_salt: str = DEFAULT_DENIED_SALT  # salts the hash of denied doc_ids in the audit log
     audit_signing_key: str | None = None      # Ed25519 seed, hex; None = ephemeral key for this process
     checkpoint_every: int = 100
+    audit_head_path: str | None = None        # file for the signed head of the audit log, outside the database (fix F4)
+    audit_head_adopt: bool = False            # record the current head once when an anchor is first added to an existing log
     identity_ttl_s: float = 60.0
     baseline_interval_s: float = 1800.0       # how often every known person's token set is re-recorded (time-travel history)
     decision_ttl_s: float = 15.0
@@ -94,6 +96,8 @@ class Settings:
             denied_id_salt=env("AUDIT_DENIED_SALT") or cls.denied_id_salt,
             audit_signing_key=env("AUDIT_SIGNING_KEY") or None,
             floor_latency_ms=int(env("BRAIN_FLOOR_LATENCY_MS") or cls.floor_latency_ms),
+            audit_head_path=env("AUDIT_HEAD_PATH") or None,
+            audit_head_adopt=env("AUDIT_HEAD_ADOPT") == "1",
             baseline_interval_s=float(env("BRAIN_BASELINE_INTERVAL_S") or cls.baseline_interval_s),
             audit_planner_base_url=env("AUDIT_PLANNER_BASE_URL") or None,
             audit_planner_api_key=env("AUDIT_PLANNER_API_KEY") or None,
@@ -125,6 +129,8 @@ class Settings:
             problems.append(f"JWT_SIGNING_KEY is shorter than {MIN_JWT_KEY_BYTES} bytes")
         if not self.audit_signing_key:
             problems.append("AUDIT_SIGNING_KEY is not set: each restart would sign audit checkpoints with a new key")
+        if not self.audit_head_path:
+            problems.append("AUDIT_HEAD_PATH is not set: the newest audit events could be deleted from the database unnoticed")
         if self.mcp and not self.public_url.startswith("https://"):
             problems.append("BRAIN_MCP=1 with a BRAIN_PUBLIC_URL that is not https: MCP clients would send tokens in clear text")
         if self.denied_id_salt == DEFAULT_DENIED_SALT:
