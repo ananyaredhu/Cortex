@@ -7,7 +7,8 @@ from brain.config import Settings
 from brain.runtime import fixture_runtime
 from brain.startup import UnsafeConfiguration, check_startup
 
-GOOD = dict(environment="production", jwt_signing_key="k" * 32, audit_signing_key="ab" * 32, denied_id_salt="a-real-secret",
+GOOD = dict(environment="production", jwt_signing_key="k" * 32, audit_signing_key="ab" * 32,
+            audit_head_path="/var/audit/head.log", denied_id_salt="a-real-secret",
             checker_model="cross-encoder/nli-deberta-v3-xsmall")
 
 
@@ -38,6 +39,7 @@ def test_production_accepts_safe_settings():
     ({"jwt_signing_key": None}, "JWT_SIGNING_KEY is not set"),
     ({"jwt_signing_key": "short"}, "shorter than 32 bytes"),
     ({"audit_signing_key": None}, "AUDIT_SIGNING_KEY"),
+    ({"audit_head_path": None}, "AUDIT_HEAD_PATH"),
     ({"denied_id_salt": "dev-salt"}, "AUDIT_DENIED_SALT"),
     ({"checker_model": "none"}, "CHECKER_MODEL"),
 ])

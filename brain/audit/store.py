@@ -13,6 +13,7 @@ import psycopg
 from psycopg.types.json import Jsonb
 
 from . import chain
+from .anchor import HeadAnchor, sign_head
 
 
 def utc_now() -> str:
@@ -25,11 +26,14 @@ class AuditStore(Protocol):
     def all(self) -> list[dict]: ...
     def count(self) -> int: ...
     def tamper(self, seq: int, mutate: Callable[[dict], None]) -> None: ...
+    def truncate(self, keep: int) -> None: ...
+    def adopt_head(self) -> None: ...
 
 
 class MemoryAuditStore:
     def __init__(self, *, signer: chain.Signer | None = None, checkpoint_every: int = 100,
-                 clock: Callable[[], str] = utc_now) -> None:
+                 clock: Callable[[], str] = utc_now, anchor: HeadAnchor | None = None) -> None:
+        self.anchor = anchor
         self._events: list[dict] = []
         self._lock = threading.Lock()
         self._signer = signer or chain.Signer()
@@ -54,6 +58,9 @@ class MemoryAuditStore:
             self._events.append(linked)
             if self._every and len(self._events) % self._every == 0:
                 self._events.append(self._link(chain.checkpoint_event(linked["seq"], linked["hash"], self._signer, self._clock())))
+            head = self._events[-1]
+            if self.anchor is not None:
+                self.anchor.publish(sign_head(head["seq"], head["hash"], self._signer, self._clock()))
             return linked
 
     def _link(self, event: dict) -> dict:
@@ -77,13 +84,26 @@ class MemoryAuditStore:
         with self._lock:
             mutate(self._events[seq - 1])
 
+    def truncate(self, keep: int) -> None:
+        """Demo only: delete every event after the first `keep`, as an insider with database access could."""
+        with self._lock:
+            del self._events[keep:]
+
+    def adopt_head(self) -> None:
+        """Record the current head in an anchor that has none (first run with an anchor over an existing log)."""
+        with self._lock:
+            if self.anchor is not None and self.anchor.latest() is None and self._events:
+                head = self._events[-1]
+                self.anchor.publish(sign_head(head["seq"], head["hash"], self._signer, self._clock()))
+
 
 class PostgresAuditStore:
     """`audit_events`: seq, ts, request_id, event_type, actor, event (the whole event minus hash), prev_hash, hash.
     The connection is autocommit; `append` serializes writers with a table lock inside its own transaction."""
 
     def __init__(self, conn: psycopg.Connection, *, signer: chain.Signer | None = None, checkpoint_every: int = 100,
-                 clock: Callable[[], str] = utc_now) -> None:
+                 clock: Callable[[], str] = utc_now, anchor: HeadAnchor | None = None) -> None:
+        self.anchor = anchor
         self._conn = conn
         self._lock = threading.Lock()
         self._signer = signer or chain.Signer()
@@ -110,9 +130,12 @@ class PostgresAuditStore:
             event = dict(event)
             event.setdefault("ts", self._clock())
             linked = self._insert(event)
+            head = linked
             if self._every and linked["seq"] % self._every == 0:
-                self._insert(chain.checkpoint_event(linked["seq"], linked["hash"], self._signer, self._clock()))
-            return linked
+                head = self._insert(chain.checkpoint_event(linked["seq"], linked["hash"], self._signer, self._clock()))
+        if self.anchor is not None:                      # after the commit: an anchor never gets ahead of what was stored
+            self.anchor.publish(sign_head(head["seq"], head["hash"], self._signer, self._clock()))
+        return linked
 
     def _insert(self, event: dict) -> dict:
         row = self._conn.execute("SELECT seq, hash FROM audit_events ORDER BY seq DESC LIMIT 1").fetchone()
@@ -153,3 +176,13 @@ class PostgresAuditStore:
         event = row[0] if isinstance(row[0], dict) else json.loads(row[0])
         mutate(event)
         self._conn.execute("UPDATE audit_events SET event = %s WHERE seq = %s", (Jsonb(event), seq))
+
+    def truncate(self, keep: int) -> None:
+        """Demo only: delete every row after the first `keep`, as an insider with database access could."""
+        self._conn.execute("DELETE FROM audit_events WHERE seq > %s", (keep,))
+
+    def adopt_head(self) -> None:
+        """Record the current head in an anchor that has none (first run with an anchor over an existing log)."""
+        row = self._conn.execute("SELECT seq, hash FROM audit_events ORDER BY seq DESC LIMIT 1").fetchone()
+        if self.anchor is not None and self.anchor.latest() is None and row:
+            self.anchor.publish(sign_head(row[0], row[1], self._signer, self._clock()))
