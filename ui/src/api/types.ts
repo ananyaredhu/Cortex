@@ -17,6 +17,7 @@ export interface AskRequest {
 export interface Claim {
   text: string;
   citations: string[];
+  confidence?: "lower"; // the checker found only weak support (F21); the statement is kept and marked
 }
 
 export interface Citation {
@@ -53,7 +54,7 @@ export interface AskResponse {
   freshness?: Freshness;
   skill?: string | null;
   coverage?: Coverage; // 0.2
-  grounding?: { score: number; removed_claims: number } | null; // 0.2
+  grounding?: { score: number; removed_claims: number; lower_confidence?: number } | null; // 0.2
   policy_version?: string; // 0.2
   unavailable_sources?: Source[]; // 0.2
   clarify?: { question: string; options: string[] } | null; // 0.2

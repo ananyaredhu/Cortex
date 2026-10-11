@@ -63,6 +63,7 @@ class Settings:
     adp_app_key: str | None = None            # ADP Chat API AppKey of the published agent (brain/gateway/adp.py)
     checker_model: str = "none"              # layer 2 grounding model (brain/checker/layer2.py); none disables it
     grounding_threshold: float = 0.05         # for nli-deberta-v3-xsmall (ADR-003); MiniCheck models sit around 0.5
+    grounding_floor: float = 0.01             # F21: from here up to the threshold a claim is kept, marked lower confidence
     audit_planner_base_url: str | None = None  # optional model for the audit agent's second chance (brain/audit/agent.py)
     audit_planner_api_key: str | None = None
     audit_planner_model: str | None = None
@@ -105,6 +106,7 @@ class Settings:
             adp_app_key=env("ADP_APP_KEY") or None,
             checker_model=env("CHECKER_MODEL") or cls.checker_model,
             grounding_threshold=float(env("GROUNDING_THRESHOLD") or cls.grounding_threshold),
+            grounding_floor=float(env("GROUNDING_FLOOR") or cls.grounding_floor),
             adp_chat_url=env("ADP_CHAT_URL") or cls.adp_chat_url,
             leakci_scoreboard=env("LEAKCI_SCOREBOARD") or cls.leakci_scoreboard,
         )

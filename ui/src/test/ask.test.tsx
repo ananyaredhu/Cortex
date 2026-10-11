@@ -18,13 +18,24 @@ const wrap = (ui: ReactNode) =>
 describe("answerSegments", () => {
   it("puts each citation marker after the claim it supports, numbered by citations order", () => {
     const segs = answerSegments(ANSWER);
-    expect(segs.map((s) => (s.kind === "text" ? s.text : `[${s.n}]`)).join("")).toBe(
+    expect(segs.map((s) => (s.kind === "text" ? s.text : s.kind === "cite" ? `[${s.n}]` : "")).join("")).toBe(
       "Cutover is blocked on replica lag.[1] Blockers were raised in #db-migration last week.[2][1]",
     );
   });
 
   it("falls back to the plain answer when there are no claims", () => {
     expect(answerSegments(refusal("req_1"))).toEqual([{ kind: "text", text: refusal("req_1").answer }]);
+  });
+});
+
+describe("lower-confidence statements (F21)", () => {
+  it("marks a kept statement the checker only weakly supported, after its citation", () => {
+    const first = ANSWER.claims[0];
+    const r = { ...ANSWER, claims: [{ ...first, confidence: "lower" as const }] };
+    const kinds = answerSegments(r).map((s) => s.kind);
+    expect(kinds.at(-1)).toBe("lower");
+    expect(kinds).toContain("cite");
+    expect(answerSegments(ANSWER).some((s) => s.kind === "lower")).toBe(false);
   });
 });
 

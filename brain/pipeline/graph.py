@@ -360,8 +360,9 @@ class Brain:
         allowed_ids = {e["doc_id"] for e in state["packet"]["evidence"]}
         checked = check(state["generated"], allowed_ids, state["denied_docs"])
         evidence_text = {e.doc_id: f"{e.title}. {e.raw}" for e in state["evidence"]}
-        grounded = check_layer2(checked.claims, evidence_text, self.scorer, threshold=self.settings.grounding_threshold)
-        if grounded.removed_claims:
+        grounded = check_layer2(checked.claims, evidence_text, self.scorer, threshold=self.settings.grounding_threshold,
+                                floor=self.settings.grounding_floor)
+        if grounded.removed_claims or grounded.lower_confidence:
             checked = CheckResult(rebuild_answer(checked.answer, grounded.claims, grounded.removed_claims), grounded.claims,
                                   checked.removed_claims + grounded.removed_claims, checked.leak_hits,
                                   abstained=checked.abstained or not grounded.claims)
@@ -443,6 +444,7 @@ class Brain:
             "checks": {**checked.status, "generator": "unavailable" if resp["generator_unavailable"] else "ok",
                        "grounding_model": state["grounded"].status,
                        "grounding_scores": state["grounded"].scores,
+                       "grounding_lower_confidence": state["grounded"].lower_confidence,
                        "leak_hits": [hash_denied(d, salt) for d in checked.leak_hits]},
             "models": {"generator": self.generator.model, "checker": state["grounded"].model,
                        "embedding": f"{self.embedder.model}@{self.embedder.version}" if self.embedder else "none"},
