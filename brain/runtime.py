@@ -112,7 +112,8 @@ def fixture_runtime(settings: Settings | None = None, *, sources=("confluence", 
     def reset() -> None:
         fresh = fixture_runtime(settings, sources=sources)
         runtime.brain, runtime.audit, runtime.audit_store, runtime.consumer = fresh.brain, fresh.audit, fresh.audit_store, fresh.consumer
-        runtime.advance, runtime.reset, runtime.tamper, runtime.ingest = fresh.advance, fresh.reset, fresh.tamper, fresh.ingest
+        # Not `fresh.reset`: that one rebuilds `fresh`, a runtime nobody serves, so a second reset would change nothing.
+        runtime.advance, runtime.tamper, runtime.ingest = fresh.advance, fresh.tamper, fresh.ingest
 
     def tamper(seq: int) -> None:
         runtime.audit_store.tamper(seq, lambda e: e.setdefault("query", {}).__setitem__("text", "TAMPERED"))

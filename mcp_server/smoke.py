@@ -20,6 +20,7 @@ from mcp.client.session import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 
 TOOLS = ["ask", "search", "get_source", "explain_access", "audit_query"]
+TIMEOUT_S = 180.0
 
 
 def fixture_ids():
@@ -47,9 +48,10 @@ def _data(result: Any) -> dict:
 
 
 async def _as(base: str, persona: str, work: Callable[[ClientSession], Awaitable[None]]) -> None:
-    signed = httpx2.post(f"{base}/idp/token", json={"persona": persona})
+    signed = httpx2.post(f"{base}/idp/token", json={"persona": persona}, timeout=TIMEOUT_S)
     signed.raise_for_status()
-    http = httpx2.AsyncClient(headers={"Authorization": f"Bearer {signed.json()['access_token']}"})
+    # A real answer takes 5 to 30 s (retrieval, live access checks, the model); httpx's default read timeout is 5 s.
+    http = httpx2.AsyncClient(headers={"Authorization": f"Bearer {signed.json()['access_token']}"}, timeout=TIMEOUT_S)
     async with http, streamable_http_client(f"{base}/mcp", http_client=http) as streams:
         async with ClientSession(streams[0], streams[1]) as session:
             await session.initialize()

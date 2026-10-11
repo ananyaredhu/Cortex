@@ -78,3 +78,26 @@ def test_mcp_settings_are_read_from_the_environment_too(monkeypatch):
     monkeypatch.setenv("BRAIN_MCP_ALLOWED_HOSTS", "demo.example.sg")
     s = fixture_settings_from_env()
     assert s.mcp is True and s.public_url == "https://demo.example.sg" and s.mcp_allowed_hosts == ("demo.example.sg",)
+
+
+def test_reset_works_every_time_not_only_the_first():
+    """Found by the red-team harness (11 Oct): after one reset, `runtime.reset` rebuilt a runtime nobody served."""
+    from fastapi.testclient import TestClient
+
+    from brain.api.app import create_app
+    from brain.config import Settings
+    from brain.runtime import fixture_runtime
+
+    client = TestClient(create_app(fixture_runtime(Settings(floor_latency_ms=0, dev_auth=True))))
+    headers = {"Authorization": "Bearer dev:priya"}
+
+    def sees_private_thread() -> bool:
+        question = {"question": "What are the open concerns in the auth service threat model?"}
+        body = client.post("/v1/ask", json=question, headers=headers).json()
+        return "slack:C_AUTHPRIV/thread-1" in [c["doc_id"] for c in body["citations"]]
+
+    for _ in range(3):
+        assert client.post("/sim/reset").status_code == 200
+        assert sees_private_thread()
+        assert client.post("/sim/advance", json={"event_id": "e2"}).status_code == 200
+        assert not sees_private_thread()

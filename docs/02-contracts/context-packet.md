@@ -36,7 +36,8 @@ Context engineering is an explicit pipeline stage: select, compress, order and b
       "as_of": "2026-10-10T13:58:00Z",
       "acl_label": ["role:DBMIG:developer"],
       "flags": [],
-      "via_link_from": null
+      "via_link_from": null,
+      "fields": {"status": "In Progress", "assignee": "Maya"}
     }
   ],
   "constraints": {
@@ -64,6 +65,7 @@ Conversation memory entries are labeled with the intersection of their sources' 
 Context precision and recall on the golden set, citation precision, abstention correctness, and token cost per answer.
 
 ## Changelog
+- 0.1, 11 Oct: evidence `fields` (present only when the document has any): the connector's `Document.fields`, for a Jira issue its `status` and `assignee`. Cleaned like text: a value that gives the model orders, is longer than 80 characters or has a malformed name is left out, and an order sets `possible_injection`. The model may state them; the checker compares what a claim says about them with these values by code (ADR-003, layer 1b, fix F23).
 - 0.1, 11 Oct: `task.projects` (names of the projects the question names, from the registry, only those the asker may see) and `user_context.projects` now holds the names of the projects the asker is a member of. Names only: never a place, a channel or a document (T7).
 - 0.1, 11 Oct: evidence `flags` may hold `freshness_unverified`: the live version check failed and the indexed copy was served (fix F9). It is also recorded in the audit event's `flags`.
 - 0.1, 11 Oct: sanitizer narrowed and extended (fix F6); sentences end at . ! ? 。！？ or a new line.

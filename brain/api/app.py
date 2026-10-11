@@ -54,6 +54,18 @@ def _sse(event: str, data: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(data)}\n\n"
 
 
+def channel_names(threads) -> dict[str, str]:
+    """`{channel id: "#db-migration"}` from (channel id, thread title) pairs. A Slack thread's title starts with where it was
+    said ("#db-migration thread: ...", "DM maya, priya thread: ..."), so the name comes from threads the caller may open and
+    from nothing else: a channel they can see no thread in has no name here."""
+    names: dict[str, str] = {}
+    for channel, title in threads:
+        where, marker, _ = (title or "").partition(" thread:")
+        if marker and where.strip():
+            names.setdefault(channel, where.strip())
+    return names
+
+
 def create_app(runtime: Runtime) -> FastAPI:
     settings = runtime.settings
     auth = Authenticator(signing_key=settings.jwt_signing_key, audience=settings.jwt_audience, dev_auth=settings.dev_auth)
@@ -163,6 +175,7 @@ def create_app(runtime: Runtime) -> FastAPI:
             "issues": [{"doc_id": d.doc_id, "title": d.title, "url": d.url, "status": None} for d in vis if d.source == "jira"],
             "projects": sorted({d.parent_id for d in vis if d.source == "jira" and d.parent_id}),
             "channels": sorted({d.parent_id for d in vis if d.source == "slack" and d.parent_id}),
+            "channel_names": channel_names((d.parent_id, d.title) for d in vis if d.source == "slack" and d.parent_id),
             "recent_pages": [{"doc_id": d.doc_id, "title": d.title, "updated_at": d.updated_at, "url": d.url}
                              for d in vis if d.source in ("confluence", "gdrive")][:5],
             "project_profile": runtime.brain.project_profile(p),

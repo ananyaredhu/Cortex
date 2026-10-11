@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, BellRing, ExternalLink, Hash, SquareKanban } from "lucide-react";
+import { ArrowRight, BellRing, ExternalLink, Hash, MessageSquare, SquareKanban } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import { shortId, when } from "../ask/format";
@@ -109,11 +109,15 @@ export function HomePage() {
                   <SquareKanban size={12} aria-hidden /> {shortId(p)}
                 </span>
               ))}
-              {w.channels.map((c) => (
-                <span key={c} className="chip chip--static mono">
-                  <Hash size={12} aria-hidden /> {shortId(c)}
-                </span>
-              ))}
+              {w.channels.map((c) => {
+                const name = w.channel_names?.[c];
+                return (
+                  <span key={c} className="chip chip--static mono" title={shortId(c)}>
+                    {name?.startsWith("#") ? <Hash size={12} aria-hidden /> : <MessageSquare size={12} aria-hidden />}{" "}
+                    {name ? name.replace(/^#/, "") : shortId(c)}
+                  </span>
+                );
+              })}
               {w.projects.length + w.channels.length === 0 && <p className="muted small">None yet.</p>}
             </div>
           </section>

@@ -46,6 +46,7 @@ class Evidence:
     score: float = 0.0
     raw: str = ""                  # the sanitized snippet without delimiters (excerpt for the UI)
     via_link_from: str | None = None   # the allowed document whose stored link led here (None: a direct hit)
+    fields: dict[str, str] = field(default_factory=dict)   # Document.fields, sanitized: the checker compares claims with these
 
 
 def sanitize(text: str) -> tuple[str, list[str]]:
@@ -118,13 +119,38 @@ def build_packet(request_id: str, user_context: dict, question: str, skill: str 
         "history": history or [],
         "evidence": [{"chunk_id": e.chunk_id, "doc_id": e.doc_id, "source": e.source, "title": e.title, "url": e.url,
                       "text": e.text, "as_of": e.as_of, "acl_label": e.acl_label, "flags": e.flags,
-                      "via_link_from": e.via_link_from} for e in final],
+                      "via_link_from": e.via_link_from, **({"fields": e.fields} if e.fields else {})} for e in final],
         "constraints": {"must_cite": True, "abstain_if_unsupported": True, "max_tokens": 6000},
     }
 
 
+MAX_FIELD_CHARS = 80
+
+
+def clean_fields(fields: dict[str, str] | None) -> tuple[dict[str, str], list[str]]:
+    """A field value is source data like the text: one that gives the model orders, or is too long to be a field value, is
+    left out (and the evidence flagged), never passed on."""
+    out, flags = {}, []
+    for name, value in sorted((fields or {}).items()):
+        value = " ".join(str(value).split())
+        if not value or len(value) > MAX_FIELD_CHARS or not re.fullmatch(r"[a-z][a-z0-9_]{0,30}", str(name)):
+            continue
+        if sanitize(value)[1]:
+            flags = ["possible_injection"]
+            continue
+        out[str(name)] = value
+    return out, flags
+
+
 def make_evidence(chunk_id: str, doc_id: str, source: str, title: str, url: str, text: str, as_of: str | None,
-                  acl_tokens: list[str], terms: list[str], score: float, via_link_from: str | None = None) -> Evidence:
+                  acl_tokens: list[str], terms: list[str], score: float, via_link_from: str | None = None,
+                  fields: dict[str, str] | None = None) -> Evidence:
     clean, flags = sanitize(snippet(text, terms))
-    spot = f"{DELIM_OPEN} {doc_id}\n{clean}\n{DELIM_CLOSE}"
-    return Evidence(chunk_id, doc_id, source, title, url, spot, as_of, sorted(acl_tokens), flags, score, clean, via_link_from)
+    # The title is model input and client output too. A Slack thread's title is the start of its first message, so an order
+    # in that message would otherwise ride past the sanitizer in the title (found by the red-team run, 11 Oct).
+    title, title_flags = sanitize(title)
+    fields, field_flags = clean_fields(fields)
+    flags = sorted(set(flags) | set(title_flags) | set(field_flags))
+    spot =f"{DELIM_OPEN} {doc_id}\n{clean}\n{DELIM_CLOSE}"
+    return Evidence(chunk_id, doc_id, source, title, url, spot, as_of, sorted(acl_tokens), flags, score, clean, via_link_from,
+                    fields)

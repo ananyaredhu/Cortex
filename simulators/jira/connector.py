@@ -19,14 +19,25 @@ def _parse(doc_id: str) -> str | None:
     return key if prefix == "jira" and valid_issue_key(key) else None
 
 
+def _fields(fields: dict) -> dict[str, str]:
+    """`Document.fields` (connector-interface 0.4): what Jira holds as fields, for code to compare claims with."""
+    out = {}
+    if (fields.get("status") or {}).get("name"):
+        out["status"] = fields["status"]["name"]
+    if (fields.get("assignee") or {}).get("displayName"):
+        out["assignee"] = fields["assignee"]["displayName"]
+    return out
+
+
 def _body(fields: dict) -> str:
     """One document per issue: description, then status and assignee, then comments (contract: "one issue, including its
     comments"). `Status: <name>` and `Assignee: <display name>` are the lines Team focus reads (brain/projects/team.py)."""
-    parts = [fields.get("description") or ""]
-    if fields.get("status"):
-        parts.append(f"Status: {fields['status']['name']}")
-    if (fields.get("assignee") or {}).get("displayName"):
-        parts.append(f"Assignee: {fields['assignee']['displayName']}")
+    description = fields.get("description") or ""
+    parts = [description]
+    for line in (f"{label}: {value}" for label, value in (("Status", _fields(fields).get("status")),
+                                                          ("Assignee", _fields(fields).get("assignee"))) if value):
+        if line not in description:          # a description that already says it (the seeded issues) is not told twice
+            parts.append(line)
     for comment in fields["comment"]["comments"]:
         author = (comment.get("author") or {}).get("emailAddress") or "unknown"
         parts.append(f"Comment by {author} ({comment['created']}): {comment['body']}")
@@ -92,6 +103,7 @@ class JiraConnector:
             updated_at=fields["updated"],
             version=extra["version"],
             acl=AclEvidence(list(acl["tokens"]), acl["native"], acl["snapshotHash"], utc_now()),
+            fields=_fields(fields),
         )
 
     def check_access(self, identity: PlatformIdentity, doc_id: str) -> AccessDecision:

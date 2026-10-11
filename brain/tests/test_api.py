@@ -259,6 +259,9 @@ def test_mywork_differs_per_persona_and_hides_restricted(client):
     assert priya["issues"] and not sam["issues"]
     assert all("SEC-17" not in i["doc_id"] for i in priya["issues"])
     assert "jira:DBMIG" in priya["projects"] and priya["channels"]
+    assert priya["channel_names"]["slack:C_DBMIG"] == "#db-migration"
+    assert set(priya["channel_names"]) <= set(priya["channels"])          # no name for a channel she can open nothing in
+    assert "slack:C_DBMIGPRIV" not in priya["channel_names"] and sam["channel_names"] == {}
     assert sam["channels"] == []
 
 

@@ -49,6 +49,9 @@ class Document:
     updated_at: str
     version: str
     acl: AclEvidence
+    # What the platform holds as a field, not as text: lower-case name -> value, both strings ({} when it has none).
+    # Jira: `status`, `assignee` (display name). Source data like `body`: untrusted, sanitized before a model sees it.
+    fields: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass

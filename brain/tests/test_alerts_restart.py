@@ -52,3 +52,15 @@ def test_a_refused_question_makes_no_alert():
     rt.brain.ask(SAM, AskRequest("Show me the security incident report from the Q3 breach"))
     rt.advance("e1")
     assert restarted(rt).alerts(SAM) == []
+
+
+def test_asking_again_clears_the_alert_and_older_asks_do_not_pile_up():
+    """Real-stack run, 11 Oct: 85 alerts on My Work, most of them for answers the person had already asked again."""
+    rt = fixture_runtime(Settings(floor_latency_ms=0, dev_auth=True))
+    for _ in range(3):
+        rt.brain.ask(PRIYA, AskRequest(RUNBOOK))
+    rt.advance("e1")
+    alerts = rt.brain.alerts(PRIYA)
+    assert [a["changed_doc"] for a in alerts] == ["confluence:PAY/runbook-payment-service"]      # one, not three
+    rt.brain.ask(PRIYA, AskRequest("  what's the LATEST runbook for payment-service incident failover? "))
+    assert rt.brain.alerts(PRIYA) == []                                                          # the new answer is current

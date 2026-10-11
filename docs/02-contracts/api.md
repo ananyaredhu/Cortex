@@ -125,6 +125,7 @@ Personalized home for the logged-in user: assigned issues, projects, recent page
   "issues": [{"doc_id": "jira:DBMIG-142", "title": "...", "status": "In Progress", "url": "..."}],
   "projects": ["jira:DBMIG"],
   "channels": ["slack:C_DBMIG"],
+  "channel_names": {"slack:C_DBMIG": "#db-migration"},
   "recent_pages": [{"doc_id": "confluence:PAY/runbook-payment-service", "title": "...", "updated_at": "...", "url": "..."}],
   "suggested_questions": ["..."],
   "alerts": []
@@ -171,6 +172,7 @@ Simulator admin endpoints (owned by A) to revoke a permission, restrict a page, 
 ## Changelog
 - 0.2, 11 Oct: `GET /v1/team` (Team focus) with `assignee` and `mine` per issue, and optional `goal`, `start_date`, `target_date`, `milestone` and `sprint` per project in the registry file.
 - 0.2, 11 Oct: `GET /v1/projects` and `project_profile` in `/mywork` (T7).
+- 0.2, 11 Oct (after the full real-stack run): `/mywork` gains the optional `channel_names` (`{channel id: name}`, taken from the titles of threads the caller may open; a real Slack ID such as `slack:C0C654ZPPB9` says nothing to a reader). `/alerts` and `alerts` in `/mywork` count only the caller's **latest** ask of each question: asking again supersedes the older answers, so they no longer raise an alert.
 - 0.2, 11 Oct: `/leakci/latest` `status`, and `leaks: null` when no run exists; `/policy/versions` `history_kept: false` (fix F7).
 - 0.2, 11 Oct: `citations[].unverified`, `freshness.unverified_sources` and the `unverified` source status (fix F9).
 - 0.2, 11 Oct: `claims[].confidence: "lower"` and `grounding.lower_confidence` (fix F21).

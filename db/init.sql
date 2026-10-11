@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS documents (
     created_at    timestamptz,
     updated_at    timestamptz,
     version       text NOT NULL,
+    fields        jsonb NOT NULL DEFAULT '{}',      -- Document.fields: what the platform holds as fields (Jira: status, assignee)
     deleted       boolean NOT NULL DEFAULT false
 );
 

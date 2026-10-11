@@ -279,3 +279,39 @@ def test_a_failing_sink_leaves_the_cursor_so_the_event_is_retried(store):
     sink = RecordingSink()
     _ingestor(store, slack, sink=sink).run_once()
     assert len(sink.events) == 1
+
+
+# -- structured fields (connector-interface 0.4) ---------------------------------------------------
+class _NoFields:
+    """A connector from before `Document.fields`: the same documents, without them."""
+
+    def __init__(self, inner):
+        self.source = inner.source
+        self._inner = inner
+
+    def list_changes(self, cursor):
+        return self._inner.list_changes(cursor)
+
+    def fetch(self, doc_id):
+        doc = self._inner.fetch(doc_id)
+        doc.fields = {}
+        return doc
+
+
+def test_the_index_stores_each_documents_fields(store):
+    _ingestor(store, FixtureConnector("jira"), FixtureConnector("slack")).run_once()
+    assert store.indexed("jira:DBMIG-142").fields == {"status": "In Progress", "assignee": "Maya"}
+    assert store.indexed("slack:C_DBMIG/thread-1").fields == {}
+
+
+def test_an_index_built_before_the_fields_picks_them_up_on_the_next_crawl(store):
+    """Same version, same ACL, same embedder: only the fields are new. That must not count as unchanged."""
+    jira = FixtureConnector("jira")
+    _ingestor(store, _NoFields(jira)).run_once()
+    assert store.indexed("jira:DBMIG-142").fields == {}
+    with_fields = [d["doc_id"] for d in _docs("jira") if d.get("fields")]
+    replay = _ingestor(store, _Scripted("jira", jira, jira.list_changes(None).changes))
+    assert dict(replay.run_once().actions["jira"]) == {INDEXED: len(with_fields), UNCHANGED: len(_docs("jira")) - len(with_fields)}
+    assert store.indexed("jira:DBMIG-142").fields == {"status": "In Progress", "assignee": "Maya"}
+    again = _ingestor(store, _Scripted("jira", jira, jira.list_changes(None).changes))
+    assert dict(again.run_once().actions["jira"]) == {UNCHANGED: len(_docs("jira"))}

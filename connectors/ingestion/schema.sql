@@ -1,6 +1,9 @@
 -- Ingestion's own state, created at start-up if missing. Kept out of db/init.sql (the shared draft schema)
 -- until the team folds it in.
 
+-- connector-interface 0.4: `Document.fields`. For a database created before db/init.sql had the column.
+ALTER TABLE IF EXISTS documents ADD COLUMN IF NOT EXISTS fields jsonb NOT NULL DEFAULT '{}';
+
 CREATE TABLE IF NOT EXISTS ingestion_cursors (
     source      text PRIMARY KEY,                   -- slack | gdrive | confluence | jira
     cursor      text NOT NULL,                      -- opaque, from Connector.list_changes

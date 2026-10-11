@@ -219,8 +219,11 @@ class Ingestor:
             # (at least once). The other order could lose the event.
             self.sink.emit(IngestionEvent("acl_change", doc.source, detected_at, self._clock(),
                                           doc_id=doc.doc_id, snapshot_hash=doc.acl.snapshot_hash))
+        # The fields are part of what is indexed: a document indexed before the connector provided them (connector-interface
+        # 0.4), or whose platform changed a field without a new version label, is written again.
         content_current = (have is not None and not have.deleted and have.version == doc.version
-                           and (have.embedding_model, have.embedding_version) == (self.embedder.model, self.embedder.version))
+                           and (have.embedding_model, have.embedding_version) == (self.embedder.model, self.embedder.version)
+                           and (have.fields or {}) == dict(doc.fields))
         if content_current:
             if same_acl(have.snapshot_hash, have.acl_tokens, doc):
                 return UNCHANGED, None

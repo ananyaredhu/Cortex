@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Search } from "lucide-react";
 import { useState } from "react";
 import { api } from "../api/client";
-import type { AuditEvent, AuditFilter } from "../api/types";
+import type { AuditAnswer, AuditEvent, AuditFilter, SeenDoc, TimeTravel, VerifyResult } from "../api/types";
 import { usePersona } from "../auth/PersonaContext";
 import { PERSONAS } from "../auth/personas";
 import { SourceGlyph, SOURCE_LABEL } from "../components/SourceGlyph";
@@ -26,7 +26,11 @@ export function AuditPage() {
   const { persona } = usePersona();
   const [question, setQuestion] = useState(SCENARIO_5);
   const [filter, setFilter] = useState<AuditFilter>({ user: "priya@companya.com", space: "confluence:PAY", decision: "all" });
+  // Two ways in. "Ask" sends the question in words to the audit agent (POST /v1/audit/ask), which plans it, says how it
+  // understood it and runs it. "Run query" sends the filters below as they are (POST /v1/audit/query).
   const [submitted, setSubmitted] = useState<{ question: string; filter: AuditFilter } | null>(null);
+  const [asked, setAsked] = useState<{ question: string; n: number } | null>(null);
+  const [mode, setMode] = useState<"ask" | "filter">("filter");
   const [selected, setSelected] = useState<AuditEvent | null>(null);
 
   const qc = useQueryClient();
@@ -39,14 +43,34 @@ export function AuditPage() {
         .finally(() => qc.invalidateQueries({ queryKey: ["verify", persona.id] })),
     enabled: submitted !== null,
   });
+  const answer = useQuery({
+    queryKey: ["audit-ask", persona.id, asked],
+    queryFn: () =>
+      api(persona.id)
+        .auditAsk(asked!.question)
+        .finally(() => qc.invalidateQueries({ queryKey: ["verify", persona.id] })),
+    enabled: asked !== null,
+  });
   const verify = useQuery({ queryKey: ["verify", persona.id], queryFn: () => api(persona.id).auditVerify() });
   const brokenSeq = verify.data && !verify.data.ok ? verify.data.first_broken_seq : null;
-  const events = results.data?.events ?? [];
+  const asking = mode === "ask";
+  const active = asking ? answer : results;
+  const idle = asking ? asked === null : submitted === null;
+  const plan = asking ? (answer.data?.plan ?? null) : null;
+  const tabular = !asking || plan?.kind === "query";
+  const events = (asking ? eventsOf(answer.data) : results.data?.events) ?? [];
   const firstAsk = events.find((e) => e.event_type === "ask")?.seq ?? events[0]?.seq ?? null;
 
   const run = () => {
     setSelected(null);
+    setMode("filter");
     setSubmitted({ question, filter: { ...filter } });
+  };
+  const ask = () => {
+    if (!question.trim()) return;
+    setSelected(null);
+    setMode("ask");
+    setAsked((prev) => ({ question: question.trim(), n: (prev?.n ?? 0) + 1 })); // n: asking the same words again runs again
   };
 
   return (
@@ -69,8 +93,21 @@ export function AuditPage() {
             <label htmlFor="audit-q" className="visually-hidden">
               Audit question
             </label>
-            <input id="audit-q" value={question} onChange={(e) => setQuestion(e.target.value)} />
-            <button type="submit" className="audit__run">
+            <input
+              id="audit-q"
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault(); // Enter in the question box asks the question; the filters have their own button
+                  ask();
+                }
+              }}
+            />
+            <button type="button" className="audit__run" onClick={ask}>
+              Ask
+            </button>
+            <button type="submit" className="audit__run audit__run--quiet">
               Run query
             </button>
           </div>
@@ -113,20 +150,40 @@ export function AuditPage() {
           </div>
           <p className="muted small">
             A space matches documents that were allowed: denied ones are stored as salted hashes, so they can’t be
-            tied to a space. This query is recorded in the audit log too.
+            tied to a space. <strong>Ask</strong> reads the question in words and shows how it was understood;{" "}
+            <strong>Run query</strong> uses the filters above as they are. Either way the query is recorded in the audit
+            log too.
           </p>
         </form>
 
         <section className="audit__results" aria-label="Results">
-          {submitted === null ? (
-            <p className="muted">Run a query to reconstruct what people asked and what they were shown.</p>
-          ) : results.isPending ? (
+          {idle ? (
+            <p className="muted">Ask a question, or run a query, to reconstruct what people asked and what they were shown.</p>
+          ) : active.isPending ? (
             <p className="muted">Searching the log…</p>
-          ) : results.isError ? (
+          ) : active.isError ? (
             <p role="alert" className="banner banner--error">
-              {(results.error as Error).message}
+              {(active.error as Error).message}
             </p>
-          ) : events.length === 0 ? (
+          ) : asking && !plan ? (
+            <p role="status" className="audit__understood">
+              {answer.data?.clarify ?? "That question could not be read. Try naming a person, a space or a date."}
+            </p>
+          ) : (
+            <>
+              {asking && plan && (
+                <div className="audit__understood" role="status">
+                  <p>
+                    <span className="muted">Understood as:</span> {plan.understood}
+                  </p>
+                  {answer.data?.summary && <p className="audit__summary">{answer.data.summary}</p>}
+                </div>
+              )}
+              {asking && plan?.kind === "time_travel" && <TimeTravelView result={answer.data!.result as TimeTravel} />}
+              {asking && plan?.kind === "verify" && <VerifyView result={answer.data!.result as VerifyResult} />}
+            </>
+          )}
+          {idle || active.isPending || active.isError || !tabular || (asking && !plan) ? null : events.length === 0 ? (
             <p className="muted">No entries match. Ask a few questions as that person first, then run the query again.</p>
           ) : (
             <>
@@ -206,6 +263,70 @@ export function AuditPage() {
         />
       )}
     </div>
+  );
+}
+
+function eventsOf(answer: AuditAnswer | undefined): AuditEvent[] | undefined {
+  const result = answer?.result;
+  return result && "events" in result ? result.events : undefined;
+}
+
+function DocList({ title, docs, empty }: { title: string; docs: SeenDoc[]; empty: string }) {
+  return (
+    <section className="audit__seen" aria-label={title}>
+      <h2 className="audit__seen-title">
+        {title} <span className="muted">({docs.length})</span>
+      </h2>
+      {docs.length === 0 ? (
+        <p className="muted small">{empty}</p>
+      ) : (
+        <ul>
+          {docs.map((d) =>
+            "restricted" in d ? (
+              <li key={d.doc_id} className="muted">
+                <span className="mono small">{d.doc_id}</span> · restricted: you can’t open this one, so its title is withheld
+              </li>
+            ) : (
+              <li key={d.doc_id}>
+                <SourceGlyph source={d.source} size={14} /> {d.title} <span className="mono small muted">{d.doc_id}</span>
+              </li>
+            ),
+          )}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function TimeTravelView({ result }: { result: TimeTravel }) {
+  if (!result.identity.known) {
+    const first = result.identity.first_recorded_at;
+    return (
+      <p className="muted">
+        Nothing is recorded about what {result.user} could open at {when(result.at)}: it is before the first time their access
+        was recorded{first ? " (" + when(first) + ")" : ""}. No guess is shown.
+      </p>
+    );
+  }
+  return (
+    <div className="audit__travel">
+      <DocList title={"Could open at " + when(result.at)} docs={result.could_see} empty="Nothing." />
+      <DocList title="Lost since" docs={result.changed_since.lost} empty="Nothing lost since then." />
+      <DocList title="Gained since" docs={result.changed_since.gained} empty="Nothing gained since then." />
+    </div>
+  );
+}
+
+function VerifyView({ result }: { result: VerifyResult }) {
+  return result.ok ? (
+    <p className="status status--ok">
+      <span className="status__dot" aria-hidden /> Log integrity verified: {result.checked} entries, {result.checkpoints} signed
+      checkpoints.
+    </p>
+  ) : (
+    <p role="alert" className="banner banner--error">
+      The log does not verify from entry {result.first_broken_seq}: {result.reason}
+    </p>
   );
 }
 

@@ -92,6 +92,7 @@ class FixtureConnector:
             body=d["body"], parent_id=d["parent_id"], links=list(d["links"]), author=d["author"],
             created_at=d["created_at"], updated_at=d["updated_at"], version=d["version"],
             acl=AclEvidence(list(a["tokens"]), a["native"], a["snapshot_hash"], a["observed_at"]),
+            fields=dict(d.get("fields") or {}),
         )
 
     def check_access(self, identity: PlatformIdentity, doc_id: str) -> AccessDecision:

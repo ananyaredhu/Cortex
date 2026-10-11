@@ -159,3 +159,22 @@ def test_alerts_carry_the_question_and_skip_documents_no_longer_visible():
     client.post("/sim/advance", json={"event_id": "e2"})
     dump = json.dumps(client.get("/v1/alerts", headers=H("priya")).json())
     assert "C_AUTHPRIV" not in dump
+
+
+def test_the_audit_question_in_words_is_planned_and_run():
+    _ask("priya", "What's the latest runbook for payment-service incident failover?")
+    out = client.post("/v1/audit/ask", json={"question": "What did Priya access in the PAY space in the last 30 days?"},
+                      headers=H("jordan")).json()
+    assert out["plan"]["kind"] == "query" and out["plan"]["filter"] == {"user": "priya@companya.com", "space": "confluence:PAY"}
+    assert out["plan"]["understood"] and out["clarify"] is None and out["summary"].startswith(f"{out['result']['count']} events")
+    assert out["result"]["count"] >= 1 and all(e["actor"]["user_id"] == "priya@companya.com" for e in out["result"]["events"])
+
+
+def test_an_audit_question_that_names_nothing_asks_for_more_and_runs_nothing():
+    out = client.post("/v1/audit/ask", json={"question": "anything odd lately?"}, headers=H("jordan")).json()
+    assert out["plan"] is None and out["result"] is None and out["clarify"]
+
+
+def test_the_audit_question_is_for_the_compliance_role_only():
+    assert client.post("/v1/audit/ask", json={"question": "What did Priya access?"}, headers=H("sam")).status_code == 403
+
