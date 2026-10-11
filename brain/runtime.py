@@ -14,6 +14,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from brain.audit.anchor import FileAnchor, MemoryAnchor
 from brain.audit.chain import Signer
 from brain.audit.service import AuditService
 from brain.audit.store import AuditStore, MemoryAuditStore, PostgresAuditStore
@@ -93,7 +94,8 @@ def fixture_runtime(settings: Settings | None = None, *, sources=("confluence", 
     embedder = FakeEmbedder()
     ingestor = Ingestor(connectors.values(), store, embedder)
     ingestor.run_once()
-    audit_store = MemoryAuditStore(signer=Signer(settings.audit_signing_key), checkpoint_every=settings.checkpoint_every)
+    audit_store = MemoryAuditStore(signer=Signer(settings.audit_signing_key), checkpoint_every=settings.checkpoint_every,
+                                   anchor=MemoryAnchor())
     brain = Brain(settings, connectors, MemoryIndex(store), store, embedder, TemplateGenerator(), audit_store)
     consumer = OutboxConsumer(store, brain.resolver, brain.pdp, record=audit_store.append)
     runtime = Runtime(settings, brain, AuditService(audit_store, brain), audit_store, consumer)
@@ -134,8 +136,11 @@ def env_runtime(settings: Settings | None = None) -> Runtime:
             log.warning("source %s not configured (%s): skipped", name, type(exc).__name__)
     store = PostgresStore.connect(settings.database_url)
     index = PostgresIndex.connect(settings.database_url)
+    anchor = FileAnchor(settings.audit_head_path) if settings.audit_head_path else None
     audit_store = PostgresAuditStore.connect(settings.database_url, signer=Signer(settings.audit_signing_key),
-                                             checkpoint_every=settings.checkpoint_every)
+                                             checkpoint_every=settings.checkpoint_every, anchor=anchor)
+    if settings.audit_head_adopt:
+        audit_store.adopt_head()
     embedder = embedder_from_env(settings.embedding_backend)
     embedder.embed(["warm up"])      # bge-m3 loads on first use (about 30 s warm, minutes cold): pay it now, not on the first question
     scorer = scorer_from_env(settings.checker_model)

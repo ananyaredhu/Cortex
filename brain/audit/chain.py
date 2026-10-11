@@ -86,6 +86,30 @@ def checkpoint_event(head_seq: int, head_hash: str, signer: Signer, ts: str) -> 
                            "public_key": signer.public_key_hex, "signature": signer.sign(message)}}
 
 
+def check_head(events: list[dict], head: dict | None, *, public_key_hex: str | None = None) -> VerifyResult | None:
+    """Compare the log with the last signed head an anchor recorded (fix F4). None means they agree.
+
+    A log shorter than the head lost its newest events; a different hash at the head's position means history was
+    rewritten; a head with no events behind it, or events with no head at all, is also refused. The signature is checked
+    against `public_key_hex` when given, otherwise against the key the head names."""
+    if head is None:
+        if events:
+            return VerifyResult(False, len(events), 0, 1, "the log has events but no signed head is on record outside it")
+        return None
+    seq = head.get("seq")
+    key = public_key_hex or head.get("public_key", "")
+    if not isinstance(seq, int) or not Signer.verify(key, f"{seq}:{head.get('hash')}", head.get("signature", "")):
+        return VerifyResult(False, len(events), 0, seq if isinstance(seq, int) else None,
+                            "the signed head on record does not verify")
+    if seq > len(events):
+        return VerifyResult(False, len(events), 0, len(events) + 1,
+                            f"the log ends at event {len(events)}, but a signed head was recorded for event {seq}: "
+                            "the newest events were deleted")
+    if events[seq - 1].get("hash") != head.get("hash"):
+        return VerifyResult(False, len(events), 0, seq, "the event at the recorded head was replaced")
+    return None
+
+
 def verify(events: Iterable[dict], *, public_key_hex: str | None = None) -> VerifyResult:
     """Walk the chain in order. Checkpoints are verified against `public_key_hex` when given, otherwise against the
     key they name (which proves integrity of the chain, not who signed it)."""
