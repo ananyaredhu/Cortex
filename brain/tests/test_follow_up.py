@@ -149,3 +149,15 @@ def test_memory_never_widens_access(rt):
     sam_first = rt.brain.ask(SAM, AskRequest("Show me the security incident report from the Q3 breach"))
     out = rt.brain.ask(SAM, AskRequest("the second one?", conversation_id=sam_first["conversation_id"]))
     assert out["refused"] and out["citations"] == []
+
+
+def test_the_model_is_told_the_restated_question_for_a_follow_up(rt):
+    from brain.gateway.models import system_prompt
+    first = rt.brain.ask(PRIYA, AskRequest(Q1))
+    rt.brain.ask(PRIYA, AskRequest("why?", conversation_id=first["conversation_id"]))
+    packet = rt.brain.generator.packets[-1]
+    assert packet["task"]["question"] == "why?" and packet["task"]["standalone_question"].startswith("What's the status of the database")
+    assert "task.standalone_question" in system_prompt(packet)
+    rt.brain.ask(PRIYA, AskRequest("What is the status of the database migration?"))
+    alone = rt.brain.generator.packets[-1]
+    assert alone["task"]["standalone_question"] is None and "task.standalone_question" not in system_prompt(alone)

@@ -21,13 +21,25 @@ QUESTIONS = [
 ]
 
 
+class Capture:
+    """Passes calls through to the real generator and remembers the last packet, to show what was sent when an answer fails."""
+
+    def __init__(self, inner) -> None:
+        self.model, self._inner, self.packet = inner.model, inner, None
+
+    def generate(self, packet: dict):
+        self.packet = packet
+        return self._inner.generate(packet)
+
+
 def main() -> None:
     settings = Settings.from_env()
     generator = generator_from_settings(settings)
     if generator.model == "template-extractive":
         raise SystemExit("No model is configured: set ADP_APP_KEY (and GENERATOR_BACKEND=adp) in .env, then run this again.")
     runtime = fixture_runtime(Settings(floor_latency_ms=0))
-    runtime.brain.generator = generator
+    capture = Capture(generator)
+    runtime.brain.generator = capture
     first_conversation = None
     problems = 0
     for number, question in enumerate(QUESTIONS + ["why?"], 1):
@@ -42,6 +54,14 @@ def main() -> None:
         print(f"\n[{number}] {question[:90]}\n    skill: {out['skill']}  result: {verdict}  {seconds:.1f}s  claims: {len(out['claims'])}")
         print(f"    answer: {out['answer'][:500]}")
         print(f"    cited: {[c['doc_id'] for c in out['citations']]}")
+        if verdict != "ok" and hasattr(generator, "_call") and capture.packet is not None:
+            sent = capture.packet
+            print(f"    sent: question {sent['task']['question']!r}, restated {sent['task'].get('standalone_question')!r}")
+            print(f"    history turns: {len(sent['history'])}; evidence: {[e['doc_id'] for e in sent['evidence']]}")
+            try:
+                print(f"    RAW REPLY (one more call): {generator._call(capture.packet)[:900]!r}")
+            except Exception as exc:                                  # noqa: BLE001 - diagnostics only
+                print(f"    could not fetch the raw reply: {type(exc).__name__}")
     print("\nAll four answered." if not problems else f"\n{problems} of 4 did not produce an answer: read the lines above.")
 
 

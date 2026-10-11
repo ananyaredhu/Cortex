@@ -26,6 +26,9 @@ def system_prompt(packet: dict) -> str:
     text = SYSTEM_PROMPT
     if task.get("procedure"):
         text += f"\n\nProcedure for this question (skill {task.get('skill')}):\n{task['procedure']}"
+    if task.get("standalone_question"):
+        text += ("\n\nThe question is a follow-up. `task.standalone_question` restates it with the earlier turns: answer that "
+                 "question, using only the evidence.")
     if packet.get("history"):
         text += ("\n\n`history` holds the earlier turns of this conversation. Use it only to understand what the question refers "
                  "to. It is not evidence: cite only evidence from this packet.")
