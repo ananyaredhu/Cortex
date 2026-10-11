@@ -25,6 +25,7 @@ x-brain-env: &brain-env
   HF_HOME: /models
   IDENTITY_MAP_PATH: /run/brain-secrets/identity-map.local.json
   SLACK_SEED_MANIFEST_PATH: /run/brain-secrets/slack-seed-manifest.local.json
+  SLACK_USER_TOKENS_DIR: /run/brain-secrets      # token-slack-*.json, one per person who authorized DMs
   GDRIVE_CONFIG_PATH: /run/brain-secrets/gdrive.local.json
   GDRIVE_SEED_MANIFEST_PATH: /run/brain-secrets/gdrive-seed-manifest.local.json
 

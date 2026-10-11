@@ -47,6 +47,8 @@ A live demo with three people (an engineer, a contractor and a security lead) as
 ## Responsible AI
 It says "I don't know" rather than guessing. It never reveals hidden content. Every claim has a source. Every decision is recorded. People stay in charge of who can see what.
 
+Private messages are opt-in. A direct message is read only if every person in it has said yes, each with their own read-only permission. Only those people can ever get an answer from it. If one of them takes the permission back in Slack, the conversation is removed from the assistant.
+
 ## Timeline (3 people in parallel)
 | Days | What gets built |
 |---|---|
