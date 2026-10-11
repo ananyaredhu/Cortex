@@ -6,10 +6,28 @@ and sanitization, ordering against "lost in the middle", and a budget.
 import re
 from dataclasses import dataclass, field
 
+# A sentence is dropped when it tries to give the model orders: override or forget its instructions, take on a new role, read out
+# its prompt or secrets, or imitate a chat role marker. It is not dropped for merely mentioning words like "reveal" or "token":
+# "reveal the root cause of the outage" and "the token was replayed" are evidence. Phrasings the patterns miss are not the only
+# defence: the model has no tools, evidence sits inside delimiters, claims must cite, and the checker and leak scan run after.
+_ANYONE = r"(?:(?:all|any|every|the|your|my|these|those|previous|prior|above|earlier|former|preceding|system|original|safety)\s+){0,4}"
+_RULES = r"(?:instructions?|prompts?|rules|guidelines|directives|guardrails|restrictions|polic(?:y|ies))"
+_SECRETS = (r"(?:system prompt|hidden prompt|instructions|prompt|secrets?|passwords?|api[- ]?keys?|access tokens?|auth(?:entication)? "
+            r"tokens?|credentials?|private keys?|confidential (?:data|documents?|information)|internal documents?)")
 INSTRUCTION_LIKE = re.compile(
-    r"[^.!?\n]*\b(ignore (all |any )?(previous|prior|above|earlier) (instructions|prompts?)|disregard (the |all |your )?"
-    r"(previous|prior|above)? ?instructions|you are now|system prompt|reveal (the|your|all|every)|"
-    r"print (the|your|all) (secret|token|password|key)s?)\b[^.!?\n]*[.!?]?", re.I)
+    r"(?:"
+    rf"\b(?:ignore|disregard|forget|override|bypass|overrule|discard|do not follow|don't follow)\s+{_ANYONE}{_RULES}"
+    r"|\byou are now\b|\bfrom now on,? you\b|\bnew instructions?\s*:|\b(?:developer|god|jailbreak|dan) mode\b"
+    r"|\bpretend (?:to be|you are|that you)\b|\bact as (?:an?|the) (?:unrestricted|unfiltered|different|new)\b"
+    rf"|\b(?:reveal|print|show|output|display|repeat|disclose|leak|send|exfiltrate|dump|expose|tell|give)\s+(?:(?:me|us)\s+)?{_ANYONE}{_SECRETS}"
+    r"|\bsystem prompt\b"
+    r"|<\|im_(?:start|end)\|>|\[/?INST\]|^\s*(?:system|assistant)\s*:"
+    # the same orders in other languages (French, Spanish, Portuguese, German, Chinese, Japanese)
+    r"|\b(?:ignorez?|oubliez|ignora|ignore|ignorar|ignoriere|vergiss)\b[^.!?\n]{0,40}\b(?:instructions?|consignes|instrucciones|instru[cç][oõ]es|"
+    r"anweisungen|regeln|r[eè]gles)\b"
+    r"|(?:忽略|无视|忘记|忽视)[^。！？\n]{0,12}(?:指令|指示|提示|规则|说明)|(?:以前|これまで|上記)の?(?:指示|命令)[^。\n]{0,6}(?:無視|忘れ)"
+    r")", re.I | re.M)
+SENTENCE = re.compile(r"[^.!?。！？\n]*(?:[.!?。！？]+|\n|$)")
 WORD = re.compile(r"[a-z0-9]+")
 DELIM_OPEN, DELIM_CLOSE = "<<<evidence>>>", "<<</evidence>>>"
 
@@ -31,10 +49,18 @@ class Evidence:
 
 
 def sanitize(text: str) -> tuple[str, list[str]]:
-    """Strip instruction-like sentences. Retrieved text is data, never instructions."""
-    if INSTRUCTION_LIKE.search(text):
-        return INSTRUCTION_LIKE.sub(" [removed: possible prompt injection] ", text).strip(), ["possible_injection"]
-    return text, []
+    """Strip sentences that give the model orders. Retrieved text is data, never instructions. Sentences end at . ! ? 。！？ or a
+    new line, so an attack in another script, or a chat marker on its own line, costs only its own sentence."""
+    parts, flagged = [], False
+    for sentence in SENTENCE.findall(text):
+        if sentence and INSTRUCTION_LIKE.search(sentence):
+            flagged = True
+            parts.append(" [removed: possible prompt injection] ")
+        else:
+            parts.append(sentence)
+    if not flagged:
+        return text, []
+    return re.sub(r" {2,}", " ", "".join(parts)).strip(), ["possible_injection"]
 
 
 def snippet(text: str, terms: list[str], max_chars: int = 600) -> str:

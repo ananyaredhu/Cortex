@@ -17,6 +17,8 @@ class DeniedDoc:
     doc_id: str
     title: str
     text: str
+    shingles: frozenset | None = None      # set by `prepare`, so a document seen again is not re-read word by word
+    canaries: tuple[str, ...] | None = None
 
 
 def _words(text: str) -> list[str]:
@@ -25,6 +27,13 @@ def _words(text: str) -> list[str]:
 
 def _shingles(words: list[str]) -> set[tuple[str, ...]]:
     return {tuple(words[i:i + SHINGLE]) for i in range(0, max(0, len(words) - SHINGLE + 1))}
+
+
+def prepare(doc: DeniedDoc) -> DeniedDoc:
+    """The same document with its shingles and canaries computed once (the Brain caches these by document version)."""
+    if doc.shingles is not None:
+        return doc
+    return DeniedDoc(doc.doc_id, doc.title, doc.text, frozenset(_shingles(_words(doc.text))), tuple(CANARY.findall(doc.text)))
 
 
 def scan(answer: str, denied: list[DeniedDoc]) -> list[str]:
@@ -40,9 +49,9 @@ def scan(answer: str, denied: list[DeniedDoc]) -> list[str]:
         if doc.title and len(doc.title) >= 12 and doc.title.lower() in low:
             hits.append(doc.doc_id)
             continue
-        if any(c in answer for c in CANARY.findall(doc.text)):
+        if any(c in answer for c in (doc.canaries if doc.canaries is not None else CANARY.findall(doc.text))):
             hits.append(doc.doc_id)
             continue
-        if answer_shingles & _shingles(_words(doc.text)):
+        if answer_shingles & (doc.shingles if doc.shingles is not None else _shingles(_words(doc.text))):
             hits.append(doc.doc_id)
     return hits

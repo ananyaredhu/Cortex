@@ -262,6 +262,12 @@ def create_app(runtime: Runtime) -> FastAPI:
             runtime.tamper(seq)
             return {"tampered": seq}
 
+        @app.post("/sim/truncate")
+        def sim_truncate(keep: int):
+            """Demo of fix F4: delete the newest audit events as an insider with database access could; /verify must notice."""
+            runtime.audit_store.truncate(max(keep, 0))
+            return {"kept": max(keep, 0)}
+
         @app.post("/sim/advance")
         def sim_advance(body: AdvanceBody):
             if runtime.advance is None:
