@@ -15,6 +15,9 @@ from pathlib import Path
 
 D = "2026-10-10"
 ORG = "companya.com"
+# The five issues whose text gained a status or assignee line on 11 Oct. Ingestion re-reads a document only when its
+# version changes, so an index built before then needs the new label to pick the lines up.
+EDITED = f"{D}T08:00:00Z#2"
 
 
 def canon(obj) -> str:
@@ -22,7 +25,7 @@ def canon(obj) -> str:
 
 
 def doc(doc_id, source, kind, title, body, parent, tokens, native, links=(), author="system",
-        updated=f"{D}T08:00:00Z", version=None, tags=()):
+        updated=f"{D}T08:00:00Z", version=None, tags=(), created=f"{D}T00:00:00Z"):
     return {
         "doc_id": doc_id,
         "source": source,
@@ -33,7 +36,7 @@ def doc(doc_id, source, kind, title, body, parent, tokens, native, links=(), aut
         "parent_id": parent,
         "links": list(links),
         "author": author,
-        "created_at": f"{D}T00:00:00Z",
+        "created_at": created,
         "updated_at": updated,
         "version": version or updated,
         "tags": list(tags),
@@ -89,16 +92,16 @@ personas = [
 docs = [
     # --- Scenario 1: DB migration status plus Slack blockers ---
     doc("jira:DBMIG-142", "jira", "issue", "DBMIG-142 Cutover blocked on replica lag",
-        "Database migration cutover is blocked: replica lag stays above the 5 second threshold. Status: In Progress. "
+        "Database migration cutover is blocked: replica lag stays above the 5 second threshold. Status: In Progress. Assignee: Maya. "
         "Blocker owner: platform team. Follow-up DBMIG-150 tracks the replication tuning.",
         "jira:DBMIG", ["role:DBMIG:developer", "role:DBMIG:lead"],
         {"project": "DBMIG", "roles": ["developer", "lead"], "security_level": None},
-        links=["slack:C_DBMIG/thread-1", "jira:DBMIG-150"], author="maya@companya.com"),
+        links=["slack:C_DBMIG/thread-1", "jira:DBMIG-150"], author="maya@companya.com", version=EDITED),
     doc("jira:DBMIG-150", "jira", "issue", "DBMIG-150 Tune replication for database migration",
-        "Tune replication settings to remove the migration blocker. Status: To Do. Target: before cutover.",
+        "Tune replication settings to remove the migration blocker. Status: To Do. Assignee: Priya. Target: before cutover.",
         "jira:DBMIG", ["role:DBMIG:developer", "role:DBMIG:lead"],
         {"project": "DBMIG", "roles": ["developer", "lead"], "security_level": None},
-        links=["jira:DBMIG-142"], author="priya@companya.com"),
+        links=["jira:DBMIG-142"], author="priya@companya.com", version=EDITED),
     doc("slack:C_DBMIG/thread-1", "slack", "thread", "#db-migration thread: blockers last week",
         "Blockers raised last week on the database migration: replica lag is the main blocker, and the staging "
         "snapshot restore took too long. Platform team is looking at replication tuning.",
@@ -129,10 +132,10 @@ docs = [
         links=["jira:SEC-17"], author="dana@companya.com", tags=["canary", "restricted"]),
     doc("jira:SEC-17", "jira", "issue", "SEC-17 Auth token replay vulnerability",
         "Security-sensitive bug: auth tokens can be replayed within 10 minutes. Visible to the security team only. "
-        "CANARY-9b21-SEC17.",
+        "Status: In Progress. Assignee: Dana. CANARY-9b21-SEC17.",
         "jira:SEC", ["group:jira:security-team"],
         {"project": "SEC", "roles": [], "security_level": "security"},
-        links=["confluence:SEC/q3-breach-report"], author="dana@companya.com", tags=["canary", "restricted"]),
+        links=["confluence:SEC/q3-breach-report"], author="dana@companya.com", tags=["canary", "restricted"], version=EDITED),
     doc("confluence:HR/contractor-onboarding", "confluence", "page", "Contractor onboarding guide",
         "Welcome contractors. Get a laptop, request repository access, and follow the code review rules.",
         "confluence:HR", ["group:confluence:contractors", "public:org"], {"space": "HR", "restrictions": []},
@@ -162,15 +165,15 @@ docs = [
         {"project": "PAYINC", "roles": ["developer"], "security_level": None},
         links=["jira:PAYINC-10", "jira:PAYINC-11", "gdrive:postmortem-pay-outage"], author="maya@companya.com"),
     doc("jira:PAYINC-10", "jira", "issue", "PAYINC-10 Add circuit breaker to payment client",
-        "Follow-up to the payment outage: add a circuit breaker to the payment client. Status: In Progress.",
+        "Follow-up to the payment outage: add a circuit breaker to the payment client. Status: In Progress. Assignee: Priya.",
         "jira:PAYINC", ["role:PAYINC:developer"],
         {"project": "PAYINC", "roles": ["developer"], "security_level": None},
-        links=["jira:PAYINC-9"], author="priya@companya.com"),
+        links=["jira:PAYINC-9"], author="priya@companya.com", version=EDITED),
     doc("jira:PAYINC-11", "jira", "issue", "PAYINC-11 Raise connection pool alerts",
-        "Follow-up to the payment outage: raise alerts on connection pool saturation. Status: To Do.",
+        "Follow-up to the payment outage: raise alerts on connection pool saturation. Status: To Do. Assignee: Priya.",
         "jira:PAYINC", ["role:PAYINC:developer"],
         {"project": "PAYINC", "roles": ["developer"], "security_level": None},
-        links=["jira:PAYINC-9"], author="priya@companya.com"),
+        links=["jira:PAYINC-9"], author="priya@companya.com", version=EDITED),
     doc("slack:C_PAYINC/thread-1", "slack", "thread", "#payments-incident thread: outage timeline",
         "Payment outage timeline: errors started at 02:10, the retry storm exhausted the connection pool, "
         "mitigated at 03:05 by restarting workers. Root cause analysis is in the postmortem.",
@@ -187,6 +190,42 @@ docs = [
         "gdrive:folder-vendor", ["external:sam@contractor.io", "group:gdrive:payments-eng"],
         {"folder": "vendor", "sharing": [{"user": "sam@contractor.io", "role": "viewer"}]},
         author="priya@companya.com"),
+]
+
+
+
+def ticket(key, title, body, status, day, author):
+    """Team focus: the rest of a project's board. The author is the assignee. Older than the scenario documents, with no
+    links, and worded so that no golden question finds them by keyword (they share a project with the documents those
+    questions must cite)."""
+    project = key.split("-")[0]
+    roles = ["developer", "lead"] if project == "DBMIG" else ["developer"]
+    return doc(f"jira:{key}", "jira", "issue", f"{key} {title}", f"{body} Status: {status}. Assignee: {author.title()}.",
+               f"jira:{project}", [f"role:{project}:{r}" for r in roles],
+               {"project": project, "roles": roles, "security_level": None},
+               author=f"{author}@{ORG}", updated=f"2026-{day}T10:00:00Z", created=f"2026-{day}T09:00:00Z")
+
+
+docs += [
+    ticket("DBMIG-131", "Provision nodes for the new cluster",
+           "Six nodes stood up with encrypted volumes and joined to the monitoring stack.", "Done", "09-22", "maya"),
+    ticket("DBMIG-135", "Schema compatibility audit",
+           "Every table and index definition compared between the two engines; no incompatible column types remain.",
+           "Done", "09-29", "priya"),
+    ticket("DBMIG-138", "Shadow traffic rehearsal",
+           "One day of writes mirrored to the new cluster and row checksums compared; all matched.", "Done", "10-05", "priya"),
+    ticket("DBMIG-147", "Rollback rehearsal on staging",
+           "Practise switching reads back to the old cluster within ten minutes.", "In Review", "10-08", "maya"),
+    ticket("DBMIG-153", "Decommission the old cluster hardware",
+           "Return the old racks once the soak period has passed.", "To Do", "10-07", "maya"),
+    ticket("PAYINC-12", "Cap client retries with jitter",
+           "Limit the client to three attempts with randomised backoff.", "Done", "09-30", "priya"),
+    ticket("PAYINC-13", "Dashboard panel for pool saturation",
+           "Graph connections in use against the configured limit, per worker.", "Done", "10-06", "priya"),
+    ticket("PAYINC-14", "Chaos drill: restart workers under load",
+           "Run the drill in staging and record how long recovery takes.", "In Review", "10-08", "maya"),
+    ticket("PAYINC-15", "Share the lessons at the engineering all-hands",
+           "Ten-minute slot; slides drafted from the review document.", "To Do", "10-07", "maya"),
 ]
 
 events = [

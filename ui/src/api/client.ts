@@ -16,6 +16,7 @@ import type {
   Replay,
   Stage,
   StaleAlert,
+  Team,
   VerifyResult,
 } from "./types";
 
@@ -62,6 +63,7 @@ export function api(persona: PersonaId) {
     conversations: () => call<{ conversations: Conversation[] }>(persona, "/v1/conversations"),
     conversation: (id: string) => call<ConversationDetail>(persona, `/v1/conversations/${encodeURIComponent(id)}`),
     mywork: () => call<MyWork>(persona, "/v1/mywork"),
+    team: () => call<{ teams: Team[] }>(persona, "/v1/team"),
     alerts: () => call<{ alerts: StaleAlert[] }>(persona, "/v1/alerts"),
     explainAccess: (docId: string) =>
       call<ExplainAccess>(persona, `/v1/explain-access?doc_id=${encodeURIComponent(docId)}`),

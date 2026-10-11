@@ -156,7 +156,7 @@ LIMIT :k;
 | Slack DM or group DM | The same: one thread of the conversation. `kind` stays `thread` | `slack:<conversation id>/<thread ts>` (the ID starts with `D` for a DM; a group DM has a `G` or `C` ID like a channel) | `slack:<conversation id>` | The same |
 | Google Drive | One file | `gdrive:<file id>` | `gdrive:<folder id>` | File version or modified time |
 | Confluence | One page | `confluence:<space>/<page id>` | `confluence:<space>` | Page version |
-| Jira | One issue, including its comments | `jira:<issue key>` | `jira:<project key>` | Updated timestamp |
+| Jira | One issue, including its comments. After the description the `body` carries one line `Status: <name>` and one line `Assignee: <display name>` when the issue has them (Team focus reads these lines; `Document` has no structured fields) | `jira:<issue key>` | `jira:<project key>` | Updated timestamp |
 
 Real platforms assign their own IDs (Slack channel IDs, Drive file IDs), so they will not equal the IDs in `fixtures/`. A real backend ships a **seed manifest** that maps each fixture `doc_id` and container to its native ID; the contract tests translate through it.
 
@@ -181,6 +181,7 @@ Real platforms assign their own IDs (Slack channel IDs, Drive file IDs), so they
 6. Initial load: `list_changes(None)`, followed until `has_more` is false, returns an `upsert` for every seeded document of that source.
 
 ## Changelog
+- 0.3, 11 Oct addition: a Jira issue's `body` carries `Status: <name>` and `Assignee: <display name>` lines (the status line was already written; the assignee line and the simulator's `assignee` field are new). No change to the interface.
 - 0.3, 11 Oct addition: Slack DMs and group DMs are documents (same thread unit and `doc_id` shape, conversation IDs may start with `D`); `check_access` on a person-private document uses the asker's own credential. Rules in acl-model.md, "Slack DMs". No change to the interface.
 - 0.3, 7 Oct addition: `CursorExpired` from `list_changes`; the consumer crawls again. Raised by the simulators' connectors; Slack and Drive resync on their own and never raise it.
 - 0.3, 6 Oct addition: contract test 1 may compare a real backend's ACL by readers when its native model uses other tokens for the same people (real Drive's inferred groups). No change to the interface.

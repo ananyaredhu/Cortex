@@ -90,7 +90,7 @@ def test_container_listings_for_the_project_registry(index):
     assert "slack:C_DBMIGPRIV" not in index.parents_visible(TOKENS["priya"])
     assert index.parents_visible([]) == set()
     under = index.documents_under(["jira:DBMIG", "slack:C_DBMIGPRIV"], TOKENS["priya"], 10)
-    assert {d.doc_id for d in under} == {"jira:DBMIG-142", "jira:DBMIG-150"}                  # the private channel is not hers
+    assert {d.parent_id for d in under} == {"jira:DBMIG"} and len(under) == 7                 # the private channel is not hers
     assert len(index.documents_under(["jira:DBMIG"], TOKENS["priya"], 1)) == 1
     assert index.documents_under(["jira:DBMIG"], [], 10) == []
     assert {d.doc_id for d in index.documents_all()} == {d["doc_id"] for d in DATA["documents"]}

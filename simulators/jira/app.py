@@ -60,6 +60,7 @@ class IssueIn(BaseModel):
     issue_type: str = "Task"
     status: str | None = None
     reporter: str | None = None
+    assignee: str | None = None
     security_level: str | None = None
     parent_key: str | None = None
     links: list[str] = Field(default_factory=list)
@@ -73,6 +74,7 @@ class IssuePatch(BaseModel):
     summary: str | None = None
     description: str | None = None
     status: str | None = None
+    assignee: str | None = None
     links: list[str] | None = None
     version: str | None = None
     updated_at: str | None = None
@@ -161,6 +163,7 @@ def create_app(sim: JiraSim | None = None, *, admin_token: str | None = None,
             "project": {"key": issue.project_key, "name": sim.projects[issue.project_key].name},
             "status": {"name": issue.status} if issue.status else None,
             "reporter": user_json(issue.reporter),
+            "assignee": user_json(issue.assignee),
             "labels": issue.labels,
             "created": issue.created_at,
             "updated": issue.updated_at,
@@ -375,7 +378,7 @@ def create_app(sim: JiraSim | None = None, *, admin_token: str | None = None,
             body.project, body.summary, body.description, key=body.key, issue_type=body.issue_type,
             status=body.status, reporter=body.reporter, security_level=body.security_level,
             parent_key=body.parent_key, links=body.links, labels=body.labels, created_at=body.created_at,
-            updated_at=body.updated_at, version=body.version,
+            updated_at=body.updated_at, version=body.version, assignee=body.assignee,
         )
         flush(background)
         return issue_json(issue)
@@ -383,7 +386,7 @@ def create_app(sim: JiraSim | None = None, *, admin_token: str | None = None,
     @admin.put("/admin/issues/{key}")
     def edit_issue(key: str, body: IssuePatch, background: BackgroundTasks) -> dict:
         issue = sim.update_issue(key, summary=body.summary, description=body.description, status=body.status,
-                                 links=body.links, version=body.version, updated_at=body.updated_at)
+                                 links=body.links, version=body.version, updated_at=body.updated_at, assignee=body.assignee)
         flush(background)
         return issue_json(issue)
 

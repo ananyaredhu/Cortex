@@ -72,6 +72,7 @@ def create_app(runtime: Runtime) -> FastAPI:
     app = FastAPI(title="Internal Brain API", version="0.2", lifespan=lifespan)
     suggestions = {p["email"]: [g["question"] for g in load()["golden"] if g["persona"] == p["id"]][:3]
                    for p in load()["personas"]}
+    names = {p["email"]: p["display_name"] for p in load()["personas"]}
 
     # -- mock IdP (fix F2): a demo sign-in that issues short-lived signed tokens for the fictional personas ----------
     if settings.mock_idp:
@@ -173,6 +174,11 @@ def create_app(runtime: Runtime) -> FastAPI:
     def projects(p: Current):
         """The caller's projects (T7): only those, and only the places in them, that they may open something in."""
         return {"projects": runtime.brain.project_profile(p)}
+
+    @app.get("/v1/team")
+    def team(p: Current):
+        """Team focus: the projects the caller is a member of, each counted only from documents they may open."""
+        return {"teams": runtime.brain.team_focus(p, names)}
 
     @app.get("/v1/explain-access")
     def explain_access(doc_id: str, p: Current):

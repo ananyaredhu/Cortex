@@ -36,7 +36,7 @@ def test_a_crawl_and_unchanged_changes_are_not_freshness(store):
     ingestor.run_once()
     ingestor.run_once()                   # nothing changed
     samples = store.lag_since("2000-01-01T00:00:00Z")
-    assert {s.trigger for s in samples} == {"crawl"} and len(samples) == 6
+    assert {s.trigger for s in samples} == {"crawl"} and len(samples) == 15
     assert ingestor.freshness.summary() == {}
 
 
@@ -46,7 +46,7 @@ def test_a_new_embedding_model_is_not_new_content(store):
     reembed = Ingestor([_Replay(jira)], store, NullEmbedder())
     reembed.run_source(reembed.connectors[0], trigger="poll")
     poll = [s for s in store.lag_since("2000-01-01T00:00:00Z") if s.trigger == "poll"]
-    assert len(poll) == 6 and all(s.action == "indexed" and s.source_at is None for s in poll)
+    assert len(poll) == 15 and all(s.action == "indexed" and s.source_at is None for s in poll)
 
 
 def test_the_report_splits_by_trigger_and_keeps_to_its_window(store):

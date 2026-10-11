@@ -16,11 +16,14 @@ import hashlib
 import json
 import re
 from collections.abc import Iterator
+from types import SimpleNamespace
 
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from brain.projects import Registry
+from brain.projects.team import team_focus
 from fixtures.loader import State, can_see
 
 app = FastAPI(title="Internal Brain stub API", version="0.1")
@@ -245,6 +248,17 @@ def mywork(authorization: str | None = Header(None)):
 def _status(body: str) -> str | None:
     m = re.search(r"Status: ([A-Za-z ]+)\.", body)
     return m.group(1) if m else None
+
+
+@app.get("/v1/team")
+def team(authorization: str | None = Header(None)):
+    """Team focus (api.md 0.2): the registry projects the caller is a member of, counted only from documents they can see."""
+    me = _persona(authorization)
+    vis = STATE.visible_docs(me["id"])
+    views = Registry.load().views(STATE.persona_tokens[me["id"]], {d["parent_id"] for d in vis})
+    names = {p["email"]: p["display_name"] for p in STATE.data["personas"]}
+    return {"teams": team_focus(views, [SimpleNamespace(**d) for d in vis], names=names, me=me["display_name"],
+                                text=lambda doc_id: STATE.docs[doc_id]["body"])}
 
 
 @app.get("/v1/explain-access")

@@ -32,6 +32,7 @@ from brain.policy.leakscan import DeniedDoc, prepare
 from brain.policy.pdp import PDP, Decision, hash_denied, source_of
 from brain.projects import EXTRA_CANDIDATES, PROJECT_BOOST, ProjectView
 from brain.projects import Registry as ProjectRegistry
+from brain.projects.team import team_focus
 from brain.retrieval import Candidate, IndexReader, hybrid_search, query_terms
 from brain.skills import Registry, Skill
 from connectors.base import Connector, DocumentNotFound
@@ -44,6 +45,7 @@ NODE_STAGE = {"identity": "retrieve", "understand": "retrieve", "retrieve": "ret
               "freshness": "verify_live",
               "generate": "generate", "check": "check", "finalize": "check", "audit": "check"}
 UNVERIFIED = "freshness_unverified"      # evidence whose live version check failed; the indexed copy was served
+TEAM_DOCS = 500              # documents read per caller for Team focus; its counts cover at most this many
 STALE_AFTER_S = 300          # a source whose last successful pass is older than this is reported "stale"
 
 
@@ -603,6 +605,20 @@ class Brain:
     def project_profile(self, principal: Principal) -> list[dict]:
         """The caller's projects (T7), for `/v1/projects` and My Work: only what they may open something in."""
         return [v.as_json() for v in self._project_views(self.resolver.resolve(principal.email))]
+
+    def team_focus(self, principal: Principal, names: dict[str, str] | None = None) -> list[dict]:
+        """Team focus (`/v1/team`): the projects the caller is a member of, counted only from documents they may open right
+        now (prefilter, then the live check), so nothing in it reflects a document they cannot see."""
+        asker = self.resolver.resolve(principal.email)
+        views = [v for v in self._project_views(asker) if v.member] if self.settings.projects else []
+        if not views:
+            return []
+        parents = sorted({self.container_resolver(place) for v in views for place in v.places})
+        rows = self.index.documents_under(parents, sorted(asker.tokens), limit=TEAM_DOCS)
+        ok = {d.doc_id for d in self.pdp.check_many(asker, [(r.doc_id, r.version) for r in rows]) if d.allowed}
+        return team_focus(views, [r for r in rows if r.doc_id in ok], names=names, container=self.container_resolver,
+                          me=(names or {}).get(principal.email) or principal.display_name,
+                          text=lambda doc_id: "\n".join(c.text for c in self.index.chunks_of(doc_id)))
 
     def visible_documents(self, principal: Principal, source: str | None = None, limit: int = 100) -> list:
         """Index rows the person may read right now: prefilter, then the live check on each."""

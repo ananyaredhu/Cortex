@@ -110,6 +110,7 @@ class Issue:
     links: list[str] = field(default_factory=list)
     labels: list[str] = field(default_factory=list)
     comments: list[Comment] = field(default_factory=list)
+    assignee: str | None = None      # email
 
 
 @dataclass
@@ -270,7 +271,7 @@ class JiraSim:
                      issue_type: str = "Task", status: str | None = None, reporter: str | None = None,
                      security_level: str | None = None, parent_key: str | None = None, links: Iterable[str] = (),
                      labels: Iterable[str] = (), created_at: str | None = None, updated_at: str | None = None,
-                     version: str | None = None) -> Issue:
+                     version: str | None = None, assignee: str | None = None) -> Issue:
         project = self._project(project_key)
         if key is None:
             number = project.last_number + 1
@@ -298,7 +299,7 @@ class JiraSim:
             key=key, project_key=project_key, summary=summary, description=description, issue_type=issue_type,
             status=status, reporter=reporter, created_at=created_at or now, updated_at=updated_at or created_at or now,
             version=version or "v1", security_level=security_level, parent_key=parent_key,
-            links=list(links), labels=list(labels),
+            links=list(links), labels=list(labels), assignee=norm_email(assignee) if assignee else None,
         )
         self.issues[key] = issue
         project.last_number = max(project.last_number, number)
@@ -307,7 +308,7 @@ class JiraSim:
 
     def update_issue(self, key: str, *, summary: str | None = None, description: str | None = None,
                      status: str | None = None, links: Iterable[str] | None = None, version: str | None = None,
-                     updated_at: str | None = None) -> Issue:
+                     updated_at: str | None = None, assignee: str | None = None) -> Issue:
         issue = self._issue(key)
         if summary is not None:
             issue.summary = summary
@@ -317,6 +318,8 @@ class JiraSim:
             issue.status = status
         if links is not None:
             issue.links = list(links)
+        if assignee is not None:
+            issue.assignee = norm_email(assignee)
         self._touch(issue, version, updated_at)
         self._emit("upsert", issue, "jira:issue_updated")
         return issue

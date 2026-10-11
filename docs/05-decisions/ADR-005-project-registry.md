@@ -17,3 +17,4 @@ Nothing in the sources says that the Jira project DBMIG, the Slack channel `#db-
 - The registry must be kept up to date by people; the suggestion tool shows what drift looks like.
 - The real runtime translates the registry's fixture IDs for Slack and Drive through the seed manifests (`real_container`, `real_token`). **Not yet run against the real Slack and Drive.**
 - Not built: a small-model alias resolver (rules only), per-project ranking weights, a UI for the registry.
+- **11 Oct, Team focus:** a project may also carry `goal`, `start_date`, `target_date`, `milestone` and `sprint`, all optional and hand-written. They are shown to every member of the project, so the rule above extends to them: write nothing there that only a restricted place holds. They describe a project and still decide nothing about who sees what.

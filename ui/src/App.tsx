@@ -13,6 +13,7 @@ import { Sidebar } from "./components/Sidebar";
 import { DemoControls } from "./demo/DemoControls";
 import { DEMO_CONTROLS } from "./demo/sim";
 import { HomePage } from "./home/HomePage";
+import { TeamPage } from "./team/TeamPage";
 
 export function App() {
   const { persona } = usePersona();
@@ -39,6 +40,7 @@ export function App() {
       <main className="app__main" id="main" tabIndex={-1}>
         <Routes>
           <Route path="/" element={<HomePage />} />
+          <Route path="/team" element={<TeamPage />} />
           <Route path="/ask" element={<AskPage />} />
           <Route path="/ask/:conversationId" element={<AskPage />} />
           <Route path="/compare" element={<ComparePage />} />

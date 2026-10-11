@@ -98,7 +98,7 @@
       "kind": "issue",
       "title": "DBMIG-142 Cutover blocked on replica lag",
       "url": "https://fixtures.invalid/jira/DBMIG-142",
-      "body": "Database migration cutover is blocked: replica lag stays above the 5 second threshold. Status: In Progress. Blocker owner: platform team. Follow-up DBMIG-150 tracks the replication tuning.",
+      "body": "Database migration cutover is blocked: replica lag stays above the 5 second threshold. Status: In Progress. Assignee: Maya. Blocker owner: platform team. Follow-up DBMIG-150 tracks the replication tuning.",
       "parent_id": "jira:DBMIG",
       "links": [
         "slack:C_DBMIG/thread-1",
@@ -107,7 +107,7 @@
       "author": "maya@companya.com",
       "created_at": "2026-10-10T00:00:00Z",
       "updated_at": "2026-10-10T08:00:00Z",
-      "version": "2026-10-10T08:00:00Z",
+      "version": "2026-10-10T08:00:00Z#2",
       "tags": [],
       "acl": {
         "tokens": [
@@ -132,7 +132,7 @@
       "kind": "issue",
       "title": "DBMIG-150 Tune replication for database migration",
       "url": "https://fixtures.invalid/jira/DBMIG-150",
-      "body": "Tune replication settings to remove the migration blocker. Status: To Do. Target: before cutover.",
+      "body": "Tune replication settings to remove the migration blocker. Status: To Do. Assignee: Priya. Target: before cutover.",
       "parent_id": "jira:DBMIG",
       "links": [
         "jira:DBMIG-142"
@@ -140,7 +140,7 @@
       "author": "priya@companya.com",
       "created_at": "2026-10-10T00:00:00Z",
       "updated_at": "2026-10-10T08:00:00Z",
-      "version": "2026-10-10T08:00:00Z",
+      "version": "2026-10-10T08:00:00Z#2",
       "tags": [],
       "acl": {
         "tokens": [
@@ -314,7 +314,7 @@
       "kind": "issue",
       "title": "SEC-17 Auth token replay vulnerability",
       "url": "https://fixtures.invalid/jira/SEC-17",
-      "body": "Security-sensitive bug: auth tokens can be replayed within 10 minutes. Visible to the security team only. CANARY-9b21-SEC17.",
+      "body": "Security-sensitive bug: auth tokens can be replayed within 10 minutes. Visible to the security team only. Status: In Progress. Assignee: Dana. CANARY-9b21-SEC17.",
       "parent_id": "jira:SEC",
       "links": [
         "confluence:SEC/q3-breach-report"
@@ -322,7 +322,7 @@
       "author": "dana@companya.com",
       "created_at": "2026-10-10T00:00:00Z",
       "updated_at": "2026-10-10T08:00:00Z",
-      "version": "2026-10-10T08:00:00Z",
+      "version": "2026-10-10T08:00:00Z#2",
       "tags": [
         "canary",
         "restricted"
@@ -493,7 +493,7 @@
       "kind": "issue",
       "title": "PAYINC-10 Add circuit breaker to payment client",
       "url": "https://fixtures.invalid/jira/PAYINC-10",
-      "body": "Follow-up to the payment outage: add a circuit breaker to the payment client. Status: In Progress.",
+      "body": "Follow-up to the payment outage: add a circuit breaker to the payment client. Status: In Progress. Assignee: Priya.",
       "parent_id": "jira:PAYINC",
       "links": [
         "jira:PAYINC-9"
@@ -501,7 +501,7 @@
       "author": "priya@companya.com",
       "created_at": "2026-10-10T00:00:00Z",
       "updated_at": "2026-10-10T08:00:00Z",
-      "version": "2026-10-10T08:00:00Z",
+      "version": "2026-10-10T08:00:00Z#2",
       "tags": [],
       "acl": {
         "tokens": [
@@ -524,7 +524,7 @@
       "kind": "issue",
       "title": "PAYINC-11 Raise connection pool alerts",
       "url": "https://fixtures.invalid/jira/PAYINC-11",
-      "body": "Follow-up to the payment outage: raise alerts on connection pool saturation. Status: To Do.",
+      "body": "Follow-up to the payment outage: raise alerts on connection pool saturation. Status: To Do. Assignee: Priya.",
       "parent_id": "jira:PAYINC",
       "links": [
         "jira:PAYINC-9"
@@ -532,7 +532,7 @@
       "author": "priya@companya.com",
       "created_at": "2026-10-10T00:00:00Z",
       "updated_at": "2026-10-10T08:00:00Z",
-      "version": "2026-10-10T08:00:00Z",
+      "version": "2026-10-10T08:00:00Z#2",
       "tags": [],
       "acl": {
         "tokens": [
@@ -642,6 +642,277 @@
           ]
         },
         "snapshot_hash": "sha256:825ec3283469eeb059cd925767a35b5f77e7f51c06289681f210da4e36b63944",
+        "observed_at": "2026-10-10T08:00:00Z"
+      }
+    },
+    {
+      "doc_id": "jira:DBMIG-131",
+      "source": "jira",
+      "kind": "issue",
+      "title": "DBMIG-131 Provision nodes for the new cluster",
+      "url": "https://fixtures.invalid/jira/DBMIG-131",
+      "body": "Six nodes stood up with encrypted volumes and joined to the monitoring stack. Status: Done. Assignee: Maya.",
+      "parent_id": "jira:DBMIG",
+      "links": [],
+      "author": "maya@companya.com",
+      "created_at": "2026-09-22T09:00:00Z",
+      "updated_at": "2026-09-22T10:00:00Z",
+      "version": "2026-09-22T10:00:00Z",
+      "tags": [],
+      "acl": {
+        "tokens": [
+          "role:DBMIG:developer",
+          "role:DBMIG:lead"
+        ],
+        "native": {
+          "project": "DBMIG",
+          "roles": [
+            "developer",
+            "lead"
+          ],
+          "security_level": null
+        },
+        "snapshot_hash": "sha256:399bb2cd3c08b0f9a9e590035393a74c533b57cc645c9ffc259367a606cab384",
+        "observed_at": "2026-10-10T08:00:00Z"
+      }
+    },
+    {
+      "doc_id": "jira:DBMIG-135",
+      "source": "jira",
+      "kind": "issue",
+      "title": "DBMIG-135 Schema compatibility audit",
+      "url": "https://fixtures.invalid/jira/DBMIG-135",
+      "body": "Every table and index definition compared between the two engines; no incompatible column types remain. Status: Done. Assignee: Priya.",
+      "parent_id": "jira:DBMIG",
+      "links": [],
+      "author": "priya@companya.com",
+      "created_at": "2026-09-29T09:00:00Z",
+      "updated_at": "2026-09-29T10:00:00Z",
+      "version": "2026-09-29T10:00:00Z",
+      "tags": [],
+      "acl": {
+        "tokens": [
+          "role:DBMIG:developer",
+          "role:DBMIG:lead"
+        ],
+        "native": {
+          "project": "DBMIG",
+          "roles": [
+            "developer",
+            "lead"
+          ],
+          "security_level": null
+        },
+        "snapshot_hash": "sha256:399bb2cd3c08b0f9a9e590035393a74c533b57cc645c9ffc259367a606cab384",
+        "observed_at": "2026-10-10T08:00:00Z"
+      }
+    },
+    {
+      "doc_id": "jira:DBMIG-138",
+      "source": "jira",
+      "kind": "issue",
+      "title": "DBMIG-138 Shadow traffic rehearsal",
+      "url": "https://fixtures.invalid/jira/DBMIG-138",
+      "body": "One day of writes mirrored to the new cluster and row checksums compared; all matched. Status: Done. Assignee: Priya.",
+      "parent_id": "jira:DBMIG",
+      "links": [],
+      "author": "priya@companya.com",
+      "created_at": "2026-10-05T09:00:00Z",
+      "updated_at": "2026-10-05T10:00:00Z",
+      "version": "2026-10-05T10:00:00Z",
+      "tags": [],
+      "acl": {
+        "tokens": [
+          "role:DBMIG:developer",
+          "role:DBMIG:lead"
+        ],
+        "native": {
+          "project": "DBMIG",
+          "roles": [
+            "developer",
+            "lead"
+          ],
+          "security_level": null
+        },
+        "snapshot_hash": "sha256:399bb2cd3c08b0f9a9e590035393a74c533b57cc645c9ffc259367a606cab384",
+        "observed_at": "2026-10-10T08:00:00Z"
+      }
+    },
+    {
+      "doc_id": "jira:DBMIG-147",
+      "source": "jira",
+      "kind": "issue",
+      "title": "DBMIG-147 Rollback rehearsal on staging",
+      "url": "https://fixtures.invalid/jira/DBMIG-147",
+      "body": "Practise switching reads back to the old cluster within ten minutes. Status: In Review. Assignee: Maya.",
+      "parent_id": "jira:DBMIG",
+      "links": [],
+      "author": "maya@companya.com",
+      "created_at": "2026-10-08T09:00:00Z",
+      "updated_at": "2026-10-08T10:00:00Z",
+      "version": "2026-10-08T10:00:00Z",
+      "tags": [],
+      "acl": {
+        "tokens": [
+          "role:DBMIG:developer",
+          "role:DBMIG:lead"
+        ],
+        "native": {
+          "project": "DBMIG",
+          "roles": [
+            "developer",
+            "lead"
+          ],
+          "security_level": null
+        },
+        "snapshot_hash": "sha256:399bb2cd3c08b0f9a9e590035393a74c533b57cc645c9ffc259367a606cab384",
+        "observed_at": "2026-10-10T08:00:00Z"
+      }
+    },
+    {
+      "doc_id": "jira:DBMIG-153",
+      "source": "jira",
+      "kind": "issue",
+      "title": "DBMIG-153 Decommission the old cluster hardware",
+      "url": "https://fixtures.invalid/jira/DBMIG-153",
+      "body": "Return the old racks once the soak period has passed. Status: To Do. Assignee: Maya.",
+      "parent_id": "jira:DBMIG",
+      "links": [],
+      "author": "maya@companya.com",
+      "created_at": "2026-10-07T09:00:00Z",
+      "updated_at": "2026-10-07T10:00:00Z",
+      "version": "2026-10-07T10:00:00Z",
+      "tags": [],
+      "acl": {
+        "tokens": [
+          "role:DBMIG:developer",
+          "role:DBMIG:lead"
+        ],
+        "native": {
+          "project": "DBMIG",
+          "roles": [
+            "developer",
+            "lead"
+          ],
+          "security_level": null
+        },
+        "snapshot_hash": "sha256:399bb2cd3c08b0f9a9e590035393a74c533b57cc645c9ffc259367a606cab384",
+        "observed_at": "2026-10-10T08:00:00Z"
+      }
+    },
+    {
+      "doc_id": "jira:PAYINC-12",
+      "source": "jira",
+      "kind": "issue",
+      "title": "PAYINC-12 Cap client retries with jitter",
+      "url": "https://fixtures.invalid/jira/PAYINC-12",
+      "body": "Limit the client to three attempts with randomised backoff. Status: Done. Assignee: Priya.",
+      "parent_id": "jira:PAYINC",
+      "links": [],
+      "author": "priya@companya.com",
+      "created_at": "2026-09-30T09:00:00Z",
+      "updated_at": "2026-09-30T10:00:00Z",
+      "version": "2026-09-30T10:00:00Z",
+      "tags": [],
+      "acl": {
+        "tokens": [
+          "role:PAYINC:developer"
+        ],
+        "native": {
+          "project": "PAYINC",
+          "roles": [
+            "developer"
+          ],
+          "security_level": null
+        },
+        "snapshot_hash": "sha256:bc41ed65cdde97aebfb8796974f3425334f29ac0d1a8e77ecf523dd7e8597f65",
+        "observed_at": "2026-10-10T08:00:00Z"
+      }
+    },
+    {
+      "doc_id": "jira:PAYINC-13",
+      "source": "jira",
+      "kind": "issue",
+      "title": "PAYINC-13 Dashboard panel for pool saturation",
+      "url": "https://fixtures.invalid/jira/PAYINC-13",
+      "body": "Graph connections in use against the configured limit, per worker. Status: Done. Assignee: Priya.",
+      "parent_id": "jira:PAYINC",
+      "links": [],
+      "author": "priya@companya.com",
+      "created_at": "2026-10-06T09:00:00Z",
+      "updated_at": "2026-10-06T10:00:00Z",
+      "version": "2026-10-06T10:00:00Z",
+      "tags": [],
+      "acl": {
+        "tokens": [
+          "role:PAYINC:developer"
+        ],
+        "native": {
+          "project": "PAYINC",
+          "roles": [
+            "developer"
+          ],
+          "security_level": null
+        },
+        "snapshot_hash": "sha256:bc41ed65cdde97aebfb8796974f3425334f29ac0d1a8e77ecf523dd7e8597f65",
+        "observed_at": "2026-10-10T08:00:00Z"
+      }
+    },
+    {
+      "doc_id": "jira:PAYINC-14",
+      "source": "jira",
+      "kind": "issue",
+      "title": "PAYINC-14 Chaos drill: restart workers under load",
+      "url": "https://fixtures.invalid/jira/PAYINC-14",
+      "body": "Run the drill in staging and record how long recovery takes. Status: In Review. Assignee: Maya.",
+      "parent_id": "jira:PAYINC",
+      "links": [],
+      "author": "maya@companya.com",
+      "created_at": "2026-10-08T09:00:00Z",
+      "updated_at": "2026-10-08T10:00:00Z",
+      "version": "2026-10-08T10:00:00Z",
+      "tags": [],
+      "acl": {
+        "tokens": [
+          "role:PAYINC:developer"
+        ],
+        "native": {
+          "project": "PAYINC",
+          "roles": [
+            "developer"
+          ],
+          "security_level": null
+        },
+        "snapshot_hash": "sha256:bc41ed65cdde97aebfb8796974f3425334f29ac0d1a8e77ecf523dd7e8597f65",
+        "observed_at": "2026-10-10T08:00:00Z"
+      }
+    },
+    {
+      "doc_id": "jira:PAYINC-15",
+      "source": "jira",
+      "kind": "issue",
+      "title": "PAYINC-15 Share the lessons at the engineering all-hands",
+      "url": "https://fixtures.invalid/jira/PAYINC-15",
+      "body": "Ten-minute slot; slides drafted from the review document. Status: To Do. Assignee: Maya.",
+      "parent_id": "jira:PAYINC",
+      "links": [],
+      "author": "maya@companya.com",
+      "created_at": "2026-10-07T09:00:00Z",
+      "updated_at": "2026-10-07T10:00:00Z",
+      "version": "2026-10-07T10:00:00Z",
+      "tags": [],
+      "acl": {
+        "tokens": [
+          "role:PAYINC:developer"
+        ],
+        "native": {
+          "project": "PAYINC",
+          "roles": [
+            "developer"
+          ],
+          "security_level": null
+        },
+        "snapshot_hash": "sha256:bc41ed65cdde97aebfb8796974f3425334f29ac0d1a8e77ecf523dd7e8597f65",
         "observed_at": "2026-10-10T08:00:00Z"
       }
     }

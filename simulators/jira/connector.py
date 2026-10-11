@@ -20,10 +20,13 @@ def _parse(doc_id: str) -> str | None:
 
 
 def _body(fields: dict) -> str:
-    """One document per issue: description, then status, then comments (contract: "one issue, including its comments")."""
+    """One document per issue: description, then status and assignee, then comments (contract: "one issue, including its
+    comments"). `Status: <name>` and `Assignee: <display name>` are the lines Team focus reads (brain/projects/team.py)."""
     parts = [fields.get("description") or ""]
     if fields.get("status"):
         parts.append(f"Status: {fields['status']['name']}")
+    if (fields.get("assignee") or {}).get("displayName"):
+        parts.append(f"Assignee: {fields['assignee']['displayName']}")
     for comment in fields["comment"]["comments"]:
         author = (comment.get("author") or {}).get("emailAddress") or "unknown"
         parts.append(f"Comment by {author} ({comment['created']}): {comment['body']}")
