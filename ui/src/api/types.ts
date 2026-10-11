@@ -109,6 +109,24 @@ export interface MyWork {
   alerts: StaleAlert[];
 }
 
+// GET /v1/team: the registry projects the caller is a member of. Every count covers only documents they may open.
+export interface Team {
+  project_id: string;
+  name: string;
+  goal: string | null;
+  target_date: string | null; // YYYY-MM-DD
+  leads: string[];
+  places: string[];
+  issues: {
+    total: number;
+    done: number;
+    by_status: { status: string; count: number }[];
+    // assignee is a display name read from the issue; mine marks the caller's own issues
+    items: { doc_id: string; title: string; status: string | null; assignee: string | null; mine: boolean; url: string }[];
+  };
+  updates: { doc_id: string; title: string; source: Source; place: string; author: string | null; updated_at: string; url: string }[];
+}
+
 export type ExplainAccess = { found: true; proof_path: string[] } | { found: false };
 
 export interface AuditDecision {

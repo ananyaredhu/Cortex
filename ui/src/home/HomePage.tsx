@@ -9,7 +9,7 @@ import "./home.css";
 
 /**
  * My Work: only what /v1/mywork returns, all of it through the PDP (ui/MOCKUP-DRIFT.md #24).
- * The mockup's sprint board, team and timeline need data the API doesn't have, so they are left out.
+ * The team's side is on Team focus (/team); the mockup's sprint board and timeline need data the API doesn't have.
  */
 export function HomePage() {
   const { persona } = usePersona();

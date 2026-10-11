@@ -22,6 +22,7 @@ from brain.config import SOURCES
 
 PATH = Path(__file__).with_name("registry.json")
 ID = re.compile(r"[A-Za-z0-9_-]+")
+DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 PROJECT_BOOST = 0.02          # added to the rank score of a document inside a resolved project (a direct hit scores about 0.016 to 0.033)
 EXTRA_CANDIDATES = 3          # documents inside a resolved project added when retrieval missed them
 
@@ -38,6 +39,8 @@ class Project:
     components: dict[str, tuple[str, ...]]          # source -> container ids (Jira keys, Slack channels, spaces, folders)
     member_tokens: tuple[str, ...]
     owners: tuple[str, ...] = ()
+    goal: str | None = None                         # one sentence, shown on Team focus
+    target_date: str | None = None                  # YYYY-MM-DD, set by hand like the rest
 
     def containers(self) -> list[str]:
         """`source:id` for every place listed under the project, in registry order."""
@@ -72,7 +75,7 @@ def parse(data: dict) -> list[Project]:
         if pid in seen_ids:
             raise RegistryError(f"{pid}: listed twice")
         seen_ids.add(pid)
-        unknown = set(raw) - {"project_id", "name", "aliases", "components", "member_tokens", "owners"}
+        unknown = set(raw) - {"project_id", "name", "aliases", "components", "member_tokens", "owners", "goal", "target_date"}
         if unknown:
             raise RegistryError(f"{pid}: unknown key {sorted(unknown)[0]}")
         if not isinstance(raw.get("name"), str) or not raw["name"].strip():
@@ -89,7 +92,13 @@ def parse(data: dict) -> list[Project]:
             raise RegistryError(f"{pid}: unknown source {sorted(set(comps) - set(SOURCES))[0]}")
         components = {s: _tuple(v, f"components.{s}", pid) for s, v in comps.items()}
         members = _tuple(raw.get("member_tokens", []), "member_tokens", pid)
-        projects.append(Project(pid, raw["name"].strip(), aliases, components, members, _tuple(raw.get("owners", []), "owners", pid)))
+        goal, target = raw.get("goal"), raw.get("target_date")
+        if goal is not None and (not isinstance(goal, str) or not goal.strip()):
+            raise RegistryError(f"{pid}: goal must be text")
+        if target is not None and (not isinstance(target, str) or not DATE.fullmatch(target)):
+            raise RegistryError(f"{pid}: target_date must look like 2026-10-23")
+        projects.append(Project(pid, raw["name"].strip(), aliases, components, members, _tuple(raw.get("owners", []), "owners", pid),
+                                goal.strip() if goal else None, target))
     return projects
 
 

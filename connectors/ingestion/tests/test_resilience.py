@@ -71,7 +71,7 @@ def test_a_failed_source_backs_off_doubling_up_to_a_cap_and_resets_on_success(st
     assert delays == [BACKOFF_BASE * 2 ** i for i in range(5)] + [BACKOFF_MAX, BACKOFF_MAX]
     jira.error = None
     report = ingestor.run_once()
-    assert report.count("jira", "indexed") == 6 and ingestor.backing_off("jira") == 0
+    assert report.count("jira", "indexed") == 15 and ingestor.backing_off("jira") == 0
     jira.error = ConnectionError("down again")
     ingestor.run_once()
     assert ingestor.backing_off("jira") == BACKOFF_BASE, "a success starts the back-off over"
@@ -92,7 +92,7 @@ def test_an_event_wake_up_respects_the_back_off(store):
     assert ingestor.try_source(jira, trigger="event") is None and jira.calls == 1   # not even tried
     clock.now += BACKOFF_BASE
     jira.error = None
-    assert ingestor.try_source(jira, trigger="event")["indexed"] == 6
+    assert ingestor.try_source(jira, trigger="event")["indexed"] == 15
 
 
 def test_the_store_replaces_a_broken_connection(database_up):

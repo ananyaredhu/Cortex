@@ -31,7 +31,7 @@ def test_a_faithful_index_passes(conn):
     lines, problems = check(conn, DATA, FIXTURE_IDS, sources=SOURCES, model="fake")
     assert problems == []
     assert lines[0].startswith("indexed: confluence 4 documents") and "not in the fixtures" not in lines[0]
-    assert "priya: prefilter finds 15 of the 18 seeded documents" in lines
+    assert "priya: prefilter finds 24 of the 27 seeded documents" in lines
 
 
 def test_widened_acl_is_reported_per_document_and_per_persona(conn):

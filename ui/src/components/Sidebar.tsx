@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { ChevronsUpDown, Columns3, Home, MessageSquare, ScrollText, Settings2, Sparkles, X } from "lucide-react";
+import { ChevronsUpDown, Columns3, Home, MessageSquare, ScrollText, Settings2, Sparkles, Users, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
@@ -70,6 +70,9 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
               {alertCount}
             </span>
           )}
+        </NavLink>
+        <NavLink to="/team">
+          <Users size={16} aria-hidden /> Team focus
         </NavLink>
         <NavLink to="/ask">
           <MessageSquare size={16} aria-hidden /> Ask

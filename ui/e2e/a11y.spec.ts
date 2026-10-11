@@ -15,6 +15,7 @@ async function axe(page: Page) {
 
 const SCREENS: { name: string; persona: PersonaId; path: string; prepare?: (page: Page) => Promise<unknown> }[] = [
   { name: "My Work", persona: "priya", path: "/" },
+  { name: "Team focus", persona: "priya", path: "/team", prepare: (page) => expect(page.getByRole("heading", { name: "Database migration" })).toBeVisible() },
   { name: "Ask, empty", persona: "priya", path: "/ask" },
   {
     name: "Ask, answer and Trust panel",

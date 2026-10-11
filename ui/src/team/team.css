@@ -1,0 +1,24 @@
+.team__card { padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-4); }
+.team__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+.team__name { margin: 0; font: var(--type-h3); font-size: var(--fs-20, 20px); }
+.team__meta { margin: 4px 0 0; display: flex; flex-wrap: wrap; gap: 4px var(--space-3); }
+.team__goal { margin: 0; font-size: var(--fs-14); color: var(--text-body); text-wrap: pretty; }
+.team__progress { display: flex; flex-direction: column; gap: var(--space-2); }
+.team__count { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: var(--fs-13); font-variant-numeric: tabular-nums; }
+.team__statuses { margin-left: auto; display: flex; flex-wrap: wrap; gap: 6px; }
+.team__bar { height: 8px; border-radius: var(--radius-pill); background: color-mix(in srgb, var(--ink) 8%, transparent); overflow: hidden; }
+.team__bar span { display: block; height: 100%; border-radius: var(--radius-pill); background: var(--text-strong); }
+.team__cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: var(--space-4) var(--space-6); }
+.team__cols > div { min-width: 0; }
+.team__when { white-space: nowrap; }
+.team.page { max-width: 1120px; }
+.team__board { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr)); gap: var(--space-3); align-items: start; }
+.team__col { padding: var(--space-2); border-radius: var(--radius-lg); background: color-mix(in srgb, var(--ink) 5%, transparent); min-width: 0; }
+.team__col-head { margin: 0; padding: 6px 8px; display: flex; align-items: baseline; gap: var(--space-2); font-size: var(--fs-13); font-weight: 700; }
+.team__col ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.team__ticket { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: var(--border-1); border-radius: var(--radius-md); background: var(--surface-card); color: var(--text-strong); font-size: var(--fs-13); line-height: 1.4; text-decoration: none; text-wrap: pretty; }
+.team__ticket:hover { border-color: var(--border-strong); }
+.team__ticket--mine { border-color: var(--accent); }
+.team__ticket-foot { display: flex; align-items: center; gap: var(--space-2); font-size: var(--fs-12); color: var(--text-body); }
+.team__ticket-foot .avatar { margin-left: auto; }
+.team__mine { padding: 1px 6px; border-radius: var(--radius-pill); background: var(--info-soft); }

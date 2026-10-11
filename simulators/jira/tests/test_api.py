@@ -45,7 +45,7 @@ def test_search_shows_a_user_only_what_they_may_see(conn):
     assert keys(AS(DANA)) == {"SEC-17"}
     assert keys(AS(PRIYA)) == set(conn.sim.issues) - {"SEC-17"}
     assert keys(AS(SAM)) == keys(AS("ghost@nowhere.example")) == set()
-    assert keys(AS(PRIYA), jql="project = PAYINC") == {"PAYINC-9", "PAYINC-10", "PAYINC-11"}
+    assert keys(AS(PRIYA), jql="project = PAYINC") == {f"PAYINC-{n}" for n in range(9, 16)}
     assert conn.http.get(f"{API}/search", params={"jql": "assignee = currentUser()"}).status_code == 400
     assert conn.http.get(f"{API}/search", headers=AS(PRIYA), params={"jql": "project = SEC"}).json()["total"] == 0
 
@@ -128,7 +128,7 @@ def test_admin_errors_and_reset(conn):
     assert conn.http.put("/sim/admin/issues/SEC-17/security", json={"level": "nope"}).status_code == 400
     assert conn.http.get("/sim/changes", params={"cursor": "junk"}).status_code == 400
     conn.http.delete("/sim/admin/issues/SEC-17")
-    assert conn.http.post("/sim/admin/reset").json() == {"seed": "company_a", "issues": 6}
+    assert conn.http.post("/sim/admin/reset").json() == {"seed": "company_a", "issues": 15}
     assert conn.http.get(f"{API}/issue/SEC-17").status_code == 200
     assert conn.http.post("/sim/admin/reset", json={"seed": "empty"}).json()["issues"] == 0
 
@@ -205,3 +205,15 @@ def test_identity_tokens_and_unknown_reporter(conn):
     conn.http.post("/sim/admin/issues", json={"project": "DBMIG", "summary": "No reporter", "key": "DBMIG-200"}).raise_for_status()
     assert conn.fetch("jira:DBMIG-200").author is None
     assert conn.fetch("jira:DBMIG-142").author == MAYA
+
+
+def test_status_and_assignee_reach_the_document_as_lines_of_text(conn):
+    """Team focus reads `Status: <name>` and `Assignee: <display name>` from the issue's document (brain/projects/team.py)."""
+    body = {"project": "PAYINC", "summary": "Tune pool size", "description": "Raise the pool to 80.", "status": "In Review",
+            "assignee": PRIYA}
+    created = conn.http.post("/sim/admin/issues", json=body).json()
+    assert created["fields"]["assignee"]["emailAddress"] == PRIYA
+    assert conn.fetch(f"jira:{created['key']}").body == "Raise the pool to 80.\n\nStatus: In Review\n\nAssignee: Priya"
+    conn.http.put(f"/sim/admin/issues/{created['key']}", json={"assignee": MAYA, "status": "Done"}).raise_for_status()
+    assert conn.fetch(f"jira:{created['key']}").body.endswith("Status: Done\n\nAssignee: Maya")
+    assert conn.http.get(f"{API}/issue/PAYINC-9").json()["fields"]["assignee"] is None      # the seed sets none

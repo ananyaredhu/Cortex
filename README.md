@@ -22,7 +22,7 @@ Nobody has to wait for anyone else's code. Everything below works from a fresh c
 
 | Need | Use | Command |
 |---|---|---|
-| Data to build against | [fixtures/](fixtures/): 5 personas, 18 documents across the four sources, scripted events, 9 golden cases | `make fixtures` regenerates `company_a.json` |
+| Data to build against | [fixtures/](fixtures/): 5 personas, 27 documents across the four sources, scripted events, 9 golden cases | `make fixtures` regenerates `company_a.json` |
 | A connector to call (B) | `connectors/stub/fixture_connector.py` implements the [connector interface](docs/02-contracts/connector-interface.md) | |
 | A Brain API to call (C) | `brain/stub_api/`: stub of the [HTTP API](docs/02-contracts/api.md); auth header `Authorization: Bearer dev:priya` | `make stub-api` |
 | A database (A, B) | Postgres + pgvector with the draft schema in `db/init.sql` | `make db-up` |

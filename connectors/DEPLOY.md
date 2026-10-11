@@ -39,7 +39,7 @@ always safe: every step is idempotent and cursors are saved after each batch.
 ## Sizing
 bge-m3 runs on CPU: about 2 GB of memory, loaded once at start-up (about 90 s; ingestion warms it before the first
 pass when it listens for events). Embedding is the slow part: 0.6 to 2.4 chunks/s on a laptop CPU depending on chunk
-length. The Company A corpus (18 documents) is nothing; the 12k-page scale corpus is about 8 hours, so do not deploy
+length. The Company A corpus (27 documents) is nothing; the 12k-page scale corpus is about 8 hours, so do not deploy
 with it. Without embedding, ingestion writes about 12 documents/s.
 
 ## Is it healthy?
