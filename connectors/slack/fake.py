@@ -5,8 +5,12 @@ transport, so the connector and client run their real HTTP code. It also models 
 permissions: a bot only reads channels it was added to, private channels are invisible to non-members, and
 guests are flagged `is_restricted`.
 
-It is a test double, not a simulator: no events, no files, no DMs.
+DMs and group DMs exist only for a user token (`client(as_user=...)`): the bot never sees them, and a person sees
+only the ones they are in. A user token here has the DM scopes and nothing else, like the real grants.
+
+It is a test double, not a simulator: no events, no files.
 """
+import threading
 import time
 from collections import Counter
 from urllib.parse import parse_qs
@@ -18,6 +22,8 @@ from connectors.slack.client import SlackClient
 from connectors.slack.manifest import SeedManifest
 
 BOT_ID = "UBOT00001"
+TEAM_ID = "T0COMPANYA"
+USER_TOKEN_PREFIX = "xoxp-fake-"     # a fake user token is this plus the user id
 
 
 class _Error(Exception):
@@ -36,8 +42,16 @@ class FakeSlack:
         self.page_size: int | None = None   # force small pages to exercise cursor paging
         self.down = False                   # every request fails at the transport
         self.delay = 0.0                    # seconds every request takes
+        self.revoked: set[str] = set()      # user ids whose user token no longer works
+        self.codes: dict[str, str] = {}     # one-time OAuth code -> the user id that approved
+        self._request = threading.local()   # who the request in hand is from; check_access asks from several threads
         self._clock = 1_791_619_200         # 2026-10-10T08:00:00Z
         self._tick = 0
+
+    @property
+    def _actor(self) -> str | None:
+        """The user id whose token the request in hand carries, or None for the bot."""
+        return getattr(self._request, "actor", None)
 
     # -- building and changing the workspace --------------------------------------------------------
     @staticmethod
@@ -53,6 +67,14 @@ class FakeSlack:
     def add_channel(self, channel_id: str, name: str, *, private: bool = False, members: tuple[str, ...] = (), bot: bool = True) -> None:
         self.channels[channel_id] = {"id": channel_id, "name": name, "private": private, "members": set(members), "bot": bot}
         self.messages[channel_id] = []
+
+    def add_dm(self, *members: str) -> str:
+        """A DM (one or two people) or a group DM (three or more). The bot is never in it."""
+        channel_id = f"{'D' if len(members) < 3 else 'G'}0DM{len(self.channels):05d}"
+        self.channels[channel_id] = {"id": channel_id, "name": "mpdm-" + channel_id.lower(), "private": True, "members": set(members),
+                                     "bot": False, "dm": "im" if len(members) < 3 else "mpim"}
+        self.messages[channel_id] = []
+        return channel_id
 
     def next_ts(self) -> str:
         self._tick += 100
@@ -85,8 +107,10 @@ class FakeSlack:
     def user_id(self, email: str) -> str:
         return next(u["id"] for u in self.users.values() if u["profile"]["email"] == email)
 
-    def client(self, **kwargs) -> SlackClient:
-        http = httpx.Client(transport=httpx.MockTransport(self._handle), base_url="https://slack.test/api/")
+    def client(self, *, as_user: str | None = None, **kwargs) -> SlackClient:
+        """The bot's client, or with `as_user` a client holding that person's user token."""
+        headers = {"Authorization": f"Bearer {USER_TOKEN_PREFIX}{as_user}"} if as_user else {}
+        http = httpx.Client(transport=httpx.MockTransport(self._handle), base_url="https://slack.test/api/", headers=headers)
         return SlackClient(http, sleep=kwargs.pop("sleep", lambda seconds: None), **kwargs)
 
     # -- the API ------------------------------------------------------------------------------------
@@ -104,7 +128,11 @@ class FakeSlack:
         handler = getattr(self, "_api_" + method.replace(".", "_"), None)
         if handler is None:
             return httpx.Response(200, json={"ok": False, "error": "unknown_method"})
+        token = request.headers.get("authorization", "").removeprefix("Bearer ")
+        self._request.actor = token.removeprefix(USER_TOKEN_PREFIX) if token.startswith(USER_TOKEN_PREFIX) else None
         try:
+            if self._actor is not None and (self._actor in self.revoked or self._actor not in self.users):
+                raise _Error("token_revoked")
             return httpx.Response(200, json={"ok": True, **handler(form)})
         except _Error as exc:
             return httpx.Response(200, json={"ok": False, "error": str(exc)})
@@ -116,43 +144,71 @@ class FakeSlack:
         return {key: items[start:end], "response_metadata": {"next_cursor": str(end) if end < len(items) else ""}}
 
     def _visible(self, channel_id: str | None, *, read: bool = False) -> dict:
-        """The channel as the bot may see it. A private channel without the bot looks nonexistent."""
+        """The channel as the caller may see it. A private channel without the bot looks nonexistent to the bot,
+        and so does every DM. A user token sees the DMs that person is in and has no scope for anything else."""
         channel = self.channels.get(channel_id or "")
-        if channel is None or (channel["private"] and not channel["bot"]):
+        if self._actor is not None:
+            if channel is None or (channel.get("dm") and self._actor not in channel["members"]):
+                raise _Error("channel_not_found")
+            if not channel.get("dm"):
+                raise _Error("missing_scope")
+            return channel
+        if channel is None or channel.get("dm") or (channel["private"] and not channel["bot"]):
             raise _Error("channel_not_found")
         if read and not channel["bot"]:
             raise _Error("not_in_channel")
         return channel
 
-    @staticmethod
-    def _channel_json(channel: dict) -> dict:
-        return {"id": channel["id"], "name": channel["name"], "is_channel": True, "is_private": channel["private"],
-                "is_im": False, "is_mpim": False, "is_archived": False, "is_member": channel["bot"]}
+    def _channel_json(self, channel: dict) -> dict:
+        if channel.get("dm") == "im":
+            other = next(iter(channel["members"] - {self._actor}), self._actor)    # a DM with yourself names you
+            return {"id": channel["id"], "is_im": True, "is_org_shared": False, "user": other, "is_user_deleted": False}
+        return {"id": channel["id"], "name": channel["name"], "is_channel": not channel.get("dm"), "is_private": channel["private"],
+                "is_im": False, "is_mpim": channel.get("dm") == "mpim", "is_archived": False, "is_member": channel["bot"]}
 
     def _wanted(self, form: dict) -> list[dict]:
         types = set((form.get("types") or "public_channel").split(","))
-        return [c for c in self.channels.values()
-                if ("private_channel" if c["private"] else "public_channel") in types and (c["bot"] or not c["private"])]
+        if self._actor is not None:
+            if types - {"im", "mpim"}:
+                raise _Error("missing_scope")
+            return [c for c in self.channels.values() if c.get("dm") in types and self._actor in c["members"]]
+        return [c for c in self.channels.values() if not c.get("dm")
+                and ("private_channel" if c["private"] else "public_channel") in types and (c["bot"] or not c["private"])]
+
+    def _bot_only(self) -> None:
+        if self._actor is not None:
+            raise _Error("missing_scope")
 
     def _api_auth_test(self, form: dict) -> dict:
-        return {"url": self.url, "user_id": BOT_ID}
+        return {"url": self.url, "user_id": self._actor or BOT_ID, "team_id": TEAM_ID}
+
+    def _api_oauth_v2_access(self, form: dict) -> dict:
+        user = self.codes.pop(form.get("code", ""), None)     # a code works once
+        if user is None:
+            raise _Error("invalid_code")
+        return {"authed_user": {"id": user, "scope": "im:history,im:read,mpim:history,mpim:read", "token_type": "user",
+                                "access_token": USER_TOKEN_PREFIX + user}, "team": {"id": TEAM_ID}}
 
     def _api_users_list(self, form: dict) -> dict:
+        self._bot_only()
         return self._page(list(self.users.values()), form, "members")
 
     def _api_users_info(self, form: dict) -> dict:
+        self._bot_only()
         if form.get("user") not in self.users:
             raise _Error("user_not_found")
         return {"user": self.users[form["user"]]}
 
     def _api_users_lookupByEmail(self, form: dict) -> dict:
+        self._bot_only()
         user = next((u for u in self.users.values() if u["profile"]["email"] and u["profile"]["email"] == form.get("email")), None)
         if user is None:
             raise _Error("users_not_found")
         return {"user": user}
 
     def _api_users_conversations(self, form: dict) -> dict:
-        mine = [self._channel_json(c) for c in self._wanted(form) if form.get("user") in c["members"]]
+        who = form.get("user") or self._actor      # a user token asks about itself
+        mine = [self._channel_json(c) for c in self._wanted(form) if who in c["members"]]
         return self._page(mine, form, "channels")
 
     def _api_conversations_list(self, form: dict) -> dict:
