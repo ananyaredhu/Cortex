@@ -1,4 +1,4 @@
-.PHONY: setup test lint fixtures leakci stub-api ui sim-confluence sim-jira db-up db-down
+.PHONY: setup test lint fixtures leakci stub-api ui brain-api brain-api-fixture sim-confluence sim-jira db-up db-down
 
 setup:            ## create a venv, install dev dependencies, enable the secret-scan hook
 	python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt && .venv/bin/pre-commit install

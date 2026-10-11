@@ -93,3 +93,14 @@ def test_production_refuses_mcp_over_plain_http():
 def test_development_warns_when_mcp_keeps_the_localhost_address():
     assert "BRAIN_PUBLIC_URL" in " ".join(check_startup(Settings(mcp=True)))
     assert not any("BRAIN_PUBLIC_URL" in w for w in check_startup(Settings(mcp=True, public_url="https://brain.example.sg")))
+
+
+def test_the_cache_lifetimes_are_settings(monkeypatch):
+    from brain.config import Settings
+    monkeypatch.setenv("BRAIN_IDENTITY_TTL_S", "5")
+    monkeypatch.setenv("BRAIN_DECISION_TTL_S", "2.5")
+    s = Settings.from_env()
+    assert s.identity_ttl_s == 5.0 and s.decision_ttl_s == 2.5
+    monkeypatch.delenv("BRAIN_IDENTITY_TTL_S")
+    monkeypatch.delenv("BRAIN_DECISION_TTL_S")
+    assert Settings.from_env().identity_ttl_s == 60.0 and Settings.from_env().decision_ttl_s == 15.0

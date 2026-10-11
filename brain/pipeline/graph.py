@@ -11,7 +11,7 @@ import time
 import uuid
 from collections.abc import Callable, Mapping
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, TypedDict
 
@@ -52,18 +52,6 @@ class AskRequest:
     skill_hint: str | None = None
     sources: list[str] | None = None
     time_range: str | None = None
-
-
-@dataclass
-class Answered:
-    """What we remember about an answer: enough for alerts, replay and conversations, labeled by its sources."""
-    request_id: str
-    email: str
-    question: str
-    conversation_id: str
-    asked_at: str
-    doc_versions: dict[str, str | None]
-    label: list[list[str]] = field(default_factory=list)
 
 
 class State(TypedDict, total=False):
@@ -117,7 +105,6 @@ class Brain:
         self.link_resolver = link_resolver or (lambda doc_id: doc_id)   # stored link -> the ID the index and connectors use
         self.resolver = resolver or IdentityResolver(self.connectors, ttl_s=settings.identity_ttl_s)
         self.pdp = pdp or PDP(self.connectors, policy_version=POLICY_VERSION, ttl_s=settings.decision_ttl_s)
-        self.answers: dict[str, Answered] = {}
         self._lock = threading.Lock()
         self._identity_seen: dict[str, frozenset[str]] = {}
         self._leak_cache: dict[tuple[str, str], DeniedDoc] = {}      # prepared denied-set entries, by document and version
@@ -472,10 +459,6 @@ class Brain:
             "latency_ms": int((time.monotonic() - state["started"]) * 1000),
         }
         self.audit.append(event)
-        versions = {d.doc_id: d.doc_version for d in state["decisions"] if d.allowed and d.doc_id in cited}
-        with self._lock:
-            self.answers[state["request_id"]] = Answered(state["request_id"], p.email, req.question,
-                                                         resp["conversation_id"], utc_now(), versions, label)
         return {}
 
     # -- other front-door operations, all through the PDP ---------------------------------------
@@ -582,20 +565,24 @@ class Brain:
         return [r for r in rows if r.doc_id in ok]
 
     def alerts(self, principal: Principal) -> list[dict]:
-        """Answers whose cited documents changed since, for documents the person may still see."""
+        """Answers whose cited documents changed since, for documents the person may still see.
+
+        Rebuilt from the person's own `ask` events, which record the version of every document each answer cited, so alerts
+        survive a restart (fix F16)."""
         out = []
         asker = self.resolver.resolve(principal.email)
-        with self._lock:
-            mine = [a for a in self.answers.values() if a.email == principal.email]
-        for a in mine:
-            for doc_id, then in a.doc_versions.items():
+        for event in self._asks(principal.email):
+            cited = set((event.get("answer") or {}).get("citations", []))
+            versions = {d["doc_id"]: d.get("doc_version") for d in event.get("decisions", [])
+                        if d.get("allowed") and d.get("doc_id") in cited}
+            for doc_id, then in versions.items():
                 row = self.index.document(doc_id)
                 now_version = self._indexed_version(doc_id)
                 if row is None or now_version is None or now_version == then:
                     continue
                 if not self.pdp.check(asker, doc_id, now_version).allowed:
                     continue
-                out.append({"request_id": a.request_id, "question": a.question, "changed_doc": doc_id,
+                out.append({"request_id": event["request_id"], "question": event["query"]["text"], "changed_doc": doc_id,
                             "changed_title": row.title, "changed_at": row.updated_at,
                             "summary": f"{row.title} changed after your answer"})
         return out
