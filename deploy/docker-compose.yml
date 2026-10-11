@@ -86,12 +86,14 @@ services:
       BRAIN_ENV: ${BRAIN_ENV:-production}  # production refuses to start with unsafe settings (brain/startup.py)
       BRAIN_DEV_AUTH: "0"
       BRAIN_RUNTIME: ""
+      AUDIT_HEAD_PATH: /var/audit-head/head.log   # the signed head of the audit log, on a volume apart from the database (fix F4)
       BRAIN_PUBLIC_URL: https://${SITE_HOST:?set SITE_HOST in deploy/.env}
       BRAIN_MCP_ALLOWED_HOSTS: ${SITE_HOST}
     volumes:
       - models:/models
       - state:/state
       - scoreboard:/app/evals/scoreboard
+      - audit-head:/var/audit-head
       - ./secrets:/run/brain-secrets:ro
     depends_on:
       db: {condition: service_healthy}
@@ -130,5 +132,6 @@ volumes:
   models:
   state:
   scoreboard:
+  audit-head:                         # keep with the audit signing key; losing it makes /verify say the head is missing
   caddy-data:
   caddy-config:
