@@ -44,7 +44,7 @@ The log must be **tamper-evident**, **complete** (who, what, retrieved IDs, fina
     "acl_label": ["user:priya@companya.com"]
   },
   "links_followed": [{"doc_id": "slack:C_DBMIG/thread-1", "via_link_from": "jira:DBMIG-142"}],
-  "checks": {"deterministic": "pass", "generator": "ok", "grounding_model": "pass", "leak_scan": "clean"},
+  "checks": {"deterministic": "pass", "generator": "ok", "grounding_model": "pass", "leak_scan": "clean", "leak_scan_docs": 14},
   "models": {"generator": "deepseek-v3", "checker": "minicheck-...", "embedding": "bge-m3@1"},
   "latency_ms": 2310,
   "prev_hash": "sha256:...",
@@ -80,6 +80,7 @@ Audit queries (natural language or structured) are read-only and run **under RBA
 `ask` events carry `conversation_id` (the one returned by `/ask`). The Brain keeps no other record of conversations: `/v1/conversations` and `/v1/conversations/{id}` are rebuilt from these events, under the same ownership rule (only the asker's own events), so history survives a restart.
 
 ## Changelog
+- 0.1, 11 Oct: `checks.leak_scan_docs`: how many documents the leak scan compared the answer with (fix F5). "clean" means clean against that many.
 - 0.1, 11 Oct: `/verify` compares the log with a signed head kept outside the database (fix F4).
 - 0.1, 11 Oct: `query.skill_version`, `query.skill_sha256` (the skill file pinned by hash) and `query.rewritten` (the standalone search text, set only when a follow-up was rewritten; `query.text` stays what the person typed).
 - 0.1, 10 Oct: `identity_snapshot` events (time-travel queries).

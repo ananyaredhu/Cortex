@@ -47,6 +47,7 @@ class IndexReader(Protocol):
     def document(self, doc_id: str) -> DocRow | None: ...
     def chunks_of(self, doc_id: str) -> list[ChunkRow]: ...
     def documents_visible(self, tokens: list[str], source: str | None = None, limit: int = 200) -> list[DocRow]: ...
+    def documents_hidden(self, tokens: list[str]) -> list[DocRow]: ...
 
 
 def _stem(word: str) -> str:
@@ -100,6 +101,12 @@ class MemoryIndex:
         seen = {c.doc_id for c in self._rows(source, tokens)}
         rows = [self.document(d) for d in sorted(seen)]
         return sorted([r for r in rows if r], key=lambda r: r.updated_at or "", reverse=True)[:limit]
+
+    def documents_hidden(self, tokens: list[str]) -> list[DocRow]:
+        """Every live document no chunk of which carries one of `tokens`: what the prefilter keeps from the asker (fix F5)."""
+        seen = {c.doc_id for c in self._rows(None, tokens)}
+        rows = [self.document(d) for d in sorted(self._store.documents) if d not in seen]
+        return [r for r in rows if r and not r.deleted]
 
 
 # ---------------------------------------------------------------------------------------------------
@@ -177,6 +184,13 @@ class PostgresIndex:
             " AND EXISTS (SELECT 1 FROM chunks c WHERE c.doc_id = d.doc_id AND c.acl_tokens && %(tokens)s::text[])"
             " ORDER BY updated_at DESC NULLS LAST LIMIT %(limit)s",
             {"source": source, "tokens": list(tokens), "limit": limit}).fetchall()
+        return [self._doc(r) for r in rows]
+
+    def documents_hidden(self, tokens: list[str]) -> list[DocRow]:
+        rows = self._conn.execute(
+            f"SELECT {DOC_COLUMNS} FROM documents d WHERE NOT deleted AND NOT EXISTS"
+            " (SELECT 1 FROM chunks c WHERE c.doc_id = d.doc_id AND c.acl_tokens && %(tokens)s::text[]) ORDER BY doc_id",
+            {"tokens": list(tokens)}).fetchall()
         return [self._doc(r) for r in rows]
 
 

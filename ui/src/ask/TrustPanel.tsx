@@ -8,6 +8,7 @@ const FRESH: Record<FreshnessStatus, { label: string; tone: string }> = {
   ok: { label: "Up to date", tone: "ok" },
   stale: { label: "Behind", tone: "warn" },
   unavailable: { label: "Unreachable", tone: "bad" },
+  unverified: { label: "Not verified", tone: "warn" },
 };
 
 /**
