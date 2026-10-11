@@ -35,10 +35,18 @@ Deny rules (Jira issue security levels, Confluence page restrictions that narrow
 |---|---|
 | **Confluence** | Space permissions, plus page restrictions (view/edit) that narrow access; restrictions inherit from ancestor pages; anonymous/public spaces |
 | **Jira** | Project permission scheme via project roles and groups; **issue security levels** restrict individual issues (e.g. security-sensitive bugs visible only to the security team) |
-| **Slack** | Public channels: readable by every full workspace member, joined or not, so their documents carry `public:org` **and** `channel:<id>` (the channel token is what a guest holds). Private channels: members only, `channel:<id>` alone. DMs (participants only); threads follow their channel; external/guest users restricted to their channels |
+| **Slack** | Public channels: readable by every full workspace member, joined or not, so their documents carry `public:org` **and** `channel:<id>` (the channel token is what a guest holds). Private channels: members only, `channel:<id>` alone. DMs and group DMs: participants only, so their documents carry one `user:<email>` per participant and no channel token (see "Slack DMs" below). Threads follow their channel; external/guest users restricted to their channels |
 | **Google Drive** | Folder and file sharing (viewer/commenter/editor), inheritance from folders, shared drives vs personal drives, link sharing, external sharing for some folders |
 
 Simulators must implement these rules, not simplified versions. The contract tests prove it.
+
+### Slack DMs
+A bot cannot read a DM between two people, so DMs are read with each person's **own read-only user token**, which they grant by authorizing the app (opt-in, one person at a time). Rules:
+- **Consent of everyone in it.** A DM or group DM is indexed only when every participant is a mapped person who has authorized the app. One participant's consent is not enough: the conversation also holds the other person's messages. A DM with a bot, with Slackbot or with an unmapped account is never indexed.
+- **Tokens.** The document carries `user:<canonical email>` for each participant and nothing else. No `channel:` token and never `public:org`: nobody gains a DM through a membership or a group.
+- **Live check.** `check_access` asks Slack with the **asker's own** user token whether that thread is readable. No token, a revoked token, an error or a timeout is a deny. Another participant's token is never used to answer for the asker.
+- **Withdrawing consent.** When a participant revokes the app in Slack, every DM they are in stops meeting the first rule and is reported as a `delete`, so its chunks leave the index. The live check denies them from the moment of the revocation.
+- A DM's participants never change (Slack starts a new conversation instead), so DMs emit no `principal_change`.
 
 ## Identity mapping
 The IdP (mock OIDC) issues a JWT with `sub` and `email`. That email is the person's **canonical email** (for the fixtures, `priya@companya.com`). `resolve_identity(email)` maps it to each platform's user and groups. Missing mapping = **no access on that platform** (fail closed).
@@ -59,5 +67,6 @@ Each allow/deny decision stores: `doc_id`, `allowed`, `proof_path`, `acl_snapsho
 A denied document and a nonexistent one produce the same response shape, similar timing, and no counts or titles. Link-edge expansion follows a link only if the target passes the PDP.
 
 ## Changelog
+- 0.2, 11 Oct addition: Slack DMs and group DMs. Read with each participant's own user token, indexed only when every participant has authorized, `user:` tokens only, live check with the asker's own token, a revoked authorization deletes the DMs. No new token type.
 - 0.2: canonical email and per-connector identity mapping; asker token set built from `PlatformIdentity.groups`; `public:org` excludes guests and externals; narrowing rule for intersecting permissions; document ACL change versus principal change; public Slack channels carry `public:org` plus the channel token.
 - 0.1: first draft.
