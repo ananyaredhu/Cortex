@@ -69,7 +69,7 @@ def test_pipeline_drops_a_claim_the_grounding_model_rejects_and_records_it():
     r = client.post("/v1/ask", json={"question": "Why is the database migration cutover blocked?"},
                     headers={"Authorization": "Bearer dev:priya"}).json()
     assert len(r["claims"]) == 1 and "Zurich" not in r["answer"]
-    assert r["grounding"] == {"score": 0.5, "removed_claims": 1}
+    assert r["grounding"] == {"score": 0.5, "removed_claims": 1, "lower_confidence": 0}
     events = client.post("/v1/audit/query", json={}, headers={"Authorization": "Bearer dev:jordan"}).json()["events"]
     ask = [e for e in events if e["event_type"] == "ask"][-1]
     assert ask["checks"]["grounding_model"] == "fail" and ask["models"]["checker"] == "fake-overlap"

@@ -46,6 +46,7 @@ Response:
 ```
 Fields added in 0.2 (all optional):
 - `citations[].unverified` and `freshness.unverified_sources` *(fix F9)*: when the live version check of a cited document failed (a timeout or an error from the platform), the indexed copy is still served, but the citation says `unverified: true`, its source is listed in `freshness.unverified_sources` and its `freshness.per_source` status is `"unverified"` (besides `ok`, `stale`, `unavailable`). The UI shows a banner. A document that no longer exists is dropped, not served.
+- `claims[].confidence` and `grounding.lower_confidence` *(fix F21)*: the grounding checker scores each claim against the documents it cites. A claim scoring at or above `GROUNDING_THRESHOLD` (0.05 for the default model) stands. One between `GROUNDING_FLOOR` (0.01) and the threshold is kept and carries `confidence: "lower"` (the rebuilt `answer` text adds "(lower confidence: a source supports this only weakly)"), and `grounding.lower_confidence` counts them. Below the floor it is dropped, as before. Clients should show the marker with the claim.
 - `citations[].via_link_from`: the `doc_id` of the cited document whose stored link led to this one, or `null` for a direct search hit. A link never grants access: the target passed the same live permission check as any hit. A target the asker may not open, or that does not exist, is absent with no trace.
 - `citations[].excerpt`: up to 280 characters of the cited document, sanitized like the context packet. Shown as a quoted excerpt, never as the assistant's words.
 - `freshness.per_source`: per source, the connector's `last_sync` and `status` (`ok` within the SLA, `stale` beyond it, `unavailable` if the source could not be read for this request).
@@ -143,6 +144,7 @@ Simulator admin endpoints (owned by A) to revoke a permission, restrict a page, 
 ## Changelog
 - 0.2, 11 Oct: `/leakci/latest` `status`, and `leaks: null` when no run exists; `/policy/versions` `history_kept: false` (fix F7).
 - 0.2, 11 Oct: `citations[].unverified`, `freshness.unverified_sources` and the `unverified` source status (fix F9).
+- 0.2, 11 Oct: `claims[].confidence: "lower"` and `grounding.lower_confidence` (fix F21).
 - 0.2, 11 Oct: `skill` in the `/ask` response is the skill the Brain selected (`null` for the default procedure), not an echo of `skill_hint`. A follow-up in a `conversation_id` of the caller's own is understood from its earlier turns; someone else's or an unknown `conversation_id` behaves as no conversation.
 - 0.2, 10 Oct: `/audit/time-travel` implemented (response above).
 - 0.2, 10 Oct: `citations[].via_link_from` (link-edge expansion).

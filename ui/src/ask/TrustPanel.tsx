@@ -116,6 +116,12 @@ export function TrustPanel({
                 <div className="meter" role="img" aria-label={`${Math.round(answer.grounding.score * 100)} percent grounded`}>
                   <div className="meter__fill" style={{ width: `${answer.grounding.score * 100}%` }} />
                 </div>
+                {(answer.grounding.lower_confidence ?? 0) > 0 && (
+                  <p className="small">
+                    {answer.grounding.lower_confidence} statement{answer.grounding.lower_confidence! > 1 ? "s are" : " is"} marked lower
+                    confidence: a source supports {answer.grounding.lower_confidence! > 1 ? "them" : "it"} only weakly. Check the citation.
+                  </p>
+                )}
                 {answer.grounding.removed_claims > 0 && (
                   <p className="small">
                     {answer.grounding.removed_claims} unsupported statement

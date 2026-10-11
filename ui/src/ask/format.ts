@@ -1,7 +1,10 @@
 import type { AskResponse, Citation, Source } from "../api/types";
 import { SOURCE_LABEL } from "../components/SourceGlyph";
 
-export type Segment = { kind: "text"; text: string } | { kind: "cite"; n: number; citation: Citation };
+export type Segment =
+  | { kind: "text"; text: string }
+  | { kind: "cite"; n: number; citation: Citation }
+  | { kind: "lower" };
 
 /**
  * The answer as sentences with their citation markers, built from `claims[]` (one sentence each), so every
@@ -18,6 +21,7 @@ export function answerSegments(r: AskResponse): Segment[] {
       const n = index.get(id);
       if (n !== undefined) out.push({ kind: "cite", n: n + 1, citation: r.citations[n] });
     }
+    if (claim.confidence === "lower") out.push({ kind: "lower" });
   });
   return out;
 }

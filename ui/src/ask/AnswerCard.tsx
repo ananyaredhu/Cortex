@@ -34,7 +34,7 @@ export function AnswerCard({
 
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(segments.map((s) => (s.kind === "text" ? s.text : `[${s.n}]`)).join(""));
+      await navigator.clipboard.writeText(segments.map((s) => (s.kind === "text" ? s.text : s.kind === "cite" ? `[${s.n}]` : " (lower confidence)")).join(""));
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
@@ -72,6 +72,10 @@ export function AnswerCard({
         {segments.map((s, i) =>
           s.kind === "text" ? (
             <span key={i}>{s.text}</span>
+          ) : s.kind === "lower" ? (
+            <span key={i} className="chip chip--lower" title="A source supports this statement only weakly. Open the citation to check it.">
+              lower confidence
+            </span>
           ) : (
             <button
               key={i}
