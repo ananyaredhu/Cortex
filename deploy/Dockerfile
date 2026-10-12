@@ -26,10 +26,10 @@ COPY evals ./evals
 COPY db ./db
 COPY deploy/entry.py ./deploy/entry.py
 
-# Not root. /models holds the model cache, /state what must outlive a container, evals/scoreboard the Leak-CI result.
+# Not root. /models holds the model cache, /state what must outlive a container, /var/audit-head the signed head of the audit log (fix F4), evals/scoreboard the Leak-CI result.
 RUN useradd --uid 10001 --create-home app \
- && mkdir -p /models /state /app/evals/scoreboard \
- && chown -R app:app /models /state /app/evals/scoreboard /app/connectors/gdrive
+ && mkdir -p /models /state /var/audit-head /app/evals/scoreboard \
+ && chown -R app:app /models /state /var/audit-head /app/evals/scoreboard /app/connectors/gdrive
 USER app
 
 ENTRYPOINT ["python", "deploy/entry.py"]
