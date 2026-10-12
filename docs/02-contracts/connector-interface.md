@@ -1,7 +1,7 @@
 # Connector interface
 
 version: 0.4
-**0.5 is proposed (12 Oct, by C) and not yet approved; it is built on the branch `ws-c/phase3-move-titles-routines` (Jira simulator, its connector, the fixture connector, contract tests 7 and 8):** the Jira `due`, `priority` and `assignee_email` fields, and `WritableConnector.transition`, the first write a connector makes. See "Writing: moving a Jira issue" below.
+**0.5 is proposed (12 Oct, by C) and not yet approved; it is built on the branch `ws-c/ui-adjustments` (Jira simulator, its connector, the fixture connector, contract tests 7 and 8):** the Jira `due`, `priority` and `assignee_email` fields, and `WritableConnector.transition`, the first write a connector makes. See "Writing: moving a Jira issue" below.
 Producer: Workstream A. Consumers: B (ingestion, PDP, JIT checks).
 
 Every source (Slack, Google Drive, Confluence, Jira), real or simulated, implements the same protocol and passes the same **contract tests**. Simulators must be proven faithful by running the same tests against the real API wherever one exists.
@@ -216,7 +216,7 @@ Real platforms assign their own IDs (Slack channel IDs, Drive file IDs), so they
 8. *(0.5, proposed; Jira only)* Fields: `due`, `priority` and `assignee_email` match the seed, and are absent (not empty strings) on an issue that has none.
 
 ## Changelog
-- 0.5 (proposed 12 Oct, not approved; built on `ws-c/phase3-move-titles-routines`): Jira `fields` gain `due`, `priority` and `assignee_email`, with `Due:` and `Priority:` lines in `body`; `WritableConnector.transition` and `TransitionRefused` for the Jira connector, with the one write scope it needs; contract tests 7 and 8. Why: My Work and Team focus need deadlines, and a person should be able to move their own ticket from the board without the board and Jira ever disagreeing.
+- 0.5 (proposed 12 Oct, not approved; built on `ws-c/ui-adjustments`): Jira `fields` gain `due`, `priority` and `assignee_email`, with `Due:` and `Priority:` lines in `body`; `WritableConnector.transition` and `TransitionRefused` for the Jira connector, with the one write scope it needs; contract tests 7 and 8. Why: My Work and Team focus need deadlines, and a person should be able to move their own ticket from the board without the board and Jira ever disagreeing.
 - 0.4, 11 Oct: `Document.fields` (`dict[str, str]`, default `{}`) and the `documents.fields` column. The Jira connector fills `status` and `assignee` from the issue's own fields; the other connectors return `{}` for now. Why: a grounding model cannot be trusted to tell "Status: In Progress" from "the status is Done" (fix F23), and text that code must parse back into values is not a contract. The `Status:` and `Assignee:` lines stay in `body`. Contract test 1 now checks the field against the seed. `db/init.sql` has the column; ingestion adds it at start-up to a database created earlier.
 - 0.3, 11 Oct addition: a Jira issue's `body` carries `Status: <name>` and `Assignee: <display name>` lines (the status line was already written; the assignee line and the simulator's `assignee` field are new). No change to the interface.
 - 0.3, 11 Oct addition: Slack DMs and group DMs are documents (same thread unit and `doc_id` shape, conversation IDs may start with `D`); `check_access` on a person-private document uses the asker's own credential. Rules in acl-model.md, "Slack DMs". No change to the interface.

@@ -1,7 +1,7 @@
 # HTTP API
 
 version: 0.2 (additions for the UI, all optional; proposed by C, approved by A and B on 8 Oct and implemented by the Brain in `brain/api/app.py`)
-**0.3 is proposed (12 Oct, by C) and not yet approved.** It is built on the branch `ws-c/phase3-move-titles-routines` (the Brain, the Jira simulator and the UI, with tests) so that it can be reviewed running; nothing of it is on `main`. Everything marked *(0.3, proposed)* below needs A and B to agree before it merges: it adds the Brain's first write to a source (moving one's own Jira issue), ticket deadlines and priorities, conversation titles, and routines.
+**0.3 is proposed (12 Oct, by C) and not yet approved.** It is built on the branch `ws-c/ui-adjustments` (the Brain, the Jira simulator and the UI, with tests) so that it can be reviewed running; nothing of it is on `main`. Everything marked *(0.3, proposed)* below needs A and B to agree before it merges: it adds the Brain's first write to a source (moving one's own Jira issue), ticket deadlines and priorities, conversation titles, and routines.
 Producer: Workstream B. Consumer: C (UI, console). The MCP server exposes the same pipeline: see [mcp-tools](mcp-tools.md).
 
 Base path `/v1`. JSON. **Auth:** `Authorization: Bearer <JWT>` from the mock IdP on **every** request (validated per request: signature, expiry, audience). JWT claims: `sub`, `email`, `roles`, `aud`.
@@ -231,7 +231,7 @@ Stale-answer alerts: answers the user received whose sources changed afterwards 
 Simulator admin endpoints (owned by A) to revoke a permission, restrict a page, edit a document, and add or remove hidden documents (for Leak-CI). Documented in `simulators/README.md`. The stub API has its own: `/sim/advance`, `/sim/reset`, `/sim/tamper`.
 
 ## Changelog
-- 0.3 (proposed 12 Oct, not approved; built on `ws-c/phase3-move-titles-routines`): `POST /v1/issues/move`, the first write to a source, for the assignee's own Jira issue; `updated_at`, `due_date`, `priority` and `can_move` on issues in `/team`, and those plus `assignee` and `mine` in `/mywork`; `title_source`, generated titles (from the first question only) and `PATCH /v1/conversations/{id}`; the routines endpoints and `routines` in `/mywork`.
+- 0.3 (proposed 12 Oct, not approved; built on `ws-c/ui-adjustments`): `POST /v1/issues/move`, the first write to a source, for the assignee's own Jira issue; `updated_at`, `due_date`, `priority` and `can_move` on issues in `/team`, and those plus `assignee` and `mine` in `/mywork`; `title_source`, generated titles (from the first question only) and `PATCH /v1/conversations/{id}`; the routines endpoints and `routines` in `/mywork`.
 - 0.2, 11 Oct: `GET /v1/team` (Team focus) with `assignee` and `mine` per issue, and optional `goal`, `start_date`, `target_date`, `milestone` and `sprint` per project in the registry file.
 - 0.2, 11 Oct: `GET /v1/projects` and `project_profile` in `/mywork` (T7).
 - 0.2, 11 Oct (after the full real-stack run): `/mywork` gains the optional `channel_names` (`{channel id: name}`, taken from the titles of threads the caller may open; a real Slack ID such as `slack:C0C654ZPPB9` says nothing to a reader). `/alerts` and `alerts` in `/mywork` count only the caller's **latest** ask of each question: asking again supersedes the older answers, so they no longer raise an alert.

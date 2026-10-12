@@ -91,7 +91,7 @@ Status: **Done** = handled in the Phase 0 branch (`ws-c/ui-phase0`). **Proposed*
 
 ## Proposed with api.md 0.3 (12 Oct)
 
-These screens come from the product requirements of 12 Oct, not from the mockup. They are built on the branch `ws-c/phase3-move-titles-routines`, against the Brain in fixture mode, and wait for the contract to be approved before merging.
+These screens come from the product requirements of 12 Oct, not from the mockup. They are built on the branch `ws-c/ui-adjustments`, against the Brain in fixture mode, and wait for the contract to be approved before merging.
 
 | # | Requirement | Resolution | Status |
 |---|---|---|---|

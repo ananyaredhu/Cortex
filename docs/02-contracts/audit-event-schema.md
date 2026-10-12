@@ -79,7 +79,7 @@ Audit queries (natural language or structured) are read-only and run **under RBA
 ## Conversations
 `ask` events carry `conversation_id` (the one returned by `/ask`). The Brain keeps no other record of conversations: `/v1/conversations` and `/v1/conversations/{id}` are rebuilt from these events, under the same ownership rule (only the asker's own events), so history survives a restart.
 
-## Proposed events (12 Oct, with api.md 0.3; not approved; built on `ws-c/phase3-move-titles-routines`)
+## Proposed events (12 Oct, with api.md 0.3; not approved; built on `ws-c/ui-adjustments`)
 Four new event types and one new value, all in the hash chain like any other event.
 
 **`issue_transition`**: every call to `POST /v1/issues/move`, whatever its outcome.
