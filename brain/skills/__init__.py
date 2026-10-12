@@ -1,9 +1,11 @@
 """Runtime skills (docs/02-contracts/skills-format.md, backlog T5): task-specific procedures for the answer service.
 
 A skill is instructions only. It can narrow where the Brain looks (`sources`), raise or lower how much evidence reaches the
-model (`max_evidence`) and tell the model how to structure the answer (`procedure`); it cannot widen access, add tools or
-change policy, because nothing here is consulted by the policy plane. Skills are files in this directory, read once at start-up
-and never written at runtime. Each one is pinned by a SHA-256 over its files, and the hash goes in the audit event.
+model (`max_evidence`), name a fixed lookup whose results join the search hits (`adds`) and tell the model how to structure
+the answer (`procedure`); it cannot widen access, add tools or change policy, because nothing here is consulted by the policy
+plane, and what a lookup adds goes through the same live permission check as any hit. Skills are files in this directory,
+read once at start-up and never written at runtime. Each one is pinned by a SHA-256 over its files, and the hash goes in the
+audit event.
 """
 import hashlib
 import json
@@ -18,8 +20,9 @@ SCHEMA = "claims_with_citations_v1"
 TOOLS = frozenset({"search", "get_source", "explain_access", "audit_query"})
 SURFACES = ("ask", "audit")
 MAX_EVIDENCE = 12
+ADDS = frozenset({"my_issues"})          # the lookups a skill may name; each is code in the pipeline, not text a model reads
 KEYS = {"name", "version", "description", "triggers", "sources", "tools_allowlist", "output_schema", "max_evidence", "surface",
-        "roles"}
+        "roles", "adds"}
 FRONT = re.compile(r"\A---\n(.*?)\n---\n(.*)\Z", re.S)
 
 
@@ -40,6 +43,7 @@ class Skill:
     roles: tuple[str, ...]
     procedure: str
     sha256: str
+    adds: tuple[str, ...] = ()
 
     def allows(self, roles: tuple[str, ...] | list[str]) -> bool:
         """A skill restricted to some roles is never used for anyone else. It grants nothing; it only declines to apply."""
@@ -101,6 +105,9 @@ def load_skill(directory: Path) -> Skill:
     surface = meta.get("surface", "ask")
     if surface not in SURFACES:
         raise SkillError(f"{directory.name}: surface must be ask or audit")
+    adds = meta.get("adds") or []
+    if not isinstance(adds, list) or not set(adds) <= ADDS:
+        raise SkillError(f"{directory.name}: adds must be a list from {sorted(ADDS)}")
     if len(procedure) < 40:
         raise SkillError(f"{directory.name}: the procedure is empty")
     files = sorted(p for p in directory.rglob("*") if p.is_file())
@@ -108,7 +115,7 @@ def load_skill(directory: Path) -> Skill:
     for file in files:                                            # the hash covers every file, so a template change shows too
         digest.update(file.relative_to(directory).as_posix().encode() + b"\0" + file.read_bytes() + b"\0")
     return Skill(directory.name, meta["version"], meta["description"], tuple(t.strip() for t in triggers), tuple(sources),
-                 tuple(tools), limit, surface, tuple(meta.get("roles") or ()), procedure, digest.hexdigest())
+                 tuple(tools), limit, surface, tuple(meta.get("roles") or ()), procedure, digest.hexdigest(), tuple(adds))
 
 
 @dataclass

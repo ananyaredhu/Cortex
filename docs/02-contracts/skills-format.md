@@ -1,6 +1,6 @@
 # Runtime skills format
 
-version: 0.2 (built in `brain/skills/`, 11 Oct)
+version: 0.3 (built in `brain/skills/`; 0.3 is the `adds` key and the `my-work` skill, 12 Oct, proposed on `ws-c/routines-templates`)
 Owner: Workstream B. Consumers: B (router and loader), C (admin view).
 
 A **skill** makes the agent specific to a task: a procedure, an output format and an allowlist of tools. Skills are instructions only. **A skill never carries authority**: it cannot widen access, add tools beyond its allowlist, or change policy.
@@ -40,6 +40,13 @@ surface: ask
 
 Optional frontmatter keys: `surface` (`ask`, the default, or `audit`) and `roles` (the roles allowed to use it; empty means everyone). `sources` narrows where the Brain searches for a question under that skill; `max_evidence` (1 to 12) sets how much evidence reaches the model; `tools_allowlist` is recorded for the clients that use tools (the Brain's own pipeline calls none).
 
+*(0.3)* `adds` names fixed lookups whose results join the search hits. One exists: `my_issues`.
+
+- **Why.** Search matches a question's words against text, and no issue's text says "my". "List my open tickets" therefore matched nothing and was refused, for every person (12 Oct, the real stack).
+- **What `my_issues` does.** It reads the Jira rows the asker's tokens already reach, keeps those whose `assignee_email` field equals the asker's canonical email (an issue without that field falls back to the display name in its text), and puts up to eight of them at the top of the candidates: open first, the earliest due date first, then the most recently changed. Under such a skill the per-source cap on evidence is raised to eight, so the tickets are not cut to three.
+- **What it cannot do.** It is plain code in the pipeline (`brain/pipeline/graph.py`, `_with_my_issues`), not text a model reads; a skill can only name it. Every issue it adds goes through the same live permission check as a search hit, so an issue assigned to someone who may not open it is not added, and nothing is said about anyone else's issues. It does nothing when Jira is not among the sources searched. The account's address stays in the policy plane: the model gets the assignee's display name only. A person with no issues gets the same refusal as for a question that matches nothing. Tests: `brain/tests/test_my_work.py`, `evals/tests/test_my_work_leak.py`.
+- A name `adds` does not know is refused at load, like an unknown source.
+
 ## Loading and routing
 - **As built (0.2):** `brain.skills.Registry.load()` reads every `brain/skills/<name>/SKILL.md` once at start-up and refuses a file that is malformed, names a source or tool that does not exist, has the wrong `output_schema` or a `max_evidence` outside 1 to 12. Skills are frozen objects, never written at run time. Each skill's `sha256` covers every file in its folder.
 - **Routing, first version:** the skill whose `triggers` appear most often in the (rewritten) question wins; no match means the default procedure. An explicit `skill_hint` that names a usable skill wins; a hint for a skill of another surface or role is ignored, not obeyed. `audit-inquiry` is `surface: audit, roles: [compliance]` and is used only by the audit agent, never by `ask`. A model router is not built.
@@ -56,7 +63,9 @@ Optional frontmatter keys: `surface` (`ask`, the default, or `audit`) and `roles
 | `incident-investigation` | CTO question 1 (outage root cause plus follow-up tickets) |
 | `design-discussion-summary` | CTO question 2 (auth-service design threads plus decision doc link) |
 | `audit-inquiry` | Scenario 5 (what did user X access); compliance role only |
+| `my-work` *(0.3)* | Questions about the asker's own work ("my open tickets", "my brief", "my stand-up", "waiting on me"), and the routine templates built on them. `adds: [my_issues]`, `max_evidence: 12`. |
 
 ## Changelog
+- 0.3, 12 Oct (proposed, needs B): the optional `adds` key with one lookup, `my_issues`, and the `my-work` skill.
 - 0.2, 11 Oct: built. `surface` and `roles` keys; validation, hashing and trigger routing as above.
 - 0.1: first draft.

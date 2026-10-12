@@ -1,13 +1,31 @@
 /* Routines: the list, the form (a small dialog) and the block on My Work. */
+.routines__intro { margin: 0; max-width: 64ch; }
 .routines__bar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
-.routines__bar p { margin: 0; max-width: 60ch; }
+.routines__tabs { display: flex; gap: 2px; }
+.routines__tabs [role="tab"] { height: 32px; padding: 0 12px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text-muted); font-size: var(--fs-14); }
+.routines__tabs [role="tab"]:hover { color: var(--text-strong); }
+.routines__tabs [role="tab"][aria-selected="true"] { background: var(--surface-card); box-shadow: var(--shadow-1); color: var(--text-strong); font-weight: var(--fw-bold); }
+.routines__panel { display: flex; flex-direction: column; gap: var(--space-3); }
+.routines__panel > p { margin: 0; }
 .routines__new { border-color: var(--border-strong); color: var(--text-strong); font-weight: var(--fw-bold); }
-.routines__empty { margin: 0; padding: var(--space-5); }
+.routines__empty { padding: 40px var(--space-5); display: flex; flex-direction: column; align-items: center; gap: var(--space-2); text-align: center; color: var(--text-muted); }
+.routines__empty .h3, .routines__empty p { margin: 0; }
+.routines__empty p { max-width: 48ch; }
+.routines__empty-actions { margin-top: var(--space-2); display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: var(--space-2); }
+.routines__empty-actions .chip { height: 34px; }
+.routines__templates { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: var(--space-3); }
+.routines__template { width: 100%; height: 100%; padding: var(--space-4); display: flex; align-items: flex-start; gap: var(--space-3); text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.routines__template:hover { border-color: var(--border-strong); }
+.routines__template-icon { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--ink) 6%, transparent); color: var(--text-strong); }
+.routines__template-text { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.routines__template-name { font-size: var(--fs-14); font-weight: var(--fw-bold); color: var(--text-strong); }
+.routines__template-what { font-size: var(--fs-13); color: var(--text-body); text-wrap: pretty; }
+.routines__template-when { display: inline-flex; align-items: center; gap: 6px; }
 .routines__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
 .routines__item { padding: var(--space-4) var(--space-5); display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
 .routines__what { flex: 1; min-width: min(100%, 320px); display: flex; flex-direction: column; gap: 6px; }
 .routines__what p, .routines__what .h3 { margin: 0; }
-.routines__question { font-size: var(--fs-14); color: var(--text-strong); text-wrap: pretty; }
+.routines__question { font-size: var(--fs-14); color: var(--text-strong); text-wrap: pretty; white-space: pre-line; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
 .routines__last { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
 .routines__dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
 .routines__actions { display: flex; flex-wrap: wrap; gap: 2px; }
