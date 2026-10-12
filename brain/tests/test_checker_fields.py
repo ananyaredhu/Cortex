@@ -15,7 +15,7 @@ from brain.runtime import fixture_runtime
 
 PRIYA = Principal("priya@companya.com", ("engineer",), "Priya", "ui")
 FIELDS = {
-    "jira:DBMIG-142": {"status": "In Progress", "assignee": "Maya"},
+    "jira:DBMIG-142": {"status": "In Progress", "assignee": "Maya", "assignee_email": "maya@companya.com"},
     "jira:DBMIG-150": {"status": "To Do", "assignee": "Priya"},
     "jira:PAYINC-12": {"status": "Done", "assignee": "Priya"},
 }
@@ -110,8 +110,9 @@ def test_field_values_are_cleaned_like_text():
 
 def test_the_fixture_connector_the_index_and_the_packet_carry_the_fields():
     rt = fixture_runtime(Settings(floor_latency_ms=0, dev_auth=True))
-    assert rt.brain.connectors["jira"].fetch("jira:DBMIG-142").fields == {"status": "In Progress", "assignee": "Maya"}
-    assert dict(rt.brain.index.document("jira:DBMIG-142").fields) == {"status": "In Progress", "assignee": "Maya"}
+    held = {"status": "In Progress", "assignee": "Maya", "assignee_email": "maya@companya.com"}
+    assert rt.brain.connectors["jira"].fetch("jira:DBMIG-142").fields == held
+    assert dict(rt.brain.index.document("jira:DBMIG-142").fields) == held
     assert rt.brain.index.document("slack:C_DBMIG/thread-1").fields == ()
     seen = {}
 
@@ -124,7 +125,7 @@ def test_the_fixture_connector_the_index_and_the_packet_carry_the_fields():
 
     rt.brain.generator = Spy()
     rt.brain.ask(PRIYA, AskRequest("What is the status of DBMIG-142?"))
-    assert seen["jira:DBMIG-142"] == {"assignee": "Maya", "status": "In Progress"}
+    assert seen["jira:DBMIG-142"] == {"assignee": "Maya", "status": "In Progress"}      # not the account: that stays in the policy plane
     assert all(fields is None for doc_id, fields in seen.items() if not doc_id.startswith("jira:"))
 
 

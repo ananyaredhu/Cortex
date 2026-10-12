@@ -125,6 +125,9 @@ def build_packet(request_id: str, user_context: dict, question: str, skill: str 
 
 
 MAX_FIELD_CHARS = 80
+# Fields that exist for a policy decision and stay in the policy plane: whose an issue is by account (acl-model.md, "Writes").
+# The model gets the assignee's display name, as the issue's text already says it, and never the account's address.
+POLICY_ONLY_FIELDS = frozenset({"assignee_email"})
 
 
 def clean_fields(fields: dict[str, str] | None) -> tuple[dict[str, str], list[str]]:
@@ -133,6 +136,8 @@ def clean_fields(fields: dict[str, str] | None) -> tuple[dict[str, str], list[st
     out, flags = {}, []
     for name, value in sorted((fields or {}).items()):
         value = " ".join(str(value).split())
+        if name in POLICY_ONLY_FIELDS:
+            continue
         if not value or len(value) > MAX_FIELD_CHARS or not re.fullmatch(r"[a-z][a-z0-9_]{0,30}", str(name)):
             continue
         if sanitize(value)[1]:

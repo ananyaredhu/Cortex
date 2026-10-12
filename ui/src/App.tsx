@@ -13,6 +13,7 @@ import { Sidebar } from "./components/Sidebar";
 import { DemoControls } from "./demo/DemoControls";
 import { DEMO_CONTROLS } from "./demo/sim";
 import { HomePage } from "./home/HomePage";
+import { RoutinesPage } from "./routines/RoutinesPage";
 import { TeamPage } from "./team/TeamPage";
 
 export function App() {
@@ -43,6 +44,7 @@ export function App() {
           <Route path="/team" element={<TeamPage />} />
           <Route path="/ask" element={<AskPage />} />
           <Route path="/ask/:conversationId" element={<AskPage />} />
+          <Route path="/routines" element={<RoutinesPage />} />
           <Route path="/compare" element={<ComparePage />} />
           <Route path="/audit" element={canAudit(persona) ? <AuditPage /> : <Navigate to="/" replace />} />
           <Route path="/admin" element={canAdmin(persona) ? <AdminPage /> : <Navigate to="/" replace />} />

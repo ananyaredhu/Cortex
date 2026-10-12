@@ -65,6 +65,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .sidebar__recent-item:hover { background: var(--surface-card); }
 .sidebar__recent-item.active { background: var(--surface-card); box-shadow: var(--shadow-1); color: var(--text-strong); font-weight: var(--fw-bold); }
 .sidebar__recent-empty { color: var(--text-muted); }
+.sidebar__recent-row { position: relative; flex: none; display: flex; }
+.sidebar__recent-row .sidebar__recent-item { flex: 1; min-width: 0; }
+.sidebar__recent-rename { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); display: grid; place-items: center; width: 24px; height: 24px; border: 0; border-radius: 6px; background: var(--surface-card); color: var(--text-muted); opacity: 0; }
+.sidebar__recent-row:hover .sidebar__recent-rename, .sidebar__recent-rename:focus-visible { opacity: 1; }
+.sidebar__recent-rename:hover { color: var(--text-strong); }
+.sidebar__recent-edit { flex: none; display: flex; }
+.sidebar__recent-edit input { flex: 1; min-width: 0; padding: 7px 9px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface-card); color: var(--text-strong); font: inherit; font-size: var(--fs-13); }
 .sidebar__spacer { flex: 1; }
 
 .avatar { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; border-radius: 50%; overflow: hidden; background: var(--avatar-tile); box-shadow: inset 0 0 0 1px var(--border-subtle); font-weight: var(--fw-bold); color: var(--ink); }

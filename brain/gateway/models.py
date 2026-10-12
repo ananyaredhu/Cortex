@@ -91,6 +91,18 @@ class OpenAICompatibleGenerator:
             return Generated("", [], abstained=True, model=self.model, unavailable=True)
 
 
+    def complete(self, system: str, text: str) -> str | None:
+        """A plain reply to `text` under `system`, or None on any failure. Used for conversation titles (titles.py), where
+        the text is the asker's own question and never a document."""
+        try:
+            r = self._client.post("/chat/completions", json={"model": self.model, "temperature": 0, "max_tokens": 40, "messages": [
+                {"role": "system", "content": system}, {"role": "user", "content": text}]})
+            r.raise_for_status()
+            return str(r.json()["choices"][0]["message"]["content"])
+        except (httpx.HTTPError, KeyError, ValueError, TypeError, IndexError):
+            return None
+
+
 def generator_from_settings(settings) -> Generator:
     """`GENERATOR_BACKEND`: adp (ADP_APP_KEY), openai (GENERATOR_BASE_URL and GENERATOR_API_KEY), template, or auto,
     which takes the first of those that is configured."""

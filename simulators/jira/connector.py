@@ -5,7 +5,17 @@ It talks to the simulator only over HTTP, the way a connector for a real Jira si
 """
 import httpx
 
-from connectors.base import AccessDecision, AclEvidence, ChangeBatch, CursorExpired, Document, DocumentNotFound, PlatformIdentity, Source
+from connectors.base import (
+    AccessDecision,
+    AclEvidence,
+    ChangeBatch,
+    CursorExpired,
+    Document,
+    DocumentNotFound,
+    PlatformIdentity,
+    Source,
+    TransitionRefused,
+)
 from simulators.common import to_change, utc_now
 from simulators.jira.model import valid_issue_key
 
@@ -26,6 +36,13 @@ def _fields(fields: dict) -> dict[str, str]:
         out["status"] = fields["status"]["name"]
     if (fields.get("assignee") or {}).get("displayName"):
         out["assignee"] = fields["assignee"]["displayName"]
+    # 0.5: whose the issue is by account, and its deadline and priority. Absent, never empty, when the issue has none.
+    if (fields.get("assignee") or {}).get("accountId") and fields["assignee"].get("emailAddress"):
+        out["assignee_email"] = fields["assignee"]["emailAddress"].lower()
+    if fields.get("duedate"):
+        out["due"] = fields["duedate"]
+    if (fields.get("priority") or {}).get("name"):
+        out["priority"] = fields["priority"]["name"]
     return out
 
 
@@ -34,8 +51,9 @@ def _body(fields: dict) -> str:
     comments"). `Status: <name>` and `Assignee: <display name>` are the lines Team focus reads (brain/projects/team.py)."""
     description = fields.get("description") or ""
     parts = [description]
-    for line in (f"{label}: {value}" for label, value in (("Status", _fields(fields).get("status")),
-                                                          ("Assignee", _fields(fields).get("assignee"))) if value):
+    held = _fields(fields)
+    for line in (f"{label}: {held[name]}" for label, name in (("Status", "status"), ("Assignee", "assignee"), ("Due", "due"),
+                                                               ("Priority", "priority")) if held.get(name)):
         if line not in description:          # a description that already says it (the seeded issues) is not told twice
             parts.append(line)
     for comment in fields["comment"]["comments"]:
@@ -86,7 +104,31 @@ class JiraConnector:
         return ChangeBatch([to_change(c) for c in data["changes"]], data["next_cursor"], data["has_more"])
 
     def fetch(self, doc_id: str) -> Document:
-        issue = self._issue(doc_id)
+        return self._document(doc_id, self._issue(doc_id))
+
+    def transition(self, identity: PlatformIdentity, doc_id: str, status: str) -> Document:
+        """Move the issue to `status` as `identity` (connector-interface 0.5, "Writing"). The simulator applies its own
+        permission and workflow; this connector decides nothing and retries nothing."""
+        key = _parse(doc_id)
+        if key is None or identity.source != self.source:
+            raise DocumentNotFound(doc_id)
+        acting = {"X-Sim-User": identity.email}
+        offered = self._client.get(f"{API}/issue/{key}/transitions", headers=acting)
+        if offered.status_code == 404:
+            raise DocumentNotFound(doc_id)
+        offered.raise_for_status()
+        to = next((t["id"] for t in offered.json()["transitions"] if t["to"]["name"].lower() == status.strip().lower()), None)
+        if to is None:
+            raise TransitionRefused(doc_id)
+        moved = self._client.post(f"{API}/issue/{key}/transitions", json={"transition": {"id": to}}, headers=acting)
+        if moved.status_code == 404:
+            raise DocumentNotFound(doc_id)
+        if moved.status_code == 400:
+            raise TransitionRefused(doc_id)
+        moved.raise_for_status()
+        return self._document(doc_id, moved.json())
+
+    def _document(self, doc_id: str, issue: dict) -> Document:
         fields, extra = issue["fields"], issue["_simulator"]
         acl = extra["acl"]
         return Document(

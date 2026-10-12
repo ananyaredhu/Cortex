@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, ChevronDown, ChevronUp, Circle, CircleCheck, CircleDashed, CircleDot, Crosshair, ExternalLink, Pin, PinOff, X } from "lucide-react";
+import { ArrowRight, CalendarClock, Repeat, ChevronDown, ChevronUp, Circle, CircleCheck, CircleDashed, CircleDot, Crosshair, ExternalLink, Flag, Pin, PinOff, X } from "lucide-react";
 import { type DragEvent, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
@@ -10,7 +10,10 @@ import { PERSONAS } from "../auth/personas";
 import { Avatar } from "../components/Avatar";
 import { SOURCE_LABEL, SourceGlyph } from "../components/SourceGlyph";
 import { FilterBar } from "./FilterBar";
-import { filterOptions, type Filters, matches } from "./filters";
+import { outcomeText, scheduleText, whenIn } from "../routines/format";
+import "../routines/routines.css";
+import { shortDay } from "../team/dates";
+import { dueState, filterOptions, type Filters, matches } from "./filters";
 import { useFocus, type WorkItem, workItems } from "./focus";
 import "./home.css";
 
@@ -96,10 +99,11 @@ export function HomePage() {
     </li>
   );
 
-  // A ticket: its title, then what the API knows about it. A deadline and a priority join the second line once the
-  // Jira connector carries them (api.md, /v1/team: "not in it").
+  // A ticket: its title, then what the API knows about it. The deadline and the priority are there when the Jira
+  // connector carries them (api.md 0.3). "Overdue" is said in words, not in red: red is kept for trust state (#45).
   const ticket = (i: WorkItem) => {
     const { key, title } = keyAndTitle(i);
+    const due = dueState(i);
     return (
       <li key={i.doc_id} className="home__ticket" draggable onDragStart={drag(i.doc_id)}>
         <div className="home__ticket-main">
@@ -112,6 +116,16 @@ export function HomePage() {
             {i.assignee && (
               <span className="home__who">
                 <Avatar src={PERSONAS.find((p) => p.name === i.assignee)?.avatar} name={i.assignee} size={18} /> {i.assignee}
+              </span>
+            )}
+            {i.due_date && (
+              <span className={`home__due${due === "overdue" ? " home__due--overdue" : ""}`}>
+                <CalendarClock size={12} aria-hidden /> {due === "overdue" ? "Overdue · due" : "Due"} {shortDay(i.due_date)}
+              </span>
+            )}
+            {i.priority && (
+              <span className="home__who">
+                <Flag size={12} aria-hidden /> {i.priority}
               </span>
             )}
             {i.mine && <span className="home__mine">Yours</span>}
@@ -185,6 +199,41 @@ export function HomePage() {
               ))}
             </ul>
           )}
+        </section>
+      )}
+
+      {w?.routines && w.routines.some((r) => r.status === "active") && (
+        <section className="card home__panel" aria-labelledby="h-routines">
+          <div className="home__head">
+            <h2 id="h-routines" className="h3">
+              <Repeat size={16} aria-hidden /> Routines
+            </h2>
+            <Link className="ghost ghost--accent small" to="/routines">
+              All routines <ArrowRight size={12} aria-hidden />
+            </Link>
+          </div>
+          <ul className="home__list home__routines">
+            {w.routines
+              .filter((r) => r.status === "active")
+              .map((r) => {
+                const run = r.last_run;
+                return (
+                  <li key={r.routine_id}>
+                    {run?.unread ? <span className="routines__dot" role="img" aria-label="Unread" /> : <CalendarClock size={14} aria-hidden />}
+                    <span className="home__routine">
+                      {run?.conversation_id ? (
+                        <Link to={`/ask/${encodeURIComponent(run.conversation_id)}`}>{r.name}</Link>
+                      ) : (
+                        <Link to="/routines">{r.name}</Link>
+                      )}
+                      <span className="muted small">
+                        {run ? `${outcomeText(run)} · ${whenIn(run.ran_at, r.timezone)}` : `${scheduleText(r.schedule)} · first run ${whenIn(r.next_run_at, r.timezone)}`}
+                      </span>
+                    </span>
+                  </li>
+                );
+              })}
+          </ul>
         </section>
       )}
 

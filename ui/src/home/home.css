@@ -29,7 +29,8 @@
 .home__ticket-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .home__ticket-main a { font-size: var(--fs-14); color: var(--text-strong); }
 .home__ticket-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px var(--space-2); font-size: var(--fs-12); color: var(--text-body); }
-.home__who { display: inline-flex; align-items: center; gap: 4px; }
+.home__who, .home__due { display: inline-flex; align-items: center; gap: 4px; }
+.home__due--overdue { font-weight: var(--fw-bold); color: var(--text-strong); }
 /* Filters: a chip per filter in use, each opening its values, and "Add filter". */
 .filters { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--text-body); }
 .filters__item { position: relative; }

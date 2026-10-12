@@ -28,7 +28,7 @@ import os
 
 import pytest
 
-from connectors.base import Change, DocumentNotFound, PlatformIdentity
+from connectors.base import Change, DocumentNotFound, PlatformIdentity, TransitionRefused
 from connectors.gdrive.testing import RealDrive, RenamedSeededDrive, SeededDrive
 from connectors.slack.testing import RealSlack, SeededSlack
 from connectors.stub.fixture_connector import FixtureConnector
@@ -236,3 +236,60 @@ def test_initial_load_lists_every_document_as_an_upsert(conn):
     assert all(c.type == "upsert" for c in changes)
     assert sorted(c.doc_id for c in changes) == sorted(d["doc_id"] for d in _docs_of(conn))
     assert _drain(conn, cursor) == ([], cursor), "nothing has changed since the crawl"
+
+
+# 7. Transition (0.5, Jira only) --------------------------------------------------------------------
+def _assigned(conn, status):
+    """A seeded issue in `status` with a mapped assignee, and that assignee's identity."""
+    doc = next(d for d in _docs_of(conn) if d["fields"].get("status") == status and d["fields"].get("assignee_email"))
+    return doc, conn.resolve_identity(doc["fields"]["assignee_email"])
+
+
+def test_transition_moves_the_issue_and_nothing_else(conn):
+    if conn.source != "jira":
+        pytest.skip("only the Jira connector writes")
+    doc, identity = _assigned(conn, "In Progress")
+    doc_id, before = doc["doc_id"], conn.version(doc["doc_id"])
+    access = {p["id"]: _allowed(conn, p, doc) for p in DATA["personas"]}
+    _, cursor = _drain(conn)
+
+    moved = conn.transition(identity, doc_id, "done")              # matched without regard to case
+    assert moved.fields["status"] == "Done" and "Status: Done" in moved.body and "Status: In Progress" not in moved.body
+    assert moved.version != before and moved.version == conn.version(doc_id) == conn.fetch(doc_id).version
+    assert conn.fetch(doc_id).fields == moved.fields
+    assert moved.acl.tokens == doc["acl"]["tokens"]
+    changes, _ = _drain(conn, cursor)
+    assert [(c.type, c.doc_id) for c in changes] == [("upsert", doc_id)]
+    assert {p["id"]: _allowed(conn, p, doc) for p in DATA["personas"]} == access
+
+
+def test_transition_refuses_what_the_workflow_does_not_offer(conn):
+    if conn.source != "jira":
+        pytest.skip("only the Jira connector writes")
+    doc, identity = _assigned(conn, "To Do")
+    before = conn.version(doc["doc_id"])
+    for status in ("Done", "Shipped"):
+        with pytest.raises(TransitionRefused):
+            conn.transition(identity, doc["doc_id"], status)
+    assert conn.version(doc["doc_id"]) == before
+    with pytest.raises(DocumentNotFound):
+        conn.transition(identity, "jira:NOPE-1", "Done")
+    # an issue the identity cannot open does not exist for it
+    hidden = next(d for d in _docs_of(conn) if not _allowed(conn, persona_by_id(DATA, "priya"), d))
+    with pytest.raises(DocumentNotFound):
+        conn.transition(conn.resolve_identity(persona_by_id(DATA, "priya")["email"]), hidden["doc_id"], "Done")
+    assert conn.version(hidden["doc_id"]) == hidden["version"]
+
+
+# 8. Fields (0.5, Jira only) ------------------------------------------------------------------------
+def test_due_priority_and_assignee_email_are_absent_when_the_issue_has_none(conn):
+    if conn.source != "jira":
+        pytest.skip("only Jira issues carry these fields")
+    seen = set()
+    for d in _docs_of(conn):
+        got = conn.fetch(d["doc_id"]).fields
+        for name in ("due", "priority", "assignee_email"):
+            assert (name in got) == (name in d["fields"]), (d["doc_id"], name)
+            assert got.get(name, "x") != ""
+            seen |= {name} & set(got)
+    assert seen == {"due", "priority", "assignee_email"}        # the seed exercises all three

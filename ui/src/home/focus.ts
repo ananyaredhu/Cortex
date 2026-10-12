@@ -11,7 +11,9 @@ export interface WorkItem {
   status?: string | null;
   assignee?: string | null;
   mine?: boolean;
-  updated_at?: string;
+  updated_at?: string | null;
+  due_date?: string | null; // YYYY-MM-DD (api.md 0.3)
+  priority?: string | null;
 }
 
 export const sourceOf = (id: string) => id.slice(0, id.indexOf(":")) as Source;
@@ -31,9 +33,10 @@ export function workItems(w: MyWork, teams: Team[] = []) {
       ...i,
       source: "jira" as const,
       place: w.projects.find((p) => inPlace(i, p)),
+      // /mywork carries these itself from 0.3; before that, /v1/team is where they are
       status: i.status ?? onTeam.get(i.doc_id)?.status,
-      assignee: onTeam.get(i.doc_id)?.assignee,
-      mine: onTeam.get(i.doc_id)?.mine ?? false,
+      assignee: i.assignee ?? onTeam.get(i.doc_id)?.assignee,
+      mine: i.mine ?? onTeam.get(i.doc_id)?.mine ?? false,
     }))
     .sort((a, b) => rank(a) - rank(b));
 

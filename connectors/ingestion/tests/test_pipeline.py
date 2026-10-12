@@ -300,7 +300,7 @@ class _NoFields:
 
 def test_the_index_stores_each_documents_fields(store):
     _ingestor(store, FixtureConnector("jira"), FixtureConnector("slack")).run_once()
-    assert store.indexed("jira:DBMIG-142").fields == {"status": "In Progress", "assignee": "Maya"}
+    assert store.indexed("jira:DBMIG-142").fields == {"status": "In Progress", "assignee": "Maya", "assignee_email": "maya@companya.com"}
     assert store.indexed("slack:C_DBMIG/thread-1").fields == {}
 
 
@@ -312,6 +312,6 @@ def test_an_index_built_before_the_fields_picks_them_up_on_the_next_crawl(store)
     with_fields = [d["doc_id"] for d in _docs("jira") if d.get("fields")]
     replay = _ingestor(store, _Scripted("jira", jira, jira.list_changes(None).changes))
     assert dict(replay.run_once().actions["jira"]) == {INDEXED: len(with_fields), UNCHANGED: len(_docs("jira")) - len(with_fields)}
-    assert store.indexed("jira:DBMIG-142").fields == {"status": "In Progress", "assignee": "Maya"}
+    assert store.indexed("jira:DBMIG-142").fields == {"status": "In Progress", "assignee": "Maya", "assignee_email": "maya@companya.com"}
     again = _ingestor(store, _Scripted("jira", jira, jira.list_changes(None).changes))
     assert dict(again.run_once().actions["jira"]) == {UNCHANGED: len(_docs("jira"))}

@@ -27,17 +27,19 @@ from brain.checker.layer1 import render_answer
 from brain.checker.layer2 import lead_in, rebuild_answer
 from brain.config import ABSTAIN, POLICY_VERSION, REFUSAL, SOURCES, STAGES, UNAVAILABLE, Settings
 from brain.gateway.models import Generated, Generator
+from brain.gateway.titles import MAX_CUSTOM_TITLE, Titler, clean_title
 from brain.pipeline.rewrite import rewrite_query
 from brain.policy.identity import AskerIdentity, IdentityResolver
 from brain.policy.labels import acl_label, may_serve
 from brain.policy.leakscan import DeniedDoc, prepare
 from brain.policy.pdp import PDP, Decision, hash_denied, source_of
+from brain.policy.writes import is_assignee
 from brain.projects import EXTRA_CANDIDATES, PROJECT_BOOST, ProjectView
 from brain.projects import Registry as ProjectRegistry
-from brain.projects.team import team_focus
+from brain.projects.team import issue_view, status_of, team_focus
 from brain.retrieval import Candidate, IndexReader, hybrid_search, query_terms
 from brain.skills import Registry, Skill
-from connectors.base import Connector, DocumentNotFound
+from connectors.base import Connector, Document, DocumentNotFound, TransitionRefused
 from connectors.ingestion.embedding import Embedder
 from connectors.ingestion.store import Store
 
@@ -58,6 +60,10 @@ class AskRequest:
     skill_hint: str | None = None
     sources: list[str] | None = None
     time_range: str | None = None
+    # Set only by brain.routines for a routine's run (never from a request body): the routine it belongs to, and the
+    # name its new conversation gets (the routine's own name and the day, both the owner's words).
+    routine_id: str | None = None
+    title: str | None = None
 
 
 class State(TypedDict, total=False):
@@ -103,12 +109,16 @@ class Brain:
                  scorer: GroundingScorer | None = None, link_resolver: Callable[[str], str] | None = None,
                  skills: Registry | None = None, projects: ProjectRegistry | None = None,
                  container_resolver: Callable[[str], str] | None = None, token_resolver: Callable[[str], str] | None = None) -> None:
+        # Brings the index in line with a document a connector just returned, through ingestion's own upsert path; set by
+        # the runtime. None means the index waits for the next sync (move_issue then answers `indexed: false`).
+        self.reindex: Callable[[Document], None] | None = None
         self.settings = settings
         self.connectors = dict(connectors)
         self.index = index
         self.store = store
         self.embedder = embedder
         self.generator = generator
+        self.titler = Titler(generator)
         self.audit = audit
         self.scorer = scorer
         self.skills = skills if skills is not None else Registry.load()
@@ -189,10 +199,72 @@ class Brain:
         state: State = {"request_id": f"req_{uuid.uuid4().hex[:8]}", "principal": principal, "request": request,
                         "started": started, "on_stage": on_stage, "flags": []}
         final = self._graph.invoke(state)
+        if request.conversation_id is None:               # a new conversation: name it, whatever the answer was
+            self._name_later(principal, final["response"]["conversation_id"], request.question, request.title)
         remaining = self.settings.floor_latency_ms / 1000 - (time.monotonic() - started)
         if remaining > 0:
             time.sleep(remaining)
         return final["response"]
+
+    # -- conversation titles (api.md 0.3): from the first question's text and nothing else ---------------------------
+    def _name_later(self, principal: Principal, conversation_id: str, question: str, title: str | None = None) -> None:
+        """Give a new conversation its generated title. Every conversation gets one in the same way, refused ones
+        included, so a title says nothing about what exists. A model is asked on another thread, so `/ask` never waits
+        for it; the rules need no waiting."""
+        if title:                                          # a routine's run is named after the routine
+            self._title_event(principal, conversation_id, clean_title(title, MAX_CUSTOM_TITLE), "generated", client="brain",
+                              model="routine")
+        elif self.titler.uses_model:
+            self._pool.submit(self._name, principal, conversation_id, question)
+        else:
+            self._name(principal, conversation_id, question)
+
+    def _name(self, principal: Principal, conversation_id: str, question: str) -> None:
+        try:
+            title, model = self.titler.title(question)
+            self._title_event(principal, conversation_id, title, "generated", client="brain", model=model)
+        except Exception:                                  # noqa: BLE001 - an unnamed chat keeps its question as its title
+            pass
+
+    def _title_event(self, principal: Principal, conversation_id: str, title: str | None, source: str, *, client: str,
+                     model: str | None = None) -> None:
+        event = {"request_id": f"title_{uuid.uuid4().hex[:8]}", "event_type": "conversation_title",
+                 "conversation_id": conversation_id,
+                 "actor": {"user_id": principal.email, "roles": list(principal.roles), "client": client},
+                 "title": {"text": title, "source": source}, "decisions": [], "flags": []}
+        if model:
+            event["models"] = {"generator": model}
+        self.audit.append(event)
+
+    def _titles(self, email: str) -> dict[str, tuple[str, str]]:
+        """conversation id -> (title, "generated" | "custom"), from the person's own `conversation_title` events: the
+        newest custom name that was not cleared since, else the newest generated one."""
+        generated: dict[str, str] = {}
+        custom: dict[str, str] = {}
+        for e in self.audit.events(user=email):
+            if e.get("event_type") != "conversation_title":
+                continue
+            cid, title = e.get("conversation_id"), e.get("title") or {}
+            if title.get("source") == "cleared":
+                custom.pop(cid, None)
+            elif title.get("source") == "custom" and title.get("text"):
+                custom[cid] = title["text"]
+            elif title.get("source") == "generated" and title.get("text"):
+                generated[cid] = title["text"]
+        return {**{c: (t, "generated") for c, t in generated.items()}, **{c: (t, "custom") for c, t in custom.items()}}
+
+    def rename_conversation(self, principal: Principal, conversation_id: str, title: str | None) -> dict | None:
+        """Name one of the caller's own conversations, or with None go back to its generated title. None when it is not
+        theirs or does not exist: the two look alike. Raises ValueError for a title that is not one usable line."""
+        if title is not None:
+            cleaned = clean_title(title, MAX_CUSTOM_TITLE)
+            if cleaned is None or len(title.strip()) > MAX_CUSTOM_TITLE or "\n" in title.strip():
+                raise ValueError("title")
+            title = cleaned
+        if not any(self._conversation_of(e) == conversation_id for e in self._asks(principal.email)):
+            return None
+        self._title_event(principal, conversation_id, title, "custom" if title else "cleared", client=principal.client)
+        return next(c for c in self.conversations(principal) if c["conversation_id"] == conversation_id)
 
     # -- nodes ----------------------------------------------------------------------------------
     def _identity(self, state: State) -> dict:
@@ -517,6 +589,8 @@ class Brain:
             "links_followed": [{"doc_id": t, "via_link_from": f} for t, f in sorted(state.get("linked", {}).items())],
             "latency_ms": int((time.monotonic() - state["started"]) * 1000),
         }
+        if req.routine_id:
+            event["routine_id"] = req.routine_id
         self.audit.append(event)
         return {}
 
@@ -630,8 +704,83 @@ class Brain:
         rows = self.index.documents_under(parents, sorted(asker.tokens), limit=TEAM_DOCS)
         ok = {d.doc_id for d in self.pdp.check_many(asker, [(r.doc_id, r.version) for r in rows]) if d.allowed}
         return team_focus(views, [r for r in rows if r.doc_id in ok], names=names, container=self.container_resolver,
-                          me=(names or {}).get(principal.email) or principal.display_name,
-                          text=lambda doc_id: "\n".join(c.text for c in self.index.chunks_of(doc_id)))
+                          me=(names or {}).get(principal.email) or principal.display_name, email=principal.email,
+                          text=self._text)
+
+    def _text(self, doc_id: str) -> str:
+        return "\n".join(c.text for c in self.index.chunks_of(doc_id))
+
+    def my_issues(self, principal: Principal, rows: list, names: dict[str, str] | None = None) -> list[dict]:
+        """The Jira issues among `rows` (index rows the caller may open) as `/v1/mywork` lists them (api.md 0.3)."""
+        me = (names or {}).get(principal.email) or principal.display_name
+        return [issue_view(r, self._text(r.doc_id), me=me, email=principal.email) for r in rows if r.source == "jira"]
+
+    # -- the one write: moving one's own Jira issue (api.md 0.3, acl-model.md "Writes") --------------------------------
+    def move_issue(self, principal: Principal, doc_id: str, status: str) -> tuple[int, dict]:
+        """Move an issue to `status` in Jira, as the caller, if they may open it and are its assignee. Returns the HTTP
+        status and body. No model takes part, and nothing here is reachable from the LLM plane.
+
+        The order matters: the read check comes first and answers like a missing issue, so nothing after it can say
+        anything about an issue the caller cannot open. Jira holds the status; the Brain keeps none, and after a move it
+        hands the issue Jira returned to ingestion so the index says the same."""
+        started = time.monotonic()
+        request_id = f"move_{uuid.uuid4().hex[:8]}"
+        asker = self.resolver.resolve(principal.email)
+        decision = self.pdp.check(asker, doc_id, self._indexed_version(doc_id))
+        connector = self.connectors.get("jira")
+        transition: dict | None = None
+        code, body = 404, {"detail": "no such issue"}
+        if source_of(doc_id) == "jira" and decision.allowed and connector is not None:
+            transition = {"to": status, "outcome": "source_unavailable"}
+            code, body = 503, {"error": {"code": "source_unavailable", "message": "Jira could not be reached. Nothing was changed."}}
+            try:
+                live = connector.fetch(doc_id)                 # whose it is and where it stands now, from Jira itself
+                transition["from"] = live.fields.get("status") or status_of(live.body)
+                if not is_assignee(principal.email, live.fields):
+                    transition["outcome"] = "refused_not_assignee"
+                    code, body = 403, {"error": {"code": "not_assignee", "message": "Only the assignee can move this issue."}}
+                elif (transition["from"] or "").lower() == status.strip().lower():
+                    transition["outcome"] = "unchanged"
+                    code, body = 200, self._moved(request_id, live, indexed=True)
+                elif not hasattr(connector, "transition"):
+                    pass                                       # a read-only connector: nothing can be moved through it
+                else:
+                    moved = connector.transition(asker.identity("jira"), doc_id, status)
+                    indexed = self._reindex(moved)
+                    transition.update(outcome="moved", to=moved.fields.get("status") or status, indexed=indexed,
+                                      doc_version_after=moved.version)
+                    code, body = 200, self._moved(request_id, moved, indexed=indexed)
+            except DocumentNotFound:                           # gone since the check: the same answer as never there
+                transition, code, body = None, 404, {"detail": "no such issue"}
+            except TransitionRefused:
+                transition["outcome"] = "refused_by_source"
+                code, body = 409, {"error": {"code": "transition_refused", "message": "Jira does not allow that move."}}
+            except Exception:                                  # noqa: BLE001 - unknown outcome: say so, and never retry a write
+                pass
+        event = {"request_id": request_id, "event_type": "issue_transition",
+                 "actor": {"user_id": principal.email, "roles": list(principal.roles), "client": principal.client},
+                 "decisions": [decision.audit_view(self.settings.denied_id_salt)], "flags": [],
+                 "latency_ms": int((time.monotonic() - started) * 1000)}
+        if transition is not None:
+            event["transition"] = transition
+        self.audit.append(event)
+        self._pad(started)
+        return code, body
+
+    @staticmethod
+    def _moved(request_id: str, doc: Document, *, indexed: bool) -> dict:
+        return {"request_id": request_id, "doc_id": doc.doc_id, "status": doc.fields.get("status") or status_of(doc.body),
+                "updated_at": doc.updated_at, "indexed": indexed}
+
+    def _reindex(self, doc: Document) -> bool:
+        if self.reindex is None:
+            return False
+        try:
+            self.reindex(doc)
+        except Exception:                                      # noqa: BLE001 - the move happened; the next sync catches the index up
+            return False
+        self.pdp.invalidate_doc(doc.doc_id)
+        return True
 
     def visible_documents(self, principal: Principal, source: str | None = None, limit: int = 100) -> list:
         """Index rows the person may read right now: prefilter, then the live check on each."""
@@ -683,8 +832,11 @@ class Brain:
         convs: dict[str, dict] = {}
         for e in self._asks(principal.email):
             cid = self._conversation_of(e)
-            c = convs.setdefault(cid, {"conversation_id": cid, "title": e["query"]["text"]})
+            c = convs.setdefault(cid, {"conversation_id": cid, "title": e["query"]["text"], "title_source": "question"})
             c["last_asked_at"] = e["ts"]
+        for cid, (title, source) in self._titles(principal.email).items():
+            if cid in convs:
+                convs[cid].update(title=title, title_source=source)
         return sorted(convs.values(), key=lambda c: c["last_asked_at"], reverse=True)
 
     def conversation(self, principal: Principal, conversation_id: str) -> dict | None:
@@ -695,7 +847,8 @@ class Brain:
         if not asks:
             return None
         asker = self.resolver.resolve(principal.email)
-        return {"conversation_id": conversation_id, "title": asks[0]["query"]["text"], "last_asked_at": asks[-1]["ts"],
+        title, source = self._titles(principal.email).get(conversation_id, (asks[0]["query"]["text"], "question"))
+        return {"conversation_id": conversation_id, "title": title, "title_source": source, "last_asked_at": asks[-1]["ts"],
                 "turns": [self._turn(e, asker) for e in asks]}
 
     def _turn(self, event: dict, asker: AskerIdentity) -> dict:
@@ -713,7 +866,7 @@ class Brain:
         return {"request_id": event["request_id"], "asked_at": event.get("ts"), "question": event["query"]["text"],
                 "skill": event["query"].get("skill"), "answer": answer.get("text") if ok else None, "withheld": not ok,
                 "citations": citations, "refused": bool(answer.get("refused")), "abstained": bool(answer.get("abstained")),
-                "unavailable": bool(answer.get("unavailable"))}
+                "unavailable": bool(answer.get("unavailable")), "routine_id": event.get("routine_id")}
 
     def stages(self) -> tuple[str, ...]:
         return STAGES

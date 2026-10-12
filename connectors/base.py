@@ -13,6 +13,11 @@ class DocumentNotFound(LookupError):
     """Raised by `fetch` and `version`. Never raised by `check_access`, which returns a deny instead."""
 
 
+class TransitionRefused(Exception):
+    """Raised by `WritableConnector.transition` when the platform will not make the move: its workflow offers no such
+    transition from the issue's current status, or it denies this identity. Carries nothing beyond the issue itself."""
+
+
 class CursorExpired(LookupError):
     """Raised by `list_changes` when the source no longer knows the cursor (e.g. a simulator restarted and its change
     log began again). The consumer starts over with a full crawl, `list_changes(None)`."""
@@ -50,7 +55,8 @@ class Document:
     version: str
     acl: AclEvidence
     # What the platform holds as a field, not as text: lower-case name -> value, both strings ({} when it has none).
-    # Jira: `status`, `assignee` (display name). Source data like `body`: untrusted, sanitized before a model sees it.
+    # Jira: `status`, `assignee` (display name), and (0.5) `due` (YYYY-MM-DD), `priority`, `assignee_email` (canonical,
+    # only when the assignee's account is mapped). Source data like `body`: untrusted, sanitized before a model sees it.
     fields: dict[str, str] = field(default_factory=dict)
 
 
@@ -105,3 +111,12 @@ class Connector(Protocol):
 
     def version(self, doc_id: str) -> str:
         """Raises DocumentNotFound like `fetch`."""
+
+
+class WritableConnector(Connector, Protocol):
+    """(0.5) The one write in the interface, implemented for Jira only: connector-interface.md, "Writing"."""
+
+    def transition(self, identity: PlatformIdentity, doc_id: str, status: str) -> Document:
+        """Move one issue to `status` as `identity` and return it as the platform now holds it. `status` is matched
+        without regard to case against the transitions the platform offers. Raises DocumentNotFound, or
+        TransitionRefused; any other error means nothing is known to have changed."""

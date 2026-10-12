@@ -18,12 +18,15 @@ from brain.audit.anchor import FileAnchor, MemoryAnchor
 from brain.audit.chain import Signer
 from brain.audit.service import AuditService
 from brain.audit.store import AuditStore, MemoryAuditStore, PostgresAuditStore
+from brain.auth import Principal
 from brain.checker import scorer_from_env
 from brain.config import Settings
 from brain.gateway import TemplateGenerator, generator_from_settings
 from brain.pipeline.graph import Brain
 from brain.policy.events import OutboxConsumer
 from brain.retrieval import MemoryIndex, PostgresIndex
+from brain.routines.service import RoutineService
+from brain.routines.store import MemoryRoutineStore, PostgresRoutineStore
 from connectors.ingestion import FakeEmbedder, Ingestor, InMemoryStore
 from connectors.ingestion.embedding import from_env as embedder_from_env
 from connectors.ingestion.pg_store import PostgresStore
@@ -46,6 +49,7 @@ class Runtime:
     tamper: Callable[[int], None] | None = None
     ingest: Callable[[], None] | None = None             # one ingestion pass over the corpus, then sync - fixture mode only
     people: Callable[[], list[str]] = lambda: []          # everyone the Brain knows of: the identity map, or the fixture personas
+    routines: RoutineService | None = None               # saved questions on a schedule (docs/routines.md)
 
     def baseline(self) -> int:
         """Record every known person's token set now, plus anyone who has asked before (see Brain.baseline)."""
@@ -63,6 +67,20 @@ class Runtime:
                 time.sleep(self.settings.baseline_interval_s)
         threading.Thread(target=loop, name="identity-baseline", daemon=True).start()
 
+    def start_routine_loop(self) -> None:
+        """Look for due routines every `routines_tick_s` (BRAIN_ROUTINES=1). The loop reads `self.routines` each time, so a
+        fixture reset swaps the service under it."""
+        def loop() -> None:
+            while True:
+                time.sleep(self.settings.routines_tick_s)
+                try:
+                    if self.routines is not None:
+                        self.sync()
+                        self.routines.tick()
+                except Exception:                              # noqa: BLE001 - a failed pass must not end the scheduler
+                    log.exception("routine scheduler pass failed")
+        threading.Thread(target=loop, name="routine-scheduler", daemon=True).start()
+
     def sync(self) -> int:
         """Apply what ingestion's outbox says before serving: dropped caches, `acl_change_observed` events."""
         try:
@@ -70,6 +88,14 @@ class Runtime:
         except Exception:                                  # noqa: BLE001 - never block a request on the outbox
             log.exception("outbox drain failed")
             return 0
+
+
+def directory() -> Callable[[str], Principal | None]:
+    """Who a canonical email is, as sign-in would say: the people the mock IdP knows (the fictional Company A personas).
+    The routine scheduler uses it to build an owner's principal without a token; someone it does not know cannot be run
+    for. A real IdP replaces this lookup, as it replaces `POST /idp/token`."""
+    people = {p["email"]: Principal(p["email"], tuple(p["roles"]), p["display_name"]) for p in fixture_data()["personas"]}
+    return people.get
 
 
 def fixture_settings_from_env() -> Settings:
@@ -83,7 +109,8 @@ def fixture_settings_from_env() -> Settings:
     return Settings(floor_latency_ms=0, dev_auth=os.environ.get("BRAIN_DEV_AUTH", "1").strip() != "0",
                     jwt_signing_key=env.jwt_signing_key, jwt_audience=env.jwt_audience,
                     mock_idp=env.mock_idp, mock_idp_ttl_s=env.mock_idp_ttl_s,
-                    mcp=env.mcp, public_url=env.public_url, mcp_allowed_hosts=env.mcp_allowed_hosts)
+                    mcp=env.mcp, public_url=env.public_url, mcp_allowed_hosts=env.mcp_allowed_hosts,
+                    routines=env.routines)
 
 
 def fixture_runtime(settings: Settings | None = None, *, sources=("confluence", "jira", "slack", "gdrive")) -> Runtime:
@@ -97,9 +124,11 @@ def fixture_runtime(settings: Settings | None = None, *, sources=("confluence", 
     audit_store = MemoryAuditStore(signer=Signer(settings.audit_signing_key), checkpoint_every=settings.checkpoint_every,
                                    anchor=MemoryAnchor())
     brain = Brain(settings, connectors, MemoryIndex(store), store, embedder, TemplateGenerator(), audit_store)
+    brain.reindex = lambda doc: ingestor._sync(doc, doc.updated_at)       # ingestion's own upsert path, for one document
     consumer = OutboxConsumer(store, brain.resolver, brain.pdp, record=audit_store.append)
     runtime = Runtime(settings, brain, AuditService(audit_store, brain), audit_store, consumer)
     runtime.people = lambda: [p["email"] for p in fixture_data()["personas"]]
+    runtime.routines = RoutineService(brain, MemoryRoutineStore(), audit_store, directory())
     runtime.baseline()
 
     def advance(event_id: str, ingest: bool = True) -> None:
@@ -112,6 +141,7 @@ def fixture_runtime(settings: Settings | None = None, *, sources=("confluence", 
     def reset() -> None:
         fresh = fixture_runtime(settings, sources=sources)
         runtime.brain, runtime.audit, runtime.audit_store, runtime.consumer = fresh.brain, fresh.audit, fresh.audit_store, fresh.consumer
+        runtime.routines = fresh.routines
         # Not `fresh.reset`: that one rebuilds `fresh`, a runtime nobody serves, so a second reset would change nothing.
         runtime.advance, runtime.tamper, runtime.ingest = fresh.advance, fresh.tamper, fresh.ingest
 
@@ -165,12 +195,17 @@ def env_runtime(settings: Settings | None = None) -> Runtime:
 
     brain = Brain(settings, connectors, index, store, embedder, generator_from_settings(settings), audit_store, scorer=scorer,
                   link_resolver=to_real, container_resolver=to_real_container, token_resolver=to_real_token)
+    # After a move (api.md 0.3), the issue Jira returned goes through ingestion's own upsert path, so the index and the
+    # ingestion process, which will meet the same version at its next pass, cannot disagree.
+    one_document = Ingestor([], store, embedder)
+    brain.reindex = lambda doc: one_document._sync(doc, doc.updated_at)
     consumer = OutboxConsumer(store, brain.resolver, brain.pdp, record=audit_store.append)
     consumer.last_seq = max([e.seq or 0 for e in store.events_after(0, 100_000)] or [0])   # history is A's, not news
     runtime = Runtime(settings, brain, AuditService(audit_store, brain), audit_store, consumer)
     from connectors.identity_map import IdentityMap
     identity_map = IdentityMap.load()
     runtime.people = lambda: sorted({e for s in settings.sources for e in identity_map.canonical_emails(s)})
+    runtime.routines = RoutineService(brain, PostgresRoutineStore.connect(settings.database_url), audit_store, directory())
     runtime.start_baseline_loop()
     if settings.dev_auth:
         runtime.tamper = lambda seq: audit_store.tamper(seq, lambda e: e.setdefault("query", {}).__setitem__("text", "TAMPERED"))

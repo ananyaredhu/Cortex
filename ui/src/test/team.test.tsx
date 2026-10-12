@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, expect, it, vi } from "vitest";
 import type { Team } from "../api/types";
@@ -60,14 +61,86 @@ it("shows a team with only the numbers the API returned", async () => {
   expect(within(card).getByRole("progressbar", { name: "Database migration: sprint tickets done" })).toHaveAttribute("aria-valuenow", "1");
   expect(within(card).getByText("1 of 2")).toBeInTheDocument();
   expect(screen.getByRole("img", { name: "Database migration: 14 Sep to 30 Oct, 1 of 2 tickets done, Cutover on 27 Oct" })).toBeInTheDocument();
-  expect(within(card).getByRole("link", { name: /DBMIG-142/ })).toHaveAttribute("href", "https://x/142");
+  expect(within(card).getByRole("link", { name: "Cutover blocked on replica lag" })).toHaveAttribute("href", "https://x/142");
   // one column per status, in board order, with empty ones kept; the caller's own ticket is marked
   const cols = within(card).getAllByRole("region").map((c) => c.getAttribute("aria-label"));
   expect(cols).toEqual(["To Do", "In Progress", "In Review", "Done"].map((s) => `Database migration: ${s}`));
   const done = within(card).getByRole("region", { name: "Database migration: Done" });
-  expect(within(done).getByRole("link", { name: /Tune replication/ })).toHaveTextContent("Yours");
+  expect(within(done).getByRole("listitem")).toHaveTextContent(/Tune replication.*DBMIG-150.*Yours/);
   expect(within(within(card).getByRole("region", { name: "Database migration: In Progress" })).queryByText("Yours")).not.toBeInTheDocument();
   expect(within(card).getByRole("link", { name: "#db-migration thread: blockers" })).toBeInTheDocument();
+});
+
+// -- moving one's own ticket (api.md 0.3) ---------------------------------------------------------------------------
+const MOVABLE: Team = {
+  ...DBMIG,
+  issues: {
+    ...DBMIG.issues,
+    items: [
+      DBMIG.issues.items[0],
+      { ...DBMIG.issues.items[1], status: "In Progress", can_move: true },
+    ],
+  },
+};
+
+/** Serves /v1/team from `teams`, and answers POST /v1/issues/move with `move`, recording what was asked. */
+const serve = (move: () => Response) => {
+  const asked: unknown[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url === "/v1/issues/move") {
+        asked.push(JSON.parse(String(init?.body)));
+        return move();
+      }
+      return new Response(JSON.stringify({ teams: [MOVABLE] }));
+    }),
+  );
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <PersonaProvider>
+        <MemoryRouter>
+          <TeamPage today="2026-10-11" />
+        </MemoryRouter>
+      </PersonaProvider>
+    </QueryClientProvider>,
+  );
+  return asked;
+};
+const column = (name: string) => screen.getByRole("region", { name: `Database migration: ${name}` });
+
+it("lets only the assignee's own ticket be moved, and asks the API to move it", async () => {
+  const asked = serve(() => new Response(JSON.stringify({ request_id: "m1", doc_id: "jira:DBMIG-150", status: "Done", updated_at: null, indexed: true })));
+  await screen.findByRole("region", { name: "Database migration" });
+  const cards = within(column("In Progress")).getAllByRole("listitem");
+  expect(cards.map((c) => c.getAttribute("draggable"))).toEqual(["false", "true"]); // Maya's, then the caller's own
+  expect(screen.queryByRole("combobox", { name: "Move DBMIG-142 to" })).not.toBeInTheDocument();
+
+  await userEvent.selectOptions(screen.getByRole("combobox", { name: "Move DBMIG-150 to" }), "Done");
+  expect(asked).toEqual([{ doc_id: "jira:DBMIG-150", status: "Done" }]);
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+});
+
+it("moves a card dropped on another column, and never one that is not the caller's", async () => {
+  const asked = serve(() => new Response(JSON.stringify({ request_id: "m1", doc_id: "jira:DBMIG-150", status: "In Review", updated_at: null, indexed: true })));
+  await screen.findByRole("region", { name: "Database migration" });
+  const drop = (docId: string) => {
+    const dataTransfer = { types: ["application/x-cortex-issue"], getData: () => docId };
+    fireEvent.drop(column("In Review"), { dataTransfer });
+  };
+  drop("jira:DBMIG-142");
+  expect(asked).toEqual([]);
+  drop("jira:DBMIG-150");
+  await waitFor(() => expect(asked).toEqual([{ doc_id: "jira:DBMIG-150", status: "In Review" }]));
+});
+
+it("puts the card back and says why when the move is refused", async () => {
+  serve(() => new Response(JSON.stringify({ error: { code: "transition_refused", message: "Jira does not allow that move." } }), { status: 409 }));
+  await screen.findByRole("region", { name: "Database migration" });
+  await userEvent.selectOptions(screen.getByRole("combobox", { name: "Move DBMIG-150 to" }), "Done");
+  expect(await screen.findByRole("alert")).toHaveTextContent("Jira doesn’t allow that move");
+  expect(within(column("In Progress")).getByText("Tune replication")).toBeInTheDocument();
+  expect(within(column("Done")).queryByText("Tune replication")).not.toBeInTheDocument();
 });
 
 it("shows a project's details when its timeline row is pointed at or focused", async () => {

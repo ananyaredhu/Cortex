@@ -18,6 +18,8 @@ ORG = "companya.com"
 # The five issues whose text gained a status or assignee line on 11 Oct. Ingestion re-reads a document only when its
 # version changes, so an index built before then needs the new label to pick the lines up.
 EDITED = f"{D}T08:00:00Z#2"
+# The issues whose text gained a due date and a priority on 12 Oct (connector-interface 0.5): a new label for the same reason.
+DATED = f"{D}T08:00:00Z#3"
 
 
 def canon(obj) -> str:
@@ -32,7 +34,12 @@ def _fields(source, body):
     import re
     status = re.search(r"\bStatus: ([A-Za-z][A-Za-z ]*[A-Za-z])", body)
     assignee = re.search(r"\bAssignee: ([A-Za-z][A-Za-z '-]*[A-Za-z])", body)
-    return {k: m.group(1) for k, m in (("status", status), ("assignee", assignee)) if m}
+    due = re.search(r"\bDue: (\d{4}-\d{2}-\d{2})", body)
+    priority = re.search(r"\bPriority: (Highest|High|Medium|Low|Lowest)\b", body)
+    out = {k: m.group(1) for k, m in (("status", status), ("assignee", assignee), ("due", due), ("priority", priority)) if m}
+    if assignee:     # 0.5: whose the issue is by account. Every fixture assignee is a Company A employee.
+        out["assignee_email"] = f"{assignee.group(1).lower()}@{ORG}"
+    return out
 
 
 def doc(doc_id, source, kind, title, body, parent, tokens, native, links=(), author="system",
@@ -110,10 +117,11 @@ docs = [
         {"project": "DBMIG", "roles": ["developer", "lead"], "security_level": None},
         links=["slack:C_DBMIG/thread-1", "jira:DBMIG-150"], author="maya@companya.com", version=EDITED),
     doc("jira:DBMIG-150", "jira", "issue", "DBMIG-150 Tune replication for database migration",
-        "Tune replication settings to remove the migration blocker. Status: To Do. Assignee: Priya. Target: before cutover.",
+        "Tune replication settings to remove the migration blocker. Status: To Do. Assignee: Priya. Target: before cutover. "
+        "Due: 2026-10-16. Priority: High.",
         "jira:DBMIG", ["role:DBMIG:developer", "role:DBMIG:lead"],
         {"project": "DBMIG", "roles": ["developer", "lead"], "security_level": None},
-        links=["jira:DBMIG-142"], author="priya@companya.com", version=EDITED),
+        links=["jira:DBMIG-142"], author="priya@companya.com", version=DATED),
     doc("slack:C_DBMIG/thread-1", "slack", "thread", "#db-migration thread: blockers last week",
         "Blockers raised last week on the database migration: replica lag is the main blocker, and the staging "
         "snapshot restore took too long. Platform team is looking at replication tuning.",
@@ -177,15 +185,17 @@ docs = [
         {"project": "PAYINC", "roles": ["developer"], "security_level": None},
         links=["jira:PAYINC-10", "jira:PAYINC-11", "gdrive:postmortem-pay-outage"], author="maya@companya.com"),
     doc("jira:PAYINC-10", "jira", "issue", "PAYINC-10 Add circuit breaker to payment client",
-        "Follow-up to the payment outage: add a circuit breaker to the payment client. Status: In Progress. Assignee: Priya.",
+        "Follow-up to the payment outage: add a circuit breaker to the payment client. Status: In Progress. Assignee: Priya. "
+        "Due: 2026-10-14. Priority: Medium.",
         "jira:PAYINC", ["role:PAYINC:developer"],
         {"project": "PAYINC", "roles": ["developer"], "security_level": None},
-        links=["jira:PAYINC-9"], author="priya@companya.com", version=EDITED),
+        links=["jira:PAYINC-9"], author="priya@companya.com", version=DATED),
     doc("jira:PAYINC-11", "jira", "issue", "PAYINC-11 Raise connection pool alerts",
-        "Follow-up to the payment outage: raise alerts on connection pool saturation. Status: To Do. Assignee: Priya.",
+        "Follow-up to the payment outage: raise alerts on connection pool saturation. Status: To Do. Assignee: Priya. "
+        "Due: 2026-10-09. Priority: Low.",
         "jira:PAYINC", ["role:PAYINC:developer"],
         {"project": "PAYINC", "roles": ["developer"], "security_level": None},
-        links=["jira:PAYINC-9"], author="priya@companya.com", version=EDITED),
+        links=["jira:PAYINC-9"], author="priya@companya.com", version=DATED),
     doc("slack:C_PAYINC/thread-1", "slack", "thread", "#payments-incident thread: outage timeline",
         "Payment outage timeline: errors started at 02:10, the retry storm exhausted the connection pool, "
         "mitigated at 03:05 by restarting workers. Root cause analysis is in the postmortem.",
@@ -206,16 +216,18 @@ docs = [
 
 
 
-def ticket(key, title, body, status, day, author):
+def ticket(key, title, body, status, day, author, due=None, priority=None):
     """Team focus: the rest of a project's board. The author is the assignee. Older than the scenario documents, with no
     links, and worded so that no golden question finds them by keyword (they share a project with the documents those
     questions must cite)."""
     project = key.split("-")[0]
     roles = ["developer", "lead"] if project == "DBMIG" else ["developer"]
-    return doc(f"jira:{key}", "jira", "issue", f"{key} {title}", f"{body} Status: {status}. Assignee: {author.title()}.",
+    return doc(f"jira:{key}", "jira", "issue", f"{key} {title}", f"{body} Status: {status}. Assignee: {author.title()}."
+               + (f" Due: {due}." if due else "") + (f" Priority: {priority}." if priority else ""),
                f"jira:{project}", [f"role:{project}:{r}" for r in roles],
                {"project": project, "roles": roles, "security_level": None},
-               author=f"{author}@{ORG}", updated=f"2026-{day}T10:00:00Z", created=f"2026-{day}T09:00:00Z")
+               author=f"{author}@{ORG}", updated=f"2026-{day}T10:00:00Z", created=f"2026-{day}T09:00:00Z",
+               version=f"2026-{day}T10:00:00Z#2" if due or priority else None)
 
 
 docs += [
@@ -227,15 +239,17 @@ docs += [
     ticket("DBMIG-138", "Shadow traffic rehearsal",
            "One day of writes mirrored to the new cluster and row checksums compared; all matched.", "Done", "10-05", "priya"),
     ticket("DBMIG-147", "Rollback rehearsal on staging",
-           "Practise switching reads back to the old cluster within ten minutes.", "In Review", "10-08", "maya"),
+           "Practise switching reads back to the old cluster within ten minutes.", "In Review", "10-08", "maya",
+           due="2026-10-15", priority="High"),
     ticket("DBMIG-153", "Decommission the old cluster hardware",
-           "Return the old racks once the soak period has passed.", "To Do", "10-07", "maya"),
+           "Return the old racks once the soak period has passed.", "To Do", "10-07", "maya", due="2026-10-30", priority="Low"),
     ticket("PAYINC-12", "Cap client retries with jitter",
            "Limit the client to three attempts with randomised backoff.", "Done", "09-30", "priya"),
     ticket("PAYINC-13", "Dashboard panel for pool saturation",
            "Graph connections in use against the configured limit, per worker.", "Done", "10-06", "priya"),
     ticket("PAYINC-14", "Chaos drill: restart workers under load",
-           "Run the drill in staging and record how long recovery takes.", "In Review", "10-08", "maya"),
+           "Run the drill in staging and record how long recovery takes.", "In Review", "10-08", "maya",
+           due="2026-10-13", priority="Medium"),
     ticket("PAYINC-15", "Share the lessons at the engineering all-hands",
            "Ten-minute slot; slides drafted from the review document.", "To Do", "10-07", "maya"),
 ]

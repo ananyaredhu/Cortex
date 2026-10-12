@@ -1,7 +1,7 @@
 # HTTP API
 
 version: 0.2 (additions for the UI, all optional; proposed by C, approved by A and B on 8 Oct and implemented by the Brain in `brain/api/app.py`)
-**0.3 is proposed (12 Oct, by C) and not yet approved or built.** Everything marked *(0.3, proposed)* below needs A and B to agree before any code: it adds the Brain's first write to a source (moving one's own Jira issue), ticket deadlines and priorities, conversation titles, and routines.
+**0.3 is proposed (12 Oct, by C) and not yet approved.** It is built on the branch `ws-c/ui-adjustments` (the Brain, the Jira simulator and the UI, with tests) so that it can be reviewed running; nothing of it is on `main`. Everything marked *(0.3, proposed)* below needs A and B to agree before it merges: it adds the Brain's first write to a source (moving one's own Jira issue), ticket deadlines and priorities, conversation titles, and routines.
 Producer: Workstream B. Consumer: C (UI, console). The MCP server exposes the same pipeline: see [mcp-tools](mcp-tools.md).
 
 Base path `/v1`. JSON. **Auth:** `Authorization: Bearer <JWT>` from the mock IdP on **every** request (validated per request: signature, expiry, audience). JWT claims: `sub`, `email`, `roles`, `aud`.
@@ -76,6 +76,7 @@ The caller's own conversations, newest first: `{ "conversations": [{"conversatio
 *(0.3, proposed)* **Titles.** Each conversation also carries `title_source`: `"question"`, `"generated"` or `"custom"`, and `title` is the first of these that exists: the name the caller gave it, else a generated title, else the first question (as in 0.2).
 - **A generated title is written from the first question's text and nothing else.** After the first `/ask` of a conversation the Brain asks the generator model for a title of at most 60 characters, giving it only that question: not the answer, not a citation, not a document, not a later turn. The title is therefore made of the caller's own words, is derived from no source, and needs no ACL label ([acl-model](acl-model.md)). A title written from the answer would be a derived artifact and is not allowed here.
 - It is generated for **every** conversation in the same way, whatever the outcome (answered, refused, abstained, unavailable), so a title says nothing about what exists. This does send a refused question's text to the model, which `/ask` itself does not; it is the caller's own text.
+- With no model configured (the template generator, the fixture runtime) the title is the question's own first clause, cut by a rule; the event then names `rules` as its generator.
 - It is generated after `/ask` has answered and never delays it. Until it exists, and if the model fails or times out, `title` is the first question. The model's output is untrusted: the Brain keeps one line of plain text, strips control characters and markup, and cuts it at 60 characters; the UI renders it as text.
 - Titles are stored as `conversation_title` audit events ([audit-event-schema](audit-event-schema.md)), so they are rebuilt from the log like the list itself.
 
@@ -99,6 +100,7 @@ Rules:
 - Someone else's conversation and a nonexistent one both answer `404 {"detail": "no such conversation"}`.
 - An answer is a derived artifact ([acl-model](acl-model.md), labels): it is shown again only if the caller may still open **every** document it cited, by its stored label and a live check. Otherwise `answer` is `null`, `citations` is `[]` and `withheld` is `true`; the question stays. Nothing in a withheld turn names the document that was revoked.
 - Turns carry what the log holds: no `claims`, `freshness`, `coverage` or `grounding`. The UI renders a reopened answer as plain text with its citations.
+- *(0.3, proposed)* A turn that was a routine's run carries `routine_id` (else `null`), so the UI can say which of the caller's routines produced it.
 
 ## `GET /v1/projects` *(0.2, 11 Oct, T7)*
 The caller's projects from the project registry (`brain/projects/registry.json`): `{"projects": [{"project_id", "name", "member", "places"}]}`. `places` are the containers (`jira:DBMIG`, `slack:C_DBMIG`, `confluence:PAY`, `gdrive:folder-incidents`) the caller may open something in; a project none of whose places they may open is absent, and so is any place they cannot open (a private channel under a project they can see). `member` is true when the caller holds one of the project's member tokens, so seeing a project through public pages does not make someone part of it. Another person's projects are never returned. Also returned as `project_profile` in `/mywork`.
@@ -139,11 +141,12 @@ Move one's own Jira issue to another status: the Brain's only write to a source.
 2. The Brain calls the Jira connector's `transition` as the caller ([connector-interface](connector-interface.md) 0.5). Jira applies its own workflow and permissions.
 3. The connector returns the issue as Jira now holds it, and the Brain hands that document to ingestion's ordinary upsert path before answering, so `/v1/team` and `/v1/mywork` show the new status at once and the next sync finds the version it already has. If that re-index fails, the move still happened: the response says `indexed: false`, and the index catches up at the next sync (within the freshness SLA).
 
+`status` must be one line of 1 to 40 characters, else `422`; that check looks at the request alone, before any issue is looked up.
+
 Rules, checked in this order:
 - **May the caller open the issue?** Prefilter, then the live check, as for any read. If not, or the issue does not exist, or `doc_id` is not a Jira issue: `404 {"detail": "no such issue"}`. A forbidden and a nonexistent issue give the same body and similar timing, and this check comes before every other, so nothing below can reveal an issue the caller cannot open.
-- **Is the caller its assignee?** By account, as for `can_move`. If not: `403 {"error": {"code": "not_assignee"}}`. This reveals nothing new: the caller can open the issue and already sees its assignee. An unassigned issue cannot be moved by anyone through Cortex.
-- **Is `status` a status?** A string of 1 to 40 characters, matched without regard to case against the transitions Jira offers for that issue. Otherwise `422`.
-- **Does Jira accept it?** If the workflow does not allow the move, or Jira denies it for its own reasons: `409 {"error": {"code": "transition_refused"}}`, and nothing has changed. If Jira cannot be reached: `503`, nothing has changed, and the Brain does not retry on its own (a retry could apply a move the person has since given up on).
+- **Is the caller its assignee?** By account, as for `can_move`, read from Jira at that moment, not from the index. If not: `403 {"error": {"code": "not_assignee"}}`. This reveals nothing new: the caller can open the issue and already sees its assignee. An unassigned issue cannot be moved by anyone through Cortex.
+- **Does Jira accept it?** `status` is matched without regard to case against the transitions Jira offers for that issue. If the workflow offers no such move (a status it does not have included), or Jira denies it for its own reasons: `409 {"error": {"code": "transition_refused"}}`, and nothing has changed. If Jira cannot be reached: `503 {"error": {"code": "source_unavailable"}}`, nothing is known to have changed, and the Brain does not retry on its own (a retry could apply a move the person has since given up on).
 - Moving an issue to the status it already has is `200` and changes nothing.
 
 Limits:
@@ -175,10 +178,10 @@ A routine is a question its owner has the Brain ask again on a schedule, as them
 
 | Call | Does |
 |---|---|
-| `GET /v1/routines` | The caller's routines: `{"routines": [{"routine_id", "name", "question", "sources", "schedule", "timezone", "status", "paused_reason", "next_run_at", "last_run"}]}`. `last_run` is `{"request_id", "conversation_id", "ran_at", "outcome", "unread"}` or `null`; `outcome` is `answered`, `abstained`, `unavailable` or `skipped`. |
+| `GET /v1/routines` | The caller's routines: `{"routines": [{"routine_id", "name", "question", "sources", "schedule", "timezone", "status", "paused_reason", "next_run_at", "last_run"}]}`. `last_run` is `{"request_id", "conversation_id", "ran_at", "outcome", "unread"}` or `null`; `outcome` is `answered`, `abstained`, `unavailable` or `skipped`. `abstained` covers a refusal too: telling the two apart here would say whether something the owner cannot open exists. `conversation_id` is `null` for a skipped run. |
 | `POST /v1/routines` | Create: `{"name", "question", "sources"?, "schedule", "timezone"}`. `question` has the limits of `/ask`. `422` for a bad schedule or time zone; `409` at the limit of 5 active routines. |
 | `PATCH /v1/routines/{routine_id}` | Change `name`, `question`, `sources`, `schedule` or `timezone`; `{"status": "paused" \| "active"}` pauses and resumes. |
-| `DELETE /v1/routines/{routine_id}` | Delete. Past runs stay in the audit log. |
+| `DELETE /v1/routines/{routine_id}` | Delete: `{"deleted": "<id>"}`. Past runs stay in the audit log. |
 | `POST /v1/routines/{routine_id}/run` | Run now. Answers with the `/v1/ask` response; counts as a normal question. |
 | `GET /v1/routines/{routine_id}/runs` | Past runs, newest first, in the shape of `last_run`. Each opens through `/v1/conversations/{conversation_id}`, which already withholds an answer whose sources the owner can no longer open. |
 
@@ -186,6 +189,10 @@ A routine is a question its owner has the Brain ask again on a schedule, as them
 - **Private.** Another person's routine and a nonexistent one both answer `404 {"detail": "no such routine"}` with similar timing, on every call above. No list, count or admin view names who has routines; Admin shows totals of runs only.
 - A run's stored answer is a derived artifact with ACL labels. `last_run` and `runs` carry no answer text: the text is read through the conversation, under its withholding rule.
 - A run whose owner cannot be resolved (account removed, or a connector failing) is `skipped`. It is never run on an earlier identity.
+- A run is a new conversation of the owner's, titled with the routine's name and the day ("Morning brief · 12 Oct"), and its turn carries `routine_id`.
+- A request body with a field outside those listed is `422`, checked before the routine is looked up, so a bad body is refused alike for one's own routine, someone else's and a missing one.
+- The endpoints are always served. Scheduled runs happen only when the Brain runs with `BRAIN_ROUTINES=1`; "Run now" works either way.
+- `GET /v1/routines-totals` (admin): `{"window_hours": 24, "runs", "unavailable", "skipped"}`. Totals only: no owner, no routine, no question.
 
 ## `GET /v1/explain-access?doc_id=...`
 Why can I see this? Returns `{"found": true, "proof_path": [...]}` for an allowed document. For a forbidden or nonexistent one, returns the uniform `{"found": false}`.
@@ -224,7 +231,7 @@ Stale-answer alerts: answers the user received whose sources changed afterwards 
 Simulator admin endpoints (owned by A) to revoke a permission, restrict a page, edit a document, and add or remove hidden documents (for Leak-CI). Documented in `simulators/README.md`. The stub API has its own: `/sim/advance`, `/sim/reset`, `/sim/tamper`.
 
 ## Changelog
-- 0.3 (proposed 12 Oct, not approved, not built): `POST /v1/issues/move`, the first write to a source, for the assignee's own Jira issue; `updated_at`, `due_date`, `priority` and `can_move` on issues in `/team`, and those plus `assignee` and `mine` in `/mywork`; `title_source`, generated titles (from the first question only) and `PATCH /v1/conversations/{id}`; the routines endpoints and `routines` in `/mywork`.
+- 0.3 (proposed 12 Oct, not approved; built on `ws-c/ui-adjustments`): `POST /v1/issues/move`, the first write to a source, for the assignee's own Jira issue; `updated_at`, `due_date`, `priority` and `can_move` on issues in `/team`, and those plus `assignee` and `mine` in `/mywork`; `title_source`, generated titles (from the first question only) and `PATCH /v1/conversations/{id}`; the routines endpoints and `routines` in `/mywork`.
 - 0.2, 11 Oct: `GET /v1/team` (Team focus) with `assignee` and `mine` per issue, and optional `goal`, `start_date`, `target_date`, `milestone` and `sprint` per project in the registry file.
 - 0.2, 11 Oct: `GET /v1/projects` and `project_profile` in `/mywork` (T7).
 - 0.2, 11 Oct (after the full real-stack run): `/mywork` gains the optional `channel_names` (`{channel id: name}`, taken from the titles of threads the caller may open; a real Slack ID such as `slack:C0C654ZPPB9` says nothing to a reader). `/alerts` and `alerts` in `/mywork` count only the caller's **latest** ask of each question: asking again supersedes the older answers, so they no longer raise an alert.

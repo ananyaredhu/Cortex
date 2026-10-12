@@ -1,6 +1,6 @@
 # Routines: requirement and implementation plan
 
-Status: **proposed** (12 Oct). Nothing here is built. Step 1 of the plan, the contract changes, is written as proposals in `api.md` (0.3, "Routines"), `audit-event-schema.md` and `acl-model.md`, and waits for A and B to approve (AGENTS rule 1).
+Status: **proposed** (12 Oct). Built on the branch `ws-c/ui-adjustments` for review (steps 1 to 9 below, and the Admin totals of step 10); not merged, and off by default (`BRAIN_ROUTINES=1` starts the scheduler). Not built: F8 (the run's own date is not passed to the pipeline), a seeded demo routine, dragging a routine into Current focus, and the daily-brief skill. Step 1 of the plan, the contract changes, is written as proposals in `api.md` (0.3, "Routines"), `audit-event-schema.md` and `acl-model.md`, and waits for A and B to approve (AGENTS rule 1).
 
 ## 1. What it is
 

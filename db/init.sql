@@ -69,3 +69,15 @@ CREATE TABLE IF NOT EXISTS audit_events (
     hash       text NOT NULL UNIQUE
 );
 CREATE INDEX IF NOT EXISTS audit_actor_idx ON audit_events ((actor->>'user_id'), ts);
+
+-- Routines (docs/routines.md): a saved question and its schedule, one row each. Nothing about access is stored: no token,
+-- no token set, no decision. `data` is the whole routine as JSON; the columns beside it are what the scheduler filters on.
+CREATE TABLE IF NOT EXISTS routines (
+    routine_id   TEXT PRIMARY KEY,
+    owner        TEXT NOT NULL,
+    status       TEXT NOT NULL,
+    next_run_at  TEXT,
+    data         JSONB NOT NULL
+);
+CREATE INDEX IF NOT EXISTS routines_owner_idx ON routines (owner);
+CREATE INDEX IF NOT EXISTS routines_due_idx ON routines (status, next_run_at);

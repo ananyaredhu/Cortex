@@ -79,7 +79,7 @@ Audit queries (natural language or structured) are read-only and run **under RBA
 ## Conversations
 `ask` events carry `conversation_id` (the one returned by `/ask`). The Brain keeps no other record of conversations: `/v1/conversations` and `/v1/conversations/{id}` are rebuilt from these events, under the same ownership rule (only the asker's own events), so history survives a restart.
 
-## Proposed events (12 Oct, with api.md 0.3; not approved, not built)
+## Proposed events (12 Oct, with api.md 0.3; not approved; built on `ws-c/ui-adjustments`)
 Four new event types and one new value, all in the hash chain like any other event.
 
 **`issue_transition`**: every call to `POST /v1/issues/move`, whatever its outcome.
@@ -90,15 +90,15 @@ Four new event types and one new value, all in the hash chain like any other eve
                 "acl_snapshot_hash": "sha256:...", "policy_version": "pol-0.3", "doc_version": "...", "jit_checked": true}],
  "transition": {"from": "In Progress", "to": "Done", "outcome": "moved", "indexed": true, "doc_version_after": "..."}}
 ```
-- `outcome`: `moved`, `unchanged` (already in that status), `refused_not_assignee`, `refused_by_source`, `invalid_status` or `source_unavailable`.
+- `outcome`: `moved`, `unchanged` (already in that status), `refused_not_assignee`, `refused_by_source` or `source_unavailable`.
 - When the caller may not open the issue, or it does not exist, the event has the usual denied decision (`doc_id_hash`, salted) and **no** `transition` block: the log records the attempt without naming the issue, as for a denied read.
-- `from` and `doc_version_after` are absent when nothing was read or changed.
+- `from` is absent when Jira could not be read; `indexed` and `doc_version_after` are present only on `moved`.
 
-**`conversation_title`**: `{"event_type": "conversation_title", "conversation_id": "c_1", "actor": {...}, "title": {"text": "DB migration blockers", "source": "generated" | "custom" | "cleared"}}`. A generated title's actor is the conversation's owner with `client: "brain"`, and `models.generator` names the model. `/v1/conversations` takes the newest `custom` title that has not been `cleared`, else the newest `generated` one, else the first question. Only the question's text was given to the model, so the event carries no decisions and no `acl_label`.
+**`conversation_title`**: `{"event_type": "conversation_title", "conversation_id": "c_1", "actor": {...}, "title": {"text": "DB migration blockers", "source": "generated" | "custom" | "cleared"}}`. A generated title's actor is the conversation's owner with `client: "brain"`, and `models.generator` names what wrote it: the model, `rules` when no model is configured or it failed, or `routine` for a routine's run (its title is the routine's name and the day). `/v1/conversations` takes the newest `custom` title that has not been `cleared`, else the newest `generated` one, else the first question. Only the question's text was given to the model, so the event carries no decisions and no `acl_label`.
 
 **`routine_change`**: `{"event_type": "routine_change", "routine_id": "rt_...", "actor": {...}, "routine": {"action": "created" | "updated" | "paused" | "resumed" | "deleted", "question": "...", "schedule": {...}, "timezone": "..."}}`. `question`, `schedule` and `timezone` are present on `created` and `updated`. A pause the Brain makes itself (N3 and N4 in [docs/routines.md](../routines.md)) has `actor.user_id: "system:routines"` and a `reason`.
 
-**`routine_skipped`**: `{"event_type": "routine_skipped", "routine_id": "rt_...", "actor": {"user_id": "system:routines", "client": "brain"}, "routine": {"owner": "<email>", "reason": "identity_unresolved" | "missed" | "limit"}}`, so a routine's history has no silent gaps. Nothing was sent to a model.
+**`routine_skipped`**: `{"event_type": "routine_skipped", "routine_id": "rt_...", "actor": {"user_id": "system:routines", "client": "brain"}, "routine": {"owner": "<email>", "reason": "identity_unresolved" | "missed" | "error"}}`, so a routine's history has no silent gaps. Nothing was sent to a model.
 
 **`ask` events from a routine run** have `actor.client: "routine"` (besides `ui` and `mcp`) and a top-level `routine_id`. `actor.user_id` is the owner, whose identity was resolved for that run. Everything else is as for a typed question, so replay and time-travel treat a run like any other ask.
 

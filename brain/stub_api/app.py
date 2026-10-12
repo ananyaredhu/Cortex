@@ -23,7 +23,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from brain.projects import Registry
-from brain.projects.team import team_focus
+from brain.projects.team import issue_view, team_focus
 from fixtures.loader import State, can_see
 
 app = FastAPI(title="Internal Brain stub API", version="0.1")
@@ -233,7 +233,7 @@ def mywork(authorization: str | None = Header(None)):
     vis = STATE.visible_docs(me["id"])
     return {
         "user": {"display_name": me["display_name"], "roles": me["roles"]},
-        "issues": [{"doc_id": d["doc_id"], "title": d["title"], "url": d["url"], "status": _status(d["body"])}
+        "issues": [issue_view(SimpleNamespace(**d), d["body"], me=me["display_name"], email=me["email"])
                    for d in vis if d["source"] == "jira"],
         "projects": sorted({d["parent_id"] for d in vis if d["source"] == "jira"}),
         "channels": sorted({d["parent_id"] for d in vis if d["source"] == "slack"}),
@@ -260,7 +260,7 @@ def team(authorization: str | None = Header(None)):
     views = Registry.load().views(STATE.persona_tokens[me["id"]], {d["parent_id"] for d in vis})
     names = {p["email"]: p["display_name"] for p in STATE.data["personas"]}
     return {"teams": team_focus(views, [SimpleNamespace(**d) for d in vis], names=names, me=me["display_name"],
-                                text=lambda doc_id: STATE.docs[doc_id]["body"])}
+                                email=me["email"], text=lambda doc_id: STATE.docs[doc_id]["body"])}
 
 
 @app.get("/v1/explain-access")

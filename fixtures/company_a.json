@@ -110,7 +110,8 @@
       "version": "2026-10-10T08:00:00Z#2",
       "fields": {
         "status": "In Progress",
-        "assignee": "Maya"
+        "assignee": "Maya",
+        "assignee_email": "maya@companya.com"
       },
       "tags": [],
       "acl": {
@@ -136,7 +137,7 @@
       "kind": "issue",
       "title": "DBMIG-150 Tune replication for database migration",
       "url": "https://fixtures.invalid/jira/DBMIG-150",
-      "body": "Tune replication settings to remove the migration blocker. Status: To Do. Assignee: Priya. Target: before cutover.",
+      "body": "Tune replication settings to remove the migration blocker. Status: To Do. Assignee: Priya. Target: before cutover. Due: 2026-10-16. Priority: High.",
       "parent_id": "jira:DBMIG",
       "links": [
         "jira:DBMIG-142"
@@ -144,10 +145,13 @@
       "author": "priya@companya.com",
       "created_at": "2026-10-10T00:00:00Z",
       "updated_at": "2026-10-10T08:00:00Z",
-      "version": "2026-10-10T08:00:00Z#2",
+      "version": "2026-10-10T08:00:00Z#3",
       "fields": {
         "status": "To Do",
-        "assignee": "Priya"
+        "assignee": "Priya",
+        "due": "2026-10-16",
+        "priority": "High",
+        "assignee_email": "priya@companya.com"
       },
       "tags": [],
       "acl": {
@@ -338,7 +342,8 @@
       "version": "2026-10-10T08:00:00Z#2",
       "fields": {
         "status": "In Progress",
-        "assignee": "Dana"
+        "assignee": "Dana",
+        "assignee_email": "dana@companya.com"
       },
       "tags": [
         "canary",
@@ -515,7 +520,7 @@
       "kind": "issue",
       "title": "PAYINC-10 Add circuit breaker to payment client",
       "url": "https://fixtures.invalid/jira/PAYINC-10",
-      "body": "Follow-up to the payment outage: add a circuit breaker to the payment client. Status: In Progress. Assignee: Priya.",
+      "body": "Follow-up to the payment outage: add a circuit breaker to the payment client. Status: In Progress. Assignee: Priya. Due: 2026-10-14. Priority: Medium.",
       "parent_id": "jira:PAYINC",
       "links": [
         "jira:PAYINC-9"
@@ -523,10 +528,13 @@
       "author": "priya@companya.com",
       "created_at": "2026-10-10T00:00:00Z",
       "updated_at": "2026-10-10T08:00:00Z",
-      "version": "2026-10-10T08:00:00Z#2",
+      "version": "2026-10-10T08:00:00Z#3",
       "fields": {
         "status": "In Progress",
-        "assignee": "Priya"
+        "assignee": "Priya",
+        "due": "2026-10-14",
+        "priority": "Medium",
+        "assignee_email": "priya@companya.com"
       },
       "tags": [],
       "acl": {
@@ -550,7 +558,7 @@
       "kind": "issue",
       "title": "PAYINC-11 Raise connection pool alerts",
       "url": "https://fixtures.invalid/jira/PAYINC-11",
-      "body": "Follow-up to the payment outage: raise alerts on connection pool saturation. Status: To Do. Assignee: Priya.",
+      "body": "Follow-up to the payment outage: raise alerts on connection pool saturation. Status: To Do. Assignee: Priya. Due: 2026-10-09. Priority: Low.",
       "parent_id": "jira:PAYINC",
       "links": [
         "jira:PAYINC-9"
@@ -558,10 +566,13 @@
       "author": "priya@companya.com",
       "created_at": "2026-10-10T00:00:00Z",
       "updated_at": "2026-10-10T08:00:00Z",
-      "version": "2026-10-10T08:00:00Z#2",
+      "version": "2026-10-10T08:00:00Z#3",
       "fields": {
         "status": "To Do",
-        "assignee": "Priya"
+        "assignee": "Priya",
+        "due": "2026-10-09",
+        "priority": "Low",
+        "assignee_email": "priya@companya.com"
       },
       "tags": [],
       "acl": {
@@ -693,7 +704,8 @@
       "version": "2026-09-22T10:00:00Z",
       "fields": {
         "status": "Done",
-        "assignee": "Maya"
+        "assignee": "Maya",
+        "assignee_email": "maya@companya.com"
       },
       "tags": [],
       "acl": {
@@ -728,7 +740,8 @@
       "version": "2026-09-29T10:00:00Z",
       "fields": {
         "status": "Done",
-        "assignee": "Priya"
+        "assignee": "Priya",
+        "assignee_email": "priya@companya.com"
       },
       "tags": [],
       "acl": {
@@ -763,7 +776,8 @@
       "version": "2026-10-05T10:00:00Z",
       "fields": {
         "status": "Done",
-        "assignee": "Priya"
+        "assignee": "Priya",
+        "assignee_email": "priya@companya.com"
       },
       "tags": [],
       "acl": {
@@ -789,16 +803,19 @@
       "kind": "issue",
       "title": "DBMIG-147 Rollback rehearsal on staging",
       "url": "https://fixtures.invalid/jira/DBMIG-147",
-      "body": "Practise switching reads back to the old cluster within ten minutes. Status: In Review. Assignee: Maya.",
+      "body": "Practise switching reads back to the old cluster within ten minutes. Status: In Review. Assignee: Maya. Due: 2026-10-15. Priority: High.",
       "parent_id": "jira:DBMIG",
       "links": [],
       "author": "maya@companya.com",
       "created_at": "2026-10-08T09:00:00Z",
       "updated_at": "2026-10-08T10:00:00Z",
-      "version": "2026-10-08T10:00:00Z",
+      "version": "2026-10-08T10:00:00Z#2",
       "fields": {
         "status": "In Review",
-        "assignee": "Maya"
+        "assignee": "Maya",
+        "due": "2026-10-15",
+        "priority": "High",
+        "assignee_email": "maya@companya.com"
       },
       "tags": [],
       "acl": {
@@ -824,16 +841,19 @@
       "kind": "issue",
       "title": "DBMIG-153 Decommission the old cluster hardware",
       "url": "https://fixtures.invalid/jira/DBMIG-153",
-      "body": "Return the old racks once the soak period has passed. Status: To Do. Assignee: Maya.",
+      "body": "Return the old racks once the soak period has passed. Status: To Do. Assignee: Maya. Due: 2026-10-30. Priority: Low.",
       "parent_id": "jira:DBMIG",
       "links": [],
       "author": "maya@companya.com",
       "created_at": "2026-10-07T09:00:00Z",
       "updated_at": "2026-10-07T10:00:00Z",
-      "version": "2026-10-07T10:00:00Z",
+      "version": "2026-10-07T10:00:00Z#2",
       "fields": {
         "status": "To Do",
-        "assignee": "Maya"
+        "assignee": "Maya",
+        "due": "2026-10-30",
+        "priority": "Low",
+        "assignee_email": "maya@companya.com"
       },
       "tags": [],
       "acl": {
@@ -868,7 +888,8 @@
       "version": "2026-09-30T10:00:00Z",
       "fields": {
         "status": "Done",
-        "assignee": "Priya"
+        "assignee": "Priya",
+        "assignee_email": "priya@companya.com"
       },
       "tags": [],
       "acl": {
@@ -901,7 +922,8 @@
       "version": "2026-10-06T10:00:00Z",
       "fields": {
         "status": "Done",
-        "assignee": "Priya"
+        "assignee": "Priya",
+        "assignee_email": "priya@companya.com"
       },
       "tags": [],
       "acl": {
@@ -925,16 +947,19 @@
       "kind": "issue",
       "title": "PAYINC-14 Chaos drill: restart workers under load",
       "url": "https://fixtures.invalid/jira/PAYINC-14",
-      "body": "Run the drill in staging and record how long recovery takes. Status: In Review. Assignee: Maya.",
+      "body": "Run the drill in staging and record how long recovery takes. Status: In Review. Assignee: Maya. Due: 2026-10-13. Priority: Medium.",
       "parent_id": "jira:PAYINC",
       "links": [],
       "author": "maya@companya.com",
       "created_at": "2026-10-08T09:00:00Z",
       "updated_at": "2026-10-08T10:00:00Z",
-      "version": "2026-10-08T10:00:00Z",
+      "version": "2026-10-08T10:00:00Z#2",
       "fields": {
         "status": "In Review",
-        "assignee": "Maya"
+        "assignee": "Maya",
+        "due": "2026-10-13",
+        "priority": "Medium",
+        "assignee_email": "maya@companya.com"
       },
       "tags": [],
       "acl": {
@@ -967,7 +992,8 @@
       "version": "2026-10-07T10:00:00Z",
       "fields": {
         "status": "To Do",
-        "assignee": "Maya"
+        "assignee": "Maya",
+        "assignee_email": "maya@companya.com"
       },
       "tags": [],
       "acl": {

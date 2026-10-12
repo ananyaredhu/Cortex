@@ -7,17 +7,19 @@ import json
 import queue
 import threading
 from collections.abc import Iterator
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from brain.auth import Authenticator, AuthError, Principal, mint_token
 from brain.config import ADMIN_ROLES, COMPLIANCE_ROLE, POLICY_VERSION
 from brain.pipeline.graph import AskRequest
+from brain.policy.writes import valid_status
+from brain.routines.service import RoutineError
 from brain.runtime import Runtime
 from fixtures.loader import load
 
@@ -30,6 +32,15 @@ class AskBody(BaseModel):
     skill_hint: str | None = None
     sources: list[str] | None = None
     time_range: str | None = None
+
+
+class RenameBody(BaseModel):
+    title: str | None
+
+
+class MoveBody(BaseModel):
+    doc_id: str
+    status: str
 
 
 class EvaluateBody(BaseModel):
@@ -164,6 +175,19 @@ def create_app(runtime: Runtime) -> FastAPI:
         out = runtime.brain.conversation(p, conversation_id)
         if out is None:                                    # someone else's or nonexistent: the same answer
             raise HTTPException(404, "no such conversation")
+        if runtime.routines is not None:
+            runtime.routines.note_opened(p, conversation_id)   # a routine's latest run, once opened, is no longer unread
+        return out
+
+    @app.patch("/v1/conversations/{conversation_id}")
+    def rename_conversation(conversation_id: str, body: RenameBody, p: Current):
+        """Name one's own conversation; `null` goes back to the generated title (api.md 0.3)."""
+        try:
+            out = runtime.brain.rename_conversation(p, conversation_id, body.title)
+        except ValueError:
+            raise HTTPException(422, "`title` must be 1 to 80 characters on one line, or null") from None
+        if out is None:                                    # someone else's or nonexistent: the same answer
+            raise HTTPException(404, "no such conversation")
         return out
 
     # -- my work, access, alerts --------------------------------------------------------------
@@ -172,7 +196,7 @@ def create_app(runtime: Runtime) -> FastAPI:
         vis = runtime.brain.visible_documents(p)
         return {
             "user": {"display_name": p.display_name or p.email, "roles": list(p.roles)},
-            "issues": [{"doc_id": d.doc_id, "title": d.title, "url": d.url, "status": None} for d in vis if d.source == "jira"],
+            "issues": runtime.brain.my_issues(p, vis, names),
             "projects": sorted({d.parent_id for d in vis if d.source == "jira" and d.parent_id}),
             "channels": sorted({d.parent_id for d in vis if d.source == "slack" and d.parent_id}),
             "channel_names": channel_names((d.parent_id, d.title) for d in vis if d.source == "slack" and d.parent_id),
@@ -181,6 +205,7 @@ def create_app(runtime: Runtime) -> FastAPI:
             "project_profile": runtime.brain.project_profile(p),
             "suggested_questions": suggestions.get(p.email, []),
             "alerts": runtime.brain.alerts(p),
+            "routines": runtime.routines.mine(p) if runtime.routines is not None else [],
         }
 
     @app.get("/v1/projects")
@@ -192,6 +217,61 @@ def create_app(runtime: Runtime) -> FastAPI:
     def team(p: Current):
         """Team focus: the projects the caller is a member of, each counted only from documents they may open."""
         return {"teams": runtime.brain.team_focus(p, names)}
+
+    # -- routines (api.md 0.3, docs/routines.md): private to their owner; someone else's and a missing one answer alike --
+    def routines():
+        if runtime.routines is None:
+            raise HTTPException(404, "no such routine")
+        return runtime.routines
+
+    def stored(change):
+        try:
+            return change()
+        except RoutineError as exc:
+            raise HTTPException(409 if exc.code == "limit" else 422, str(exc)) from None
+
+    def found(out):
+        if out is None or out is False:
+            raise HTTPException(404, "no such routine")
+        return out
+
+    @app.get("/v1/routines")
+    def list_routines(p: Current):
+        return {"routines": runtime.routines.mine(p) if runtime.routines is not None else []}
+
+    @app.post("/v1/routines")
+    def create_routine(body: dict, p: Current):
+        return stored(lambda: routines().create(p, body))
+
+    @app.patch("/v1/routines/{routine_id}")
+    def update_routine(routine_id: str, body: dict, p: Current):
+        return found(stored(lambda: routines().update(p, routine_id, body)))
+
+    @app.delete("/v1/routines/{routine_id}")
+    def delete_routine(routine_id: str, p: Current):
+        found(routines().delete(p, routine_id))
+        return {"deleted": routine_id}
+
+    @app.post("/v1/routines/{routine_id}/run")
+    def run_routine(routine_id: str, p: Current):
+        """Run now: an ordinary question from the caller, marked as this routine's. Answers like `/v1/ask`."""
+        return found(routines().run_now(p, routine_id))
+
+    @app.get("/v1/routines/{routine_id}/runs")
+    def routine_runs(routine_id: str, p: Current):
+        out = routines().runs(p, routine_id)
+        if out is None:
+            raise HTTPException(404, "no such routine")
+        return {"runs": out}
+
+    @app.post("/v1/issues/move")
+    def move_issue(body: MoveBody, p: Current):
+        """Move one's own Jira issue to another status: the Brain's only write to a source (api.md 0.3). The caller must be
+        able to open the issue and be its assignee; a forbidden and a nonexistent issue get the same 404."""
+        if not valid_status(body.status):
+            raise HTTPException(422, "`status` must be 1 to 40 characters on one line")
+        code, out = runtime.brain.move_issue(p, body.doc_id, body.status)
+        return JSONResponse(out, status_code=code)
 
     @app.get("/v1/explain-access")
     def explain_access(doc_id: str, p: Current):
@@ -245,6 +325,14 @@ def create_app(runtime: Runtime) -> FastAPI:
         if store is None:
             return {"as_of": _now(), "window_hours": 24, "sources": {}}
         return report(store)
+
+    @app.get("/v1/routines-totals")
+    def routine_totals(p: Current):
+        """Admin: how many routine runs happened, failed and were skipped in the last day. Totals only (N6)."""
+        require(p, ADMIN_ROLES)
+        since = datetime.now(UTC) - timedelta(days=1)
+        return {"window_hours": 24, **(runtime.routines.totals(since) if runtime.routines is not None
+                                       else {"runs": 0, "unavailable": 0, "skipped": 0})}
 
     @app.get("/v1/leakci/latest")
     def leakci(p: Current):
