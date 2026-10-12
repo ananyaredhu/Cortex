@@ -8,6 +8,7 @@ import { PersonaProvider } from "../auth/PersonaContext";
 import { HomePage } from "../home/HomePage";
 import { scheduleText, whenIn } from "../routines/format";
 import { RoutinesPage } from "../routines/RoutinesPage";
+import { TEMPLATES } from "../routines/templates";
 
 const BRIEF: Routine = {
   routine_id: "rt_1",
@@ -65,7 +66,7 @@ it("lists a routine with its schedule, next run and last outcome, and no answer 
   serve({ routines: [BRIEF] });
   renderPage();
   const item = await screen.findByRole("listitem", { name: "Morning brief" });
-  expect(item).toHaveTextContent("“Summarise what needs my focus today.”");
+  expect(item).toHaveTextContent("Summarise what needs my focus today.");
   expect(item).toHaveTextContent("Every weekday at 09:00 (Asia/Singapore) · next Tue 13 Oct, 09:00");
   expect(item).toHaveTextContent("Last run Mon 12 Oct, 09:00: Answered.");
   expect(within(item).getByRole("img", { name: "Unread" })).toBeInTheDocument();
@@ -75,12 +76,12 @@ it("lists a routine with its schedule, next run and last outcome, and no answer 
 it("creates a routine from fixed fields", async () => {
   const calls = serve({ routines: [] });
   renderPage();
-  expect(await screen.findByText(/No routines yet/)).toBeInTheDocument();
-  await userEvent.click(screen.getByRole("button", { name: "New routine" }));
+  expect(await screen.findByRole("heading", { name: "You have no routines yet" })).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "Create your first routine" }));
   const form = screen.getByRole("dialog", { name: "New routine" });
   expect(within(form).getByRole("button", { name: "Create routine" })).toBeDisabled();
   await userEvent.type(within(form).getByLabelText("Name"), "Friday wrap-up");
-  await userEvent.type(within(form).getByLabelText("Question"), "What changed in the migration this week?");
+  await userEvent.type(within(form).getByLabelText("Instructions"), "What changed in the migration this week?");
   await userEvent.selectOptions(within(form).getByLabelText("Repeats"), "weekly");
   await userEvent.selectOptions(within(form).getByLabelText("On"), "Friday");
   await userEvent.clear(within(form).getByLabelText("Time zone"));
@@ -96,12 +97,50 @@ it("creates a routine from fixed fields", async () => {
   await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
 }, 20_000); // a dozen typed fields: slow on a busy machine
 
+it("offers templates that fill the form, every field still editable, and returns to the list once saved", async () => {
+  const calls = serve({ routines: [] });
+  renderPage();
+  await userEvent.click(await screen.findByRole("button", { name: "Start from a template" }));
+  expect(screen.getByRole("tab", { name: "Templates" })).toHaveAttribute("aria-selected", "true");
+  expect(screen.getAllByRole("listitem")).toHaveLength(TEMPLATES.length);
+  await userEvent.click(screen.getByRole("button", { name: /Week ahead/ }));
+  const form = screen.getByRole("dialog", { name: "New routine" });
+  expect(within(form).getByLabelText("Name")).toHaveValue("Week ahead");
+  expect((within(form).getByLabelText("Instructions") as HTMLTextAreaElement).value).toMatch(/^Plan my week\.\n1\. /);
+  expect(within(form).getByLabelText("Repeats")).toHaveValue("weekly");
+  expect(within(form).getByLabelText("On")).toHaveValue("0");
+  expect(within(form).getByRole("checkbox", { name: "Jira" })).toBeChecked();
+  await userEvent.clear(within(form).getByLabelText("Name"));
+  await userEvent.type(within(form).getByLabelText("Name"), "My week");
+  await userEvent.click(within(form).getByRole("button", { name: "Create routine" }));
+  expect(calls).toHaveLength(1);
+  expect(calls[0][2]).toMatchObject({ name: "My week", sources: ["jira"], schedule: { frequency: "weekly", weekday: 0, time: "09:00" } });
+  await waitFor(() => expect(screen.getByRole("tab", { name: "Yours" })).toHaveAttribute("aria-selected", "true"));
+});
+
+it("keeps every template inside what a routine may be", () => {
+  expect(new Set(TEMPLATES.map((t) => t.id)).size).toBe(TEMPLATES.length);
+  for (const t of TEMPLATES) {
+    expect(t.name.length).toBeLessThanOrEqual(80);
+    expect(t.instructions.length).toBeLessThanOrEqual(2000);
+    expect(t.schedule.time).toMatch(/^\d\d:\d\d$/);
+    expect(t.schedule.weekday === null).toBe(t.schedule.frequency !== "weekly");
+  }
+});
+
+it("says the Brain has no routines when the list is a 404, not a bare Not Found", async () => {
+  serve({ routines: [] }, () => new Response(JSON.stringify({ detail: "Not Found" }), { status: 404 }));
+  renderPage();
+  expect(await screen.findByText(/This Brain does not serve routines yet/, {}, { timeout: 12_000 })).toBeInTheDocument(); // after the query's retries
+  expect(screen.queryByText("Not Found")).not.toBeInTheDocument();
+}, 15_000);
+
 it("says so when the limit of five is reached, and keeps the form open", async () => {
   serve({ routines: [] }, (method) => (method === "POST" ? new Response(JSON.stringify({ detail: "at most 5 active routines" }), { status: 409 }) : undefined));
   renderPage();
   await userEvent.click(await screen.findByRole("button", { name: "New routine" }));
   await userEvent.type(screen.getByLabelText("Name"), "Sixth");
-  await userEvent.type(screen.getByLabelText("Question"), "Anything new?");
+  await userEvent.type(screen.getByLabelText("Instructions"), "Anything new?");
   await userEvent.click(screen.getByRole("button", { name: "Create routine" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("You already have five active routines");
   expect(screen.getByRole("dialog")).toBeInTheDocument();

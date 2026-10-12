@@ -60,9 +60,10 @@ def write(tmp_path: Path, text: str, name: str = "demo") -> Path:
 
 
 # -- loading and validation --------------------------------------------------------------------------------------------------
-def test_the_four_skills_load_with_pinned_hashes():
+def test_the_skills_load_with_pinned_hashes():
     registry = Registry.load()
-    assert sorted(registry.skills) == ["audit-inquiry", "design-discussion-summary", "incident-investigation", "status-and-blockers"]
+    assert sorted(registry.skills) == ["audit-inquiry", "design-discussion-summary", "incident-investigation", "my-work",
+                                       "status-and-blockers"]
     assert all(len(s.sha256) == 64 and s.version == 1 and s.procedure.startswith("# Procedure") for s in registry.skills.values())
     assert Registry.load().skills["status-and-blockers"].sha256 == registry.skills["status-and-blockers"].sha256
 

@@ -8,14 +8,23 @@ import { SOURCE_LABEL } from "../components/SourceGlyph";
 import { browserZone, WEEKDAYS } from "./format";
 import "./routines.css";
 
+const PLACEHOLDER = [
+  "What Cortex should do on each run, step by step. For example:",
+  "1. List my open tickets, most urgent first.",
+  "2. Say what changed since yesterday.",
+].join("\n");
+
 export interface RoutineSeed {
+  name?: string;
   question?: string;
   sources?: Source[];
+  schedule?: RoutineSchedule;
 }
 
 /**
- * The one form for a routine: new (from the Routines list, the Ask composer or an answer) or an existing one being
- * edited. The schedule is fixed fields, never free text: nothing parses "every other Tuesday", and no model sees it
+ * The one form for a routine: new (from the Routines list, a template, the Ask composer or an answer) or an existing one
+ * being edited. What the person writes is instructions for a run; on the wire it is still the routine's `question`
+ * (api.md 0.3), and a run is still an ordinary question. The schedule is fixed fields, never free text: nothing parses "every other Tuesday", and no model sees it
  * (docs/routines.md, F3).
  */
 export function RoutineForm({
@@ -23,19 +32,21 @@ export function RoutineForm({
   routine,
   seed,
   onClose,
+  onSaved,
 }: {
   persona: PersonaId;
   routine?: Routine; // editing this one
-  seed?: RoutineSeed; // or a new one, starting from this question
+  seed?: RoutineSeed; // or a new one, starting from a template or a question
   onClose: () => void;
+  onSaved?: () => void;
 }) {
   const qc = useQueryClient();
   const id = useId();
   const first = useRef<HTMLInputElement>(null);
-  const [name, setName] = useState(routine?.name ?? "");
+  const [name, setName] = useState(routine?.name ?? seed?.name ?? "");
   const [question, setQuestion] = useState(routine?.question ?? seed?.question ?? "");
   const [sources, setSources] = useState<Source[]>(routine?.sources ?? seed?.sources ?? []);
-  const [schedule, setSchedule] = useState<RoutineSchedule>(routine?.schedule ?? { frequency: "weekdays", weekday: null, time: "09:00" });
+  const [schedule, setSchedule] = useState<RoutineSchedule>(routine?.schedule ?? seed?.schedule ?? { frequency: "weekdays", weekday: null, time: "09:00" });
   const [timezone, setTimezone] = useState(routine?.timezone ?? browserZone());
 
   useEffect(() => {
@@ -53,6 +64,7 @@ export function RoutineForm({
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["routines", persona] });
       qc.invalidateQueries({ queryKey: ["mywork", persona] });
+      onSaved?.();
       onClose();
     },
   });
@@ -84,15 +96,22 @@ export function RoutineForm({
           </button>
         </header>
         <p className="muted small">
-          Cortex asks this question for you on the schedule, as you, and keeps the answer here. Each run is checked against
-          what you can open at that moment.
+          Cortex follows these instructions for you on the schedule, as you, and keeps the result here. Each run is checked
+          against what you can open at that moment.
         </p>
 
         <label htmlFor={`${id}-name`}>Name</label>
         <input id={`${id}-name`} ref={first} value={name} maxLength={80} placeholder="Morning brief" onChange={(e) => setName(e.target.value)} />
 
-        <label htmlFor={`${id}-q`}>Question</label>
-        <textarea id={`${id}-q`} rows={3} value={question} maxLength={2000} onChange={(e) => setQuestion(e.target.value)} />
+        <label htmlFor={`${id}-q`}>Instructions</label>
+        <textarea
+          id={`${id}-q`}
+          rows={6}
+          value={question}
+          maxLength={2000}
+          placeholder={PLACEHOLDER}
+          onChange={(e) => setQuestion(e.target.value)}
+        />
 
         <div className="routine-form__row">
           <div>

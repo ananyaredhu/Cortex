@@ -16,6 +16,7 @@ import hashlib
 import json
 import re
 from collections.abc import Iterator
+from datetime import UTC, datetime
 from types import SimpleNamespace
 
 from fastapi import FastAPI, Header, HTTPException
@@ -24,6 +25,7 @@ from pydantic import BaseModel
 
 from brain.projects import Registry
 from brain.projects.team import issue_view, team_focus
+from brain.routines import schedule as routine_schedule
 from fixtures.loader import State, can_see
 
 app = FastAPI(title="Internal Brain stub API", version="0.1")
@@ -32,6 +34,8 @@ AUDIT: list[dict] = []
 ANSWERED: dict[str, list[dict]] = {}   # persona -> [{request_id, question, doc_ids}]
 CONVERSATIONS: dict[str, dict[str, dict]] = {}   # persona -> conversation_id -> {title, last_asked_at}
 SOURCE_STATUS: dict[str, str] = {}   # source -> "stale" | "unavailable" (absent: "ok"), set by /sim/source-status
+ROUTINES: dict[str, list[dict]] = {}   # persona -> their routines (api.md 0.3); the stub runs one only on "run now"
+MAX_ACTIVE_ROUTINES = 5
 SALT = "stub-salt"
 REFUSAL = "I couldn't find anything you have access to about that."
 SOURCES = ("confluence", "jira", "slack", "gdrive")
@@ -244,7 +248,99 @@ def mywork(authorization: str | None = Header(None)):
                                          key=lambda x: x["updated_at"], reverse=True)[:5]],
         "suggested_questions": [g["question"] for g in STATE.data["golden"] if g["persona"] == me["id"]][:3],
         "alerts": alerts(authorization)["alerts"],
+        "routines": ROUTINES.get(me["id"], []),
     }
+
+
+# -- routines (api.md 0.3, docs/routines.md). Stub: no scheduler and no run history; "run now" is an ordinary stub answer.
+def _routine_fields(body: dict, *, patch: bool = False) -> dict:
+    allowed = {"name", "question", "sources", "schedule", "timezone"} | ({"status"} if patch else set())
+    if not isinstance(body, dict) or set(body) - allowed or (not patch and {"name", "question", "schedule", "timezone"} - set(body)):
+        raise HTTPException(422, "a routine has name, question, sources, schedule and timezone")
+    out = dict(body)
+    for field, limit in (("name", 80), ("question", 2000)):
+        if field in out and not (isinstance(out[field], str) and 0 < len(out[field].strip()) <= limit):
+            raise HTTPException(422, f"{field} must be 1 to {limit} characters")
+    if "sources" in out and not (isinstance(out["sources"], list) and set(out["sources"]) <= set(SOURCES)):
+        raise HTTPException(422, "sources must be a list of known sources")
+    if out.get("status", "active") not in ("active", "paused"):
+        raise HTTPException(422, "status must be active or paused")
+    try:
+        if "schedule" in out:
+            out["schedule"] = routine_schedule.parse(out["schedule"]).as_json()
+        if "timezone" in out:
+            routine_schedule.zone(out["timezone"])
+    except routine_schedule.ScheduleError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    return out
+
+
+def _next_run(r: dict) -> str | None:
+    if r["status"] != "active":
+        return None
+    moment = routine_schedule.next_run(routine_schedule.parse(r["schedule"]), r["timezone"], datetime.now(UTC))
+    return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _routine(me: dict, routine_id: str) -> dict:
+    r = next((x for x in ROUTINES.get(me["id"], []) if x["routine_id"] == routine_id), None)
+    if r is None:   # someone else's and a missing one answer alike
+        raise HTTPException(404, "no such routine")
+    return r
+
+
+def _at_limit(me: dict) -> bool:
+    return sum(r["status"] == "active" for r in ROUTINES.get(me["id"], [])) >= MAX_ACTIVE_ROUTINES
+
+
+@app.get("/v1/routines")
+def list_routines(authorization: str | None = Header(None)):
+    return {"routines": ROUTINES.get(_persona(authorization)["id"], [])}
+
+
+@app.post("/v1/routines")
+def create_routine(body: dict, authorization: str | None = Header(None)):
+    me = _persona(authorization)
+    fields = _routine_fields(body)
+    if _at_limit(me):
+        raise HTTPException(409, f"at most {MAX_ACTIVE_ROUTINES} active routines")
+    r = {"routine_id": f"rt_{sum(len(v) for v in ROUTINES.values()) + len(AUDIT) + 1}", "sources": [], **fields,
+         "status": "active", "paused_reason": None, "next_run_at": None, "last_run": None}
+    r["next_run_at"] = _next_run(r)
+    ROUTINES.setdefault(me["id"], []).append(r)
+    return r
+
+
+@app.patch("/v1/routines/{routine_id}")
+def update_routine(routine_id: str, body: dict, authorization: str | None = Header(None)):
+    me = _persona(authorization)
+    fields = _routine_fields(body, patch=True)   # before the lookup: a bad body is refused alike for any routine id
+    r = _routine(me, routine_id)
+    if fields.get("status") == "active" and r["status"] == "paused" and _at_limit(me):
+        raise HTTPException(409, f"at most {MAX_ACTIVE_ROUTINES} active routines")
+    r.update(fields)
+    r["paused_reason"], r["next_run_at"] = None, _next_run(r)
+    return r
+
+
+@app.delete("/v1/routines/{routine_id}")
+def delete_routine(routine_id: str, authorization: str | None = Header(None)):
+    me = _persona(authorization)
+    r = _routine(me, routine_id)
+    ROUTINES[me["id"]].remove(r)
+    return {"deleted": routine_id}
+
+
+@app.post("/v1/routines/{routine_id}/run")
+def run_routine(routine_id: str, authorization: str | None = Header(None)):
+    me = _persona(authorization)
+    r = _routine(me, routine_id)
+    result = _answer(me, AskBody(question=r["question"], sources=r["sources"] or None))
+    # A refusal reads as "abstained": telling the two apart would say whether something hidden exists (api.md 0.3).
+    r["last_run"] = {"request_id": result["request_id"], "conversation_id": result["conversation_id"],
+                     "ran_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                     "outcome": "abstained" if result["refused"] else "answered", "unread": False}
+    return result
 
 
 def _status(body: str) -> str | None:
@@ -458,6 +554,7 @@ def sim_reset():
     ANSWERED.clear()
     CONVERSATIONS.clear()
     SOURCE_STATUS.clear()
+    ROUTINES.clear()
     return {"ok": True}
 
 

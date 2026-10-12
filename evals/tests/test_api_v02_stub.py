@@ -178,3 +178,46 @@ def test_an_audit_question_that_names_nothing_asks_for_more_and_runs_nothing():
 def test_the_audit_question_is_for_the_compliance_role_only():
     assert client.post("/v1/audit/ask", json={"question": "What did Priya access?"}, headers=H("sam")).status_code == 403
 
+
+# -- routines (api.md 0.3): the stub serves them so the UI's Routines page works without the real Brain ------------------
+ROUTINE = {"name": "Morning brief", "question": BREACH, "sources": [],
+           "schedule": {"frequency": "weekdays", "weekday": None, "time": "09:00"}, "timezone": "Asia/Singapore"}
+
+
+def test_routines_start_empty_and_are_created_edited_paused_and_deleted():
+    assert client.get("/v1/routines", headers=H("priya")).json() == {"routines": []}
+    made = client.post("/v1/routines", json=ROUTINE, headers=H("priya")).json()
+    assert made["status"] == "active" and made["next_run_at"] and made["last_run"] is None
+    rid = made["routine_id"]
+    assert client.get("/v1/mywork", headers=H("priya")).json()["routines"][0]["routine_id"] == rid
+    paused = client.patch(f"/v1/routines/{rid}", json={"status": "paused", "name": "Brief"}, headers=H("priya")).json()
+    assert (paused["status"], paused["name"], paused["next_run_at"]) == ("paused", "Brief", None)
+    assert client.delete(f"/v1/routines/{rid}", headers=H("priya")).json() == {"deleted": rid}
+    assert client.get("/v1/routines", headers=H("priya")).json() == {"routines": []}
+
+
+def test_routine_bodies_are_checked_and_the_sixth_is_refused():
+    bad = [{**ROUTINE, "schedule": {"frequency": "hourly", "weekday": None, "time": "09:00"}},
+           {**ROUTINE, "timezone": "Not/AZone"}, {**ROUTINE, "owner": "someone"}, {**ROUTINE, "question": " "}]
+    assert [client.post("/v1/routines", json=b, headers=H("priya")).status_code for b in bad] == [422] * 4
+    codes = [client.post("/v1/routines", json=ROUTINE, headers=H("priya")).status_code for _ in range(6)]
+    assert codes == [200] * 5 + [409]
+
+
+def test_someone_elses_routine_and_a_missing_one_answer_alike():
+    rid = client.post("/v1/routines", json=ROUTINE, headers=H("priya")).json()["routine_id"]
+    assert client.get("/v1/routines", headers=H("sam")).json() == {"routines": []}
+    for call in (lambda i: client.patch(f"/v1/routines/{i}", json={"status": "paused"}, headers=H("sam")),
+                 lambda i: client.delete(f"/v1/routines/{i}", headers=H("sam")),
+                 lambda i: client.post(f"/v1/routines/{i}/run", headers=H("sam"))):
+        theirs, missing = call(rid), call("rt_nope")
+        assert (theirs.status_code, theirs.json()) == (missing.status_code, missing.json()) == (404, {"detail": "no such routine"})
+
+
+def test_run_now_is_an_ordinary_answer_as_the_caller_and_a_refusal_reads_as_abstained():
+    for persona, outcome in (("jordan", "answered"), ("sam", "abstained")):
+        rid = client.post("/v1/routines", json=ROUTINE, headers=H(persona)).json()["routine_id"]
+        run = client.post(f"/v1/routines/{rid}/run", headers=H(persona)).json()
+        assert _uniform(run) == _uniform(_ask(persona, BREACH))
+        last = client.get("/v1/routines", headers=H(persona)).json()["routines"][0]["last_run"]
+        assert (last["request_id"], last["outcome"]) == (run["request_id"], outcome)

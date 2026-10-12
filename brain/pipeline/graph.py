@@ -36,7 +36,7 @@ from brain.policy.pdp import PDP, Decision, hash_denied, source_of
 from brain.policy.writes import is_assignee
 from brain.projects import EXTRA_CANDIDATES, PROJECT_BOOST, ProjectView
 from brain.projects import Registry as ProjectRegistry
-from brain.projects.team import issue_view, status_of, team_focus
+from brain.projects.team import DONE, assignee_of, issue_view, status_of, team_focus
 from brain.retrieval import Candidate, IndexReader, hybrid_search, query_terms
 from brain.skills import Registry, Skill
 from connectors.base import Connector, Document, DocumentNotFound, TransitionRefused
@@ -50,6 +50,7 @@ NODE_STAGE = {"identity": "retrieve", "understand": "retrieve", "retrieve": "ret
               "generate": "generate", "check": "check", "finalize": "check", "audit": "check"}
 UNVERIFIED = "freshness_unverified"      # evidence whose live version check failed; the indexed copy was served
 TEAM_DOCS = 500              # documents read per caller for Team focus; its counts cover at most this many
+MY_ISSUES = 8                # the asker's own issues a "my work" skill adds to the candidates (skills-format, `adds`)
 STALE_AFTER_S = 300          # a source whose last successful pass is older than this is reported "stale"
 
 
@@ -320,8 +321,44 @@ class Brain:
                 vector = None
         candidates = hybrid_search(self.index, state["search_query"], asker.tokens, searched, vector=vector, model=model,
                                    candidates=self.settings.candidates, max_distance=self.settings.max_vector_distance)
-        return {"searched": searched, "unavailable": unavailable, "terms": terms,
-                "candidates": self._with_projects(candidates, state.get("resolved") or [], asker, searched)}
+        candidates = self._with_projects(candidates, state.get("resolved") or [], asker, searched)
+        if skill and "my_issues" in skill.adds:
+            candidates = self._with_my_issues(candidates, state["principal"], asker, searched)
+        return {"searched": searched, "unavailable": unavailable, "terms": terms, "candidates": candidates}
+
+    def _with_my_issues(self, candidates: list[Candidate], principal: Principal, asker: AskerIdentity,
+                        searched: list[str]) -> list[Candidate]:
+        """A question about the asker's own work ("my open tickets"): put the issues assigned to them first.
+
+        Search matches a question's words against text, and no issue's text says "my". Whose an issue is comes from the
+        connector's `assignee_email` field, compared with the asker's canonical email by plain code; an issue without that
+        field falls back to the display name its text gives. Only rows the asker's tokens already reach are read, and every
+        one added goes through the live permission check like any hit, so this adds nothing they could not open and says
+        nothing about anyone else's issues. Open issues first, the earliest due date first, then the most recently changed."""
+        if "jira" not in searched:
+            return candidates
+        mine = []
+        for row in self.index.documents_visible(sorted(asker.tokens), "jira", TEAM_DOCS):
+            fields = dict(row.fields or ())
+            text = self._text(row.doc_id)
+            if is_assignee(principal.email, fields) or (not fields.get("assignee_email") and principal.display_name
+                                                        and assignee_of(text) == principal.display_name):
+                done = (status_of(text) or "").lower() in DONE
+                mine.append((done, fields.get("due") or "9999", row))
+        mine.sort(key=lambda m: m[2].updated_at or "", reverse=True)
+        mine.sort(key=lambda m: m[:2])
+        by_id = {c.doc_id: c for c in candidates}
+        top = max((c.score for c in candidates), default=0.0) + PROJECT_BOOST
+        for place, (_, _, row) in enumerate(mine[:MY_ISSUES]):
+            cand = by_id.get(row.doc_id)
+            if cand is None:
+                chunks = [c.chunk_id for c in self.index.chunks_of(row.doc_id)][:2]
+                if not chunks:
+                    continue
+                cand = Candidate(row.doc_id, "jira", 0.0, chunks)
+                candidates.append(cand)
+            cand.score = top - place * 1e-4
+        return sorted(candidates, key=lambda c: (-c.score, c.doc_id))
 
     def _with_projects(self, candidates: list[Candidate], resolved: list[ProjectView], asker: AskerIdentity,
                        searched: list[str]) -> list[Candidate]:
@@ -471,7 +508,9 @@ class Brain:
         skill = state.get("skill")
         pkt = packetlib.build_packet(state["request_id"], user_context, state["request"].question,
                                      skill.name if skill else None, state["evidence"],
-                                     per_source_quota=self.settings.per_source_quota,
+                                     # the asker's own issues are one source: the usual per-source cap would cut them to three
+                                     per_source_quota=(max(self.settings.per_source_quota, MY_ISSUES)
+                                                       if skill and "my_issues" in skill.adds else self.settings.per_source_quota),
                                      max_evidence=skill.max_evidence if skill else self.settings.max_evidence,
                                      procedure=skill.procedure if skill else None, history=state.get("history"),
                                      projects=[v.project.name for v in state.get("resolved", [])],
