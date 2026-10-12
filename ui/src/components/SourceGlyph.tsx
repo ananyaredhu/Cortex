@@ -1,8 +1,65 @@
-import { BookOpen, HardDrive, Hash, SquareKanban } from "lucide-react";
+import type { ReactNode } from "react";
 import type { Source } from "../api/types";
 
-// Generic glyphs, never the vendors' logos (design brief and Cortex readme).
-const GLYPH = { confluence: BookOpen, jira: SquareKanban, slack: Hash, gdrive: HardDrive } as const;
+// Each product's own mark, in its own colours, so a row reads as "Jira" or "Drive" at a glance
+// (ui/MOCKUP-DRIFT.md #49; the mockup used generic glyphs). The marks belong to their owners and only say where a document lives.
+const ATLASSIAN_BLUE = "#2684FF";
+const LOGO: Record<Source, { viewBox: string; paths: ReactNode }> = {
+  confluence: {
+    viewBox: "0 0 24 24",
+    paths: (
+      <path
+        fill={ATLASSIAN_BLUE}
+        d="M.87 18.257c-.248.382-.53.875-.763 1.245a.764.764 0 0 0 .255 1.04l4.965 3.054a.764.764 0 0 0 1.058-.26c.199-.332.454-.763.733-1.221 1.967-3.247 3.945-2.853 7.508-1.146l4.957 2.337a.764.764 0 0 0 1.028-.382l2.364-5.346a.764.764 0 0 0-.382-1 599.851 599.851 0 0 1-4.965-2.361C10.911 10.97 5.224 11.185.87 18.257zM23.131 5.743c.249-.405.531-.875.764-1.25a.764.764 0 0 0-.256-1.034L18.675.404a.764.764 0 0 0-1.058.26c-.195.335-.451.763-.734 1.225-1.966 3.246-3.945 2.85-7.508 1.146L4.437.694a.764.764 0 0 0-1.027.382L1.046 6.422a.764.764 0 0 0 .382 1c1.039.49 3.105 1.467 4.965 2.361 6.698 3.246 12.392 3.029 16.738-4.04z"
+      />
+    ),
+  },
+  jira: {
+    viewBox: "0 0 24 24",
+    paths: (
+      <path
+        fill={ATLASSIAN_BLUE}
+        d="M11.571 11.513H0a5.218 5.218 0 0 0 5.232 5.215h2.13v2.057A5.215 5.215 0 0 0 12.575 24V12.518a1.005 1.005 0 0 0-1.005-1.005zm5.723-5.756H5.736a5.215 5.215 0 0 0 5.215 5.214h2.129v2.058a5.218 5.218 0 0 0 5.215 5.214V6.758a1.001 1.001 0 0 0-1.001-1.001zM23.013 0H11.455a5.215 5.215 0 0 0 5.215 5.215h2.129v2.057A5.215 5.215 0 0 0 24 12.483V1.005A1.001 1.001 0 0 0 23.013 0z"
+      />
+    ),
+  },
+  slack: {
+    viewBox: "0 0 54 54",
+    paths: (
+      <>
+        <path
+          fill="#36C5F0"
+          d="M19.712.133a5.381 5.381 0 0 0-5.376 5.387 5.381 5.381 0 0 0 5.376 5.386h5.376V5.52A5.381 5.381 0 0 0 19.712.133m0 14.365H5.376A5.381 5.381 0 0 0 0 19.884a5.381 5.381 0 0 0 5.376 5.387h14.336a5.381 5.381 0 0 0 5.376-5.387 5.381 5.381 0 0 0-5.376-5.386"
+        />
+        <path
+          fill="#2EB67D"
+          d="M53.76 19.884a5.381 5.381 0 0 0-5.376-5.386 5.381 5.381 0 0 0-5.376 5.386v5.387h5.376a5.381 5.381 0 0 0 5.376-5.387m-14.336 0V5.52A5.381 5.381 0 0 0 34.048.133a5.381 5.381 0 0 0-5.376 5.387v14.364a5.381 5.381 0 0 0 5.376 5.387 5.381 5.381 0 0 0 5.376-5.387"
+        />
+        <path
+          fill="#ECB22E"
+          d="M34.048 54a5.381 5.381 0 0 0 5.376-5.387 5.381 5.381 0 0 0-5.376-5.386h-5.376v5.386A5.381 5.381 0 0 0 34.048 54m0-14.365h14.336a5.381 5.381 0 0 0 5.376-5.386 5.381 5.381 0 0 0-5.376-5.387H34.048a5.381 5.381 0 0 0-5.376 5.387 5.381 5.381 0 0 0 5.376 5.386"
+        />
+        <path
+          fill="#E01E5A"
+          d="M0 34.249a5.381 5.381 0 0 0 5.376 5.386 5.381 5.381 0 0 0 5.376-5.386v-5.387H5.376A5.381 5.381 0 0 0 0 34.25m14.336-.001v14.364A5.381 5.381 0 0 0 19.712 54a5.381 5.381 0 0 0 5.376-5.387V34.25a5.381 5.381 0 0 0-5.376-5.387 5.381 5.381 0 0 0-5.376 5.387"
+        />
+      </>
+    ),
+  },
+  gdrive: {
+    viewBox: "0 0 87.3 78",
+    paths: (
+      <>
+        <path fill="#0066DA" d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" />
+        <path fill="#00AC47" d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0-1.2 4.5h27.5z" />
+        <path fill="#EA4335" d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" />
+        <path fill="#00832D" d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" />
+        <path fill="#2684FC" d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" />
+        <path fill="#FFBA00" d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" />
+      </>
+    ),
+  },
+};
 export const SOURCE_LABEL: Record<Source, string> = {
   confluence: "Confluence",
   jira: "Jira",
@@ -11,6 +68,10 @@ export const SOURCE_LABEL: Record<Source, string> = {
 };
 
 export function SourceGlyph({ source, size = 15 }: { source: Source; size?: number }) {
-  const Glyph = GLYPH[source];
-  return <Glyph size={size} aria-label={SOURCE_LABEL[source]} />;
+  const logo = LOGO[source];
+  return (
+    <svg className="source-logo" role="img" aria-label={SOURCE_LABEL[source]} width={size} height={size} viewBox={logo.viewBox}>
+      {logo.paths}
+    </svg>
+  );
 }

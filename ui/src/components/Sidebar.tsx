@@ -37,8 +37,6 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
     }
   };
   const navigate = useNavigate();
-  const alerts = useQuery({ queryKey: ["alerts", persona.id], queryFn: () => api(persona.id).alerts() });
-  const alertCount = alerts.data?.alerts.length ?? 0;
   const history = useQuery({
     queryKey: ["conversations", persona.id],
     queryFn: () => api(persona.id).conversations(),
@@ -65,11 +63,6 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
       <nav className="sidebar__nav" aria-label="Main">
         <NavLink to="/" end>
           <Home size={16} aria-hidden /> My work
-          {alertCount > 0 && (
-            <span className="nav-badge" aria-label={`${alertCount} changed answer${alertCount > 1 ? "s" : ""}`}>
-              {alertCount}
-            </span>
-          )}
         </NavLink>
         <NavLink to="/team">
           <Users size={16} aria-hidden /> Team focus

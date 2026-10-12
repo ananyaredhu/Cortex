@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, expect, it, vi } from "vitest";
 import type { Team } from "../api/types";
@@ -68,6 +68,26 @@ it("shows a team with only the numbers the API returned", async () => {
   expect(within(done).getByRole("link", { name: /Tune replication/ })).toHaveTextContent("Yours");
   expect(within(within(card).getByRole("region", { name: "Database migration: In Progress" })).queryByText("Yours")).not.toBeInTheDocument();
   expect(within(card).getByRole("link", { name: "#db-migration thread: blockers" })).toBeInTheDocument();
+});
+
+it("shows a project's details when its timeline row is pointed at or focused", async () => {
+  renderWith([DBMIG]);
+  const bar = await screen.findByRole("img", { name: /^Database migration: 14 Sep/ });
+  expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  fireEvent.focus(bar);
+  const tip = screen.getByRole("tooltip");
+  expect(tip).toHaveTextContent("Move the primary database to the new cluster.");
+  expect(tip).toHaveTextContent("14 Sep – 30 Oct");
+  expect(tip).toHaveTextContent("19 days left");
+  expect(tip).toHaveTextContent("Cutover · 27 Oct");
+  expect(tip).toHaveTextContent("1 of 2 done");
+  expect(tip).toHaveTextContent("Sprint 42 · day 5 of 10 · 1/2 done");
+  fireEvent.blur(bar);
+  expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  fireEvent.mouseMove(bar);
+  expect(screen.getByRole("tooltip")).toBeInTheDocument();
+  // the legend says what the dark fill is
+  expect(screen.getByRole("list", { name: "How to read the timeline" })).toHaveTextContent("Tickets done, of those you can open");
 });
 
 it("says the same thing to anyone with no team", async () => {

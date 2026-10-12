@@ -43,3 +43,19 @@
 .team__span span { display: block; height: 100%; background: var(--text-strong); }
 .team__milestone { position: absolute; top: 13px; width: 10px; height: 10px; margin-left: -5px; transform: rotate(45deg); border: 2px solid var(--text-strong); border-radius: 2px; background: var(--accent); }
 .team__milestone-label { position: absolute; top: 32px; transform: translateX(-50%); font-size: var(--fs-11, 11px); color: var(--text-body); white-space: nowrap; }
+.team__track:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.team__legend { list-style: none; margin: var(--space-3) 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px var(--space-4); font-size: var(--fs-12); color: var(--text-body); }
+.team__legend li { display: inline-flex; align-items: center; gap: 6px; }
+.team__legend i { flex: none; display: inline-block; }
+.team__key-done { width: 18px; height: 10px; border-radius: var(--radius-pill); background: var(--text-strong); }
+.team__key-span { width: 18px; height: 10px; border: 2px solid var(--text-strong); border-radius: var(--radius-pill); }
+.team__key-now { width: 2px; height: 12px; background: var(--accent); }
+.team__key-milestone { width: 8px; height: 8px; transform: rotate(45deg); border: 2px solid var(--text-strong); border-radius: 2px; background: var(--accent); }
+.team__bar-key { margin: 0; font-size: var(--fs-12); color: var(--text-body); }
+/* The project's details, at the pointer (or under the bar for the keyboard). Fixed, so the timeline's scroll box cannot clip it. */
+.team__tip { position: fixed; z-index: 40; width: 300px; padding: var(--space-3) var(--space-4); display: flex; flex-direction: column; gap: 6px; border: var(--border-1); border-radius: var(--radius-md); background: var(--surface-raised); box-shadow: var(--shadow-2); font-size: var(--fs-13); color: var(--text-body); pointer-events: none; }
+.team__tip strong { color: var(--text-strong); }
+.team__tip p { margin: 0; text-wrap: pretty; }
+.team__tip dl { margin: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px var(--space-3); }
+.team__tip dt { color: var(--text-muted); }
+.team__tip dd { margin: 0; color: var(--text-strong); font-variant-numeric: tabular-nums; }

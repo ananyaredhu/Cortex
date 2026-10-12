@@ -2,8 +2,9 @@ import { expect, test } from "@playwright/test";
 import { ask, citedIds, NEEDS_SCRIPTED_EVENTS, openAs } from "./helpers";
 
 // The demo scenarios (docs/04-scenarios.md) through the UI. Expectations mirror the golden cases in
-// fixtures/company_a.json; the API-level versions are in evals/tests/. Scenarios 2 and 4 and the stale-answer
-// alert need the scripted events, so they skip on the real Brain (there the change is made in the real source).
+// fixtures/company_a.json; the API-level versions are in evals/tests/. Scenarios 2 and 4 need the scripted events,
+// so they skip on the real Brain (there the change is made in the real source). The stale-answer alert has no screen
+// since My Work dropped its box (ui/MOCKUP-DRIFT.md #27); it is still checked at the API in evals/tests/.
 
 const REFUSAL = "I couldn't find anything you have access to about that.";
 
@@ -79,21 +80,4 @@ test("split-screen: Priya, Sam and Dana ask the same question and get different,
   await expect(column("Sam")).toContainText(REFUSAL);
   await expect(column("Sam")).not.toContainText("CANARY");
   await expect(column("Priya")).not.toContainText("CANARY");
-});
-
-test("stale-answer alert: My Work flags the changed runbook and asks again", async ({ page }) => {
-  test.skip(!(await openAs(page, "priya")), NEEDS_SCRIPTED_EVENTS);
-  const question = "What's the latest runbook for payment-service incident failover?";
-  await ask(page, question);
-  await page.request.post("/sim/advance", { data: { event_id: "e1" } });
-
-  await page.goto("/");
-  const needs = page.getByRole("region", { name: "Needs you" });
-  await expect(needs).toContainText("Payment-service incident runbook");
-  await expect(page.getByRole("link", { name: /My work/ })).toContainText("1");
-  await needs.getByRole("button", { name: /Ask again/ }).click();
-
-  await expect(page).toHaveURL(/\/ask$/);
-  const card = page.getByRole("article", { name: "Answer" }).last();
-  await expect(card).toContainText("failover step");
 });

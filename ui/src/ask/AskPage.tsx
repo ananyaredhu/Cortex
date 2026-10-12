@@ -8,7 +8,7 @@ import { usePersona } from "../auth/PersonaContext";
 import { Avatar } from "../components/Avatar";
 import { AnswerCard } from "./AnswerCard";
 import { Composer } from "./Composer";
-import { EmptyState } from "./EmptyState";
+import { EmptyState, Suggestions } from "./EmptyState";
 import { Stepper, type StageTimes } from "./Stepper";
 import { TrustPanel } from "./TrustPanel";
 import "./ask.css";
@@ -152,6 +152,10 @@ export function AskPage() {
   }, [location.key]);
 
   const shown = turns.find((t) => t.id === selected)?.answer ?? null;
+  // Nothing asked yet: the greeting, the composer and the suggestions sit together in the middle of the page.
+  const fresh = turns.length === 0 && load !== "loading";
+  // The Trust panel is about an answer, so it waits for the first question.
+  const trust = trustOpen && !fresh;
   const openTrust = (open: boolean) => {
     setTrustOpen(open);
     try {
@@ -162,12 +166,12 @@ export function AskPage() {
   };
 
   return (
-    <div className={`ask${trustOpen ? " ask--trust" : ""}`}>
-      <div className="ask__main">
+    <div className={`ask${trust ? " ask--trust" : ""}`}>
+      <div className={`ask__main${fresh ? " ask__main--fresh" : ""}`}>
         <header className="ask__head">
           <span className="ask__title">{turns[0]?.question || "New question"}</span>
           {persona.guest && <span className="guest-badge">{persona.guest}</span>}
-          {!trustOpen && (
+          {!trustOpen && !fresh && (
             <button type="button" className="ghost" aria-expanded={false} onClick={() => openTrust(true)}>
               <PanelRight size={16} aria-hidden /> Trust panel
             </button>
@@ -186,7 +190,7 @@ export function AskPage() {
                   That conversation isn’t available. Start a new question below.
                 </p>
               )}
-              <EmptyState onAsk={(q) => ask(q)} />
+              <EmptyState />
             </>
           ) : (
             turns.map((t) => (
@@ -236,11 +240,12 @@ export function AskPage() {
 
         <div className="ask__composer">
           <Composer busy={busy} onAsk={ask} />
-          <p className="footnote">Cortex never shows what you couldn’t open yourself. Every question is logged.</p>
+          {fresh && <Suggestions onAsk={(q) => ask(q)} />}
         </div>
+        <p className="footnote ask__promise">Cortex never shows what you couldn’t open yourself. Every question is logged.</p>
       </div>
 
-      {trustOpen && <TrustPanel answer={shown} highlightWhy={whyLit} onClose={() => openTrust(false)} />}
+      {trust && <TrustPanel answer={shown} highlightWhy={whyLit} onClose={() => openTrust(false)} />}
     </div>
   );
 }

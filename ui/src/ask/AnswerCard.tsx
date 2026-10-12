@@ -7,6 +7,10 @@ import type { PersonaId } from "../auth/personas";
 import { SourceGlyph, SOURCE_LABEL } from "../components/SourceGlyph";
 import { answerSegments, banners, shortId, uncitedClaims, when } from "./format";
 
+// The excerpt popover's width and its gap from the card's edge, in px (.cite-tip in ask.css).
+const TIP_WIDTH = 340;
+const TIP_GAP = 12;
+
 /**
  * One answer. Refusals use the same card, sections and footer as any other answer, and nothing in it
  * depends on why the answer was refused: a forbidden and a nonexistent document must look identical.
@@ -25,11 +29,23 @@ export function AnswerCard({
   onTrust?: () => void; // phones: the "Trust" pill opens this answer's Trust panel as a bottom sheet
   onChoose: (question: string) => void;
 }) {
+  // `active` lights a marker and its source row together. The excerpt opens from a marker only, and floats
+  // over the card at that marker, so nothing below it moves.
   const [active, setActive] = useState<number | null>(null);
+  const [tipAt, setTipAt] = useState<{ n: number; left: number; top: number } | null>(null);
   const tipId = useId();
   const [copied, setCopied] = useState(false);
   const segments = answerSegments(answer);
-  const tip = active !== null ? answer.citations[active - 1] : null;
+  const tip = tipAt ? answer.citations[tipAt.n - 1] : null;
+  const openTip = (n: number, marker: HTMLElement) => {
+    setActive(n);
+    const room = (marker.offsetParent?.clientWidth ?? 0) - TIP_WIDTH - TIP_GAP;
+    setTipAt({ n, left: Math.max(TIP_GAP, Math.min(marker.offsetLeft, room)), top: marker.offsetTop + marker.offsetHeight + 6 });
+  };
+  const closeTip = () => {
+    setActive(null);
+    setTipAt(null);
+  };
   const uncited = import.meta.env.DEV ? uncitedClaims(answer) : [];
 
   const copy = async () => {
@@ -43,7 +59,7 @@ export function AnswerCard({
   };
 
   return (
-    <article className="card answer" aria-label="Answer" onMouseLeave={() => setActive(null)}>
+    <article className="card answer" aria-label="Answer" onMouseLeave={closeTip}>
       {banners(answer).map((b) => (
         <div key={b.kind} role="status" className={`banner banner--${b.kind}`}>
           {b.kind === "error" ? (
@@ -82,10 +98,11 @@ export function AnswerCard({
               type="button"
               className={`cite${active === s.n ? " cite--on" : ""}`}
               aria-label={`Source ${s.n}: ${s.citation.title}`}
-              aria-describedby={active === s.n ? tipId : undefined}
-              onMouseEnter={() => setActive(s.n)}
-              onFocus={() => setActive(s.n)}
-              onBlur={() => setActive(null)}
+              aria-describedby={tipAt?.n === s.n ? tipId : undefined}
+              onMouseEnter={(e) => openTip(s.n, e.currentTarget)}
+              onMouseLeave={closeTip}
+              onFocus={(e) => openTip(s.n, e.currentTarget)}
+              onBlur={closeTip}
               onClick={() => window.open(s.citation.url, "_blank", "noopener,noreferrer")}
             >
               {s.n}
@@ -106,8 +123,8 @@ export function AnswerCard({
         </p>
       )}
 
-      {tip && (
-        <div id={tipId} role="tooltip" className="cite-tip">
+      {tip && tipAt && (
+        <div id={tipId} role="tooltip" className="cite-tip" style={{ left: tipAt.left, top: tipAt.top }}>
           <div className="cite-tip__head">
             <SourceGlyph source={tip.source} size={14} /> {SOURCE_LABEL[tip.source]} · {tip.title}
           </div>
