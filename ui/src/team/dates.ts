@@ -18,6 +18,11 @@ export function shortDay(iso: string): string {
   return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
 }
 
+/** Calendar days from `today` to `iso`: negative once it has passed. */
+export function daysUntil(today: string, iso: string): number {
+  return Math.round((utc(iso) - utc(today)) / DAY);
+}
+
 /** Monday to Friday days from `start` to `end`, both included. */
 export function workdays(start: string, end: string): number {
   let n = 0;

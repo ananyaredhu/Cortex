@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, Hash, SquareKanban } from "lucide-react";
+import { ArrowRight, SquareKanban } from "lucide-react";
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import type { Source, Team } from "../api/types";
-import { shortId, when } from "../ask/format";
+import { keyAndTitle, shortId, when } from "../ask/format";
 import { usePersona } from "../auth/PersonaContext";
 import { PERSONAS } from "../auth/personas";
 import { Avatar } from "../components/Avatar";
@@ -36,11 +36,6 @@ function columns(items: Issue[]): { status: string; items: Issue[] }[] {
   return order.map((status) => ({ status, items: by.get(status) ?? [] }));
 }
 
-// "DBMIG-142 Cutover blocked" -> key and the rest, so the key can sit in the card's footer.
-function split(issue: Issue): { key: string; title: string } {
-  const key = shortId(issue.doc_id);
-  return { key, title: issue.title.startsWith(`${key} `) ? issue.title.slice(key.length + 1) : issue.title };
-}
 /** `today` is for tests; the page uses the viewer's own date. */
 export function TeamPage({ today }: { today?: string }) {
   const { persona } = usePersona();
@@ -110,6 +105,7 @@ function SprintStrip({ sprint, name, today }: { sprint: NonNullable<Team["sprint
             <span style={{ width: `${(sprint.done / sprint.total) * 100}%` }} />
             {d.of > 0 && <i style={{ left: `${(d.day / d.of) * 100}%` }} title="Time gone in the sprint" />}
           </div>
+          <p className="team__bar-key">Filled: tickets done, of those you can open. Orange mark: time gone in the sprint.</p>
         </div>
       )}
     </div>
@@ -178,7 +174,7 @@ function TeamCard({ team: t, today, onAsk }: { team: Team; today: string; onAsk:
                 </h4>
                 <ul>
                   {col.items.map((i) => {
-                    const { key, title } = split(i);
+                    const { key, title } = keyAndTitle(i);
                     return (
                       <li key={i.doc_id}>
                         <a className={`team__ticket${i.mine ? " team__ticket--mine" : ""}`} href={i.url} target="_blank" rel="noreferrer">
@@ -227,6 +223,5 @@ function TeamCard({ team: t, today, onAsk }: { team: Team; today: string; onAsk:
 }
 
 function PlaceGlyph({ place }: { place: string }) {
-  const source = place.slice(0, place.indexOf(":")) as Source;
-  return source === "slack" ? <Hash size={12} aria-hidden /> : <SourceGlyph source={source} size={12} />;
+  return <SourceGlyph source={place.slice(0, place.indexOf(":")) as Source} size={12} />;
 }

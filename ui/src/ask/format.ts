@@ -93,3 +93,9 @@ export function when(iso: string | null | undefined): string {
 export function shortId(docId: string): string {
   return docId.slice(docId.indexOf(":") + 1);
 }
+
+/** "DBMIG-142 Cutover blocked" -> the key and the rest, so the key can be set apart from the title. */
+export function keyAndTitle(item: { doc_id: string; title: string }): { key: string; title: string } {
+  const key = shortId(item.doc_id);
+  return { key, title: item.title.startsWith(`${key} `) ? item.title.slice(key.length + 1) : item.title };
+}

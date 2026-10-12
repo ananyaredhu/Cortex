@@ -79,7 +79,33 @@ Audit queries (natural language or structured) are read-only and run **under RBA
 ## Conversations
 `ask` events carry `conversation_id` (the one returned by `/ask`). The Brain keeps no other record of conversations: `/v1/conversations` and `/v1/conversations/{id}` are rebuilt from these events, under the same ownership rule (only the asker's own events), so history survives a restart.
 
+## Proposed events (12 Oct, with api.md 0.3; not approved, not built)
+Four new event types and one new value, all in the hash chain like any other event.
+
+**`issue_transition`**: every call to `POST /v1/issues/move`, whatever its outcome.
+```json
+{"event_type": "issue_transition", "request_id": "req_...",
+ "actor": {"user_id": "priya@companya.com", "roles": ["engineer"], "client": "ui"},
+ "decisions": [{"doc_id": "jira:DBMIG-150", "allowed": true, "proof_path": ["user:priya@companya.com", "role:DBMIG:developer"],
+                "acl_snapshot_hash": "sha256:...", "policy_version": "pol-0.3", "doc_version": "...", "jit_checked": true}],
+ "transition": {"from": "In Progress", "to": "Done", "outcome": "moved", "indexed": true, "doc_version_after": "..."}}
+```
+- `outcome`: `moved`, `unchanged` (already in that status), `refused_not_assignee`, `refused_by_source`, `invalid_status` or `source_unavailable`.
+- When the caller may not open the issue, or it does not exist, the event has the usual denied decision (`doc_id_hash`, salted) and **no** `transition` block: the log records the attempt without naming the issue, as for a denied read.
+- `from` and `doc_version_after` are absent when nothing was read or changed.
+
+**`conversation_title`**: `{"event_type": "conversation_title", "conversation_id": "c_1", "actor": {...}, "title": {"text": "DB migration blockers", "source": "generated" | "custom" | "cleared"}}`. A generated title's actor is the conversation's owner with `client: "brain"`, and `models.generator` names the model. `/v1/conversations` takes the newest `custom` title that has not been `cleared`, else the newest `generated` one, else the first question. Only the question's text was given to the model, so the event carries no decisions and no `acl_label`.
+
+**`routine_change`**: `{"event_type": "routine_change", "routine_id": "rt_...", "actor": {...}, "routine": {"action": "created" | "updated" | "paused" | "resumed" | "deleted", "question": "...", "schedule": {...}, "timezone": "..."}}`. `question`, `schedule` and `timezone` are present on `created` and `updated`. A pause the Brain makes itself (N3 and N4 in [docs/routines.md](../routines.md)) has `actor.user_id: "system:routines"` and a `reason`.
+
+**`routine_skipped`**: `{"event_type": "routine_skipped", "routine_id": "rt_...", "actor": {"user_id": "system:routines", "client": "brain"}, "routine": {"owner": "<email>", "reason": "identity_unresolved" | "missed" | "limit"}}`, so a routine's history has no silent gaps. Nothing was sent to a model.
+
+**`ask` events from a routine run** have `actor.client: "routine"` (besides `ui` and `mcp`) and a top-level `routine_id`. `actor.user_id` is the owner, whose identity was resolved for that run. Everything else is as for a typed question, so replay and time-travel treat a run like any other ask.
+
+Event types then read: `ask`, `search`, `mcp_call`, `audit_query`, `admin_view`, `acl_change_observed`, `alert_sent`, `checkpoint`, `identity_snapshot`, `issue_transition`, `conversation_title`, `routine_change`, `routine_skipped`.
+
 ## Changelog
+- 0.1, 12 Oct (proposed): `issue_transition`, `conversation_title`, `routine_change` and `routine_skipped` events; `actor.client: "routine"` and `routine_id` on `ask` events.
 - 0.1, 11 Oct: `checks.fields` (`pass`, `fail` or `nothing_to_check`: whether what the claims said about structured fields matched the documents') and `checks.field_mismatches` (`[{field, doc_ids}]` for each claim dropped, without the values) (fix F23).
 - 0.1, 11 Oct: `query.projects` (ids of the registry projects the question named, among those the asker may see) (T7).
 - 0.1, 11 Oct: `checks.grounding_lower_confidence` (claims kept between the grounding floor and threshold) and the `lower_confidence` value of `checks.grounding_model` (fix F21).

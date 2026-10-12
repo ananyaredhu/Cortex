@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { AnswerCard } from "../ask/AnswerCard";
@@ -92,6 +92,14 @@ describe("AnswerCard", () => {
     wrap(<AnswerCard asker="sam" answer={ANSWER} onWhyMore={() => {}} onChoose={() => {}} />);
     fireEvent.focus(screen.getAllByRole("button", { name: /Source 1:/ })[0]);
     expect(screen.getByRole("tooltip")).toHaveTextContent("replica lag stays above the 5 second threshold");
+  });
+
+  it("only highlights a source row on hover: no excerpt box opens under the answer", () => {
+    wrap(<AnswerCard asker="sam" answer={ANSWER} onWhyMore={() => {}} onChoose={() => {}} />);
+    const row = within(screen.getByRole("region", { name: "Sources" })).getAllByRole("listitem")[0];
+    fireEvent.mouseEnter(row);
+    expect(row).toHaveClass("source--lit");
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   });
 
   it("asks the chosen clarification", () => {
