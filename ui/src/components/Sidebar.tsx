@@ -1,12 +1,11 @@
-import { useQuery } from "@tanstack/react-query";
-import { ChevronsUpDown, Columns3, Home, MessageSquare, ScrollText, Settings2, Sparkles, Users, X } from "lucide-react";
+import { CalendarClock, ChevronsUpDown, Columns3, Home, MessageSquare, ScrollText, Settings2, Sparkles, Users, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { api } from "../api/client";
 import logo from "../assets/logo/cortex-mark.svg";
 import { usePersona } from "../auth/PersonaContext";
 import { canAdmin, canAudit, PERSONAS } from "../auth/personas";
 import { Avatar } from "./Avatar";
+import { RecentChats } from "./RecentChats";
 import { ThemeToggle } from "./ThemeToggle";
 
 /** `open` and `onClose` only matter on phones, where the sidebar is a drawer (see .mobilebar in App). */
@@ -37,10 +36,6 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
     }
   };
   const navigate = useNavigate();
-  const history = useQuery({
-    queryKey: ["conversations", persona.id],
-    queryFn: () => api(persona.id).conversations(),
-  });
 
   return (
     <aside className={`sidebar${open ? " sidebar--open" : ""}`} aria-label="Navigation">
@@ -70,6 +65,9 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
         <NavLink to="/ask">
           <MessageSquare size={16} aria-hidden /> Ask
         </NavLink>
+        <NavLink to="/routines">
+          <CalendarClock size={16} aria-hidden /> Routines
+        </NavLink>
         <NavLink to="/compare">
           <Columns3 size={16} aria-hidden /> Compare people
         </NavLink>
@@ -85,23 +83,7 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
         )}
       </nav>
 
-      <section className="sidebar__recent" aria-label="Recent questions">
-        <div className="eyebrow">Recent</div>
-        {history.data?.conversations.length ? (
-          history.data.conversations.map((c) => (
-            <NavLink
-              key={c.conversation_id}
-              to={`/ask/${encodeURIComponent(c.conversation_id)}`}
-              className="sidebar__recent-item"
-              title={c.title}
-            >
-              {c.title}
-            </NavLink>
-          ))
-        ) : (
-          <div className="sidebar__recent-empty">No questions yet</div>
-        )}
-      </section>
+      <RecentChats persona={persona.id} />
 
       <div className="sidebar__spacer" />
 

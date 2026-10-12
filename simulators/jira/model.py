@@ -22,6 +22,7 @@ import re
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 
+from connectors import workflow
 from simulators.common import ChangeEntry, ChangeLog, Invalid, NotFound, norm_email, utc_now
 from simulators.jira.tokens import group_token, role_token, user_token
 
@@ -111,6 +112,11 @@ class Issue:
     labels: list[str] = field(default_factory=list)
     comments: list[Comment] = field(default_factory=list)
     assignee: str | None = None      # email
+    due: str | None = None           # YYYY-MM-DD (Jira's `duedate`)
+    priority: str | None = None      # Jira's priority name
+
+
+_STATUS_LINE = re.compile(r"\bStatus: [A-Za-z][A-Za-z ]*[A-Za-z]")
 
 
 @dataclass
@@ -271,7 +277,8 @@ class JiraSim:
                      issue_type: str = "Task", status: str | None = None, reporter: str | None = None,
                      security_level: str | None = None, parent_key: str | None = None, links: Iterable[str] = (),
                      labels: Iterable[str] = (), created_at: str | None = None, updated_at: str | None = None,
-                     version: str | None = None, assignee: str | None = None) -> Issue:
+                     version: str | None = None, assignee: str | None = None, due: str | None = None,
+                     priority: str | None = None) -> Issue:
         project = self._project(project_key)
         if key is None:
             number = project.last_number + 1
@@ -300,6 +307,7 @@ class JiraSim:
             status=status, reporter=reporter, created_at=created_at or now, updated_at=updated_at or created_at or now,
             version=version or "v1", security_level=security_level, parent_key=parent_key,
             links=list(links), labels=list(labels), assignee=norm_email(assignee) if assignee else None,
+            due=due, priority=priority,
         )
         self.issues[key] = issue
         project.last_number = max(project.last_number, number)
@@ -308,7 +316,8 @@ class JiraSim:
 
     def update_issue(self, key: str, *, summary: str | None = None, description: str | None = None,
                      status: str | None = None, links: Iterable[str] | None = None, version: str | None = None,
-                     updated_at: str | None = None, assignee: str | None = None) -> Issue:
+                     updated_at: str | None = None, assignee: str | None = None, due: str | None = None,
+                     priority: str | None = None) -> Issue:
         issue = self._issue(key)
         if summary is not None:
             issue.summary = summary
@@ -320,7 +329,28 @@ class JiraSim:
             issue.links = list(links)
         if assignee is not None:
             issue.assignee = norm_email(assignee)
+        if due is not None:
+            issue.due = due
+        if priority is not None:
+            issue.priority = priority
         self._touch(issue, version, updated_at)
+        self._emit("upsert", issue, "jira:issue_updated")
+        return issue
+
+    def transition_issue(self, key: str, status: str, actor: str | None) -> Issue:
+        """Move an issue along the project's workflow as `actor` (an email). Like Jira, an issue the actor cannot see
+        does not exist for them, and a status the workflow does not offer from here is refused. A transition is an edit:
+        the version moves and the feed reports an upsert; nobody's access changes."""
+        if not actor or not self.can_view(actor, key).allowed:
+            raise NotFound("Issue does not exist or you do not have permission to see it.")
+        issue = self._issue(key)
+        to = workflow.match(issue.status, status)
+        if to is None:
+            raise Invalid(f"No transition to {status!r} from {issue.status!r}")
+        issue.status = to
+        # The seeded issues also say their status in the description; keep the two from disagreeing.
+        issue.description = _STATUS_LINE.sub(f"Status: {to}", issue.description, count=1)
+        self._touch(issue, None, None)
         self._emit("upsert", issue, "jira:issue_updated")
         return issue
 

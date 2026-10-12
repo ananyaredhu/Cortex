@@ -16,6 +16,7 @@ may open.
 import re
 from collections.abc import Callable, Iterable
 
+from brain.policy.writes import is_assignee
 from brain.projects import ProjectView
 
 STATUS = re.compile(r"\bStatus: ([A-Za-z][A-Za-z ]*[A-Za-z])")
@@ -35,11 +36,25 @@ def assignee_of(text: str) -> str | None:
     return match.group(1) if match else None
 
 
+def issue_view(d, body: str, *, me: str | None = None, email: str | None = None) -> dict:
+    """One issue as `/v1/team` and `/v1/mywork` list it (api.md 0.3). `d` is an index row the caller may open and `body`
+    its text. `mine` compares display names and is only a highlight; `can_move` compares accounts (the connector's
+    `assignee_email` field) and says which cards the UI may offer to move. The move itself is decided again when asked for."""
+    fields = dict(getattr(d, "fields", None) or ())
+    assignee, status = assignee_of(body), status_of(body)
+    return {"doc_id": d.doc_id, "title": d.title, "status": status, "assignee": assignee,
+            "mine": bool(me) and assignee == me, "url": d.url, "updated_at": d.updated_at,
+            "due_date": fields.get("due") or None, "priority": fields.get("priority") or None,
+            "can_move": bool(email) and is_assignee(email, fields)}
+
+
 def team_focus(views: Iterable[ProjectView], docs: Iterable, *, text: Callable[[str], str], me: str | None = None,
-               names: dict[str, str] | None = None, container: Callable[[str], str] = lambda x: x) -> list[dict]:
+               names: dict[str, str] | None = None, container: Callable[[str], str] = lambda x: x,
+               email: str | None = None) -> list[dict]:
     """One entry per project in `views` the person is a member of. `docs` are index rows they may open; `text` gives an
-    issue's text by doc id; `me` is the caller's display name, to mark their own issues; `names` maps emails to display
-    names (an author it does not know is left out); `container` translates registry places to real IDs."""
+    issue's text by doc id; `me` is the caller's display name, to mark their own issues, and `email` their canonical email,
+    to say which they may move; `names` maps emails to display names (an author it does not know is left out); `container`
+    translates registry places to real IDs."""
     names = names or {}
     docs = sorted(sorted(docs, key=lambda d: d.doc_id), key=lambda d: d.updated_at or "", reverse=True)   # newest first, ties by id
     teams = []
@@ -52,10 +67,9 @@ def team_focus(views: Iterable[ProjectView], docs: Iterable, *, text: Callable[[
         issues, in_sprint, sprint_done = [], 0, 0
         for d in mine:
             if d.source == "jira":
-                body = text(d.doc_id)
-                assignee, status = assignee_of(body), status_of(body)
-                issues.append({"doc_id": d.doc_id, "title": d.title, "status": status, "assignee": assignee,
-                               "mine": bool(me) and assignee == me, "url": d.url})
+                issue = issue_view(d, text(d.doc_id), me=me, email=email)
+                issues.append(issue)
+                status = issue["status"]
                 done = bool(status) and status.lower() in DONE
                 if project.sprint and status and (not done or (d.updated_at or "")[:10] >= project.sprint.start_date):
                     in_sprint += 1

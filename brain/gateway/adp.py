@@ -46,13 +46,16 @@ class AdpGenerator:
         self._client = httpx.Client(timeout=timeout, transport=transport)
 
     def request_body(self, packet: dict) -> dict:
+        return self._body(json.dumps(packet, ensure_ascii=False), system_prompt(packet))
+
+    def _body(self, text: str, system: str) -> dict:
         return {
             "RequestId": uuid.uuid4().hex,
             "ConversationId": uuid.uuid4().hex,      # one turn per request: our memory lives in our own store
             "AppKey": self._app_key,
             "VisitorId": "internal-brain",
-            "Contents": [{"Type": "text", "Text": json.dumps(packet, ensure_ascii=False)}],
-            "SystemRole": system_prompt(packet),
+            "Contents": [{"Type": "text", "Text": text}],
+            "SystemRole": system,
             "Stream": "enable",
             "Incremental": True,
             "SearchNetwork": "disable",
@@ -86,8 +89,19 @@ class AdpGenerator:
             return out
         return Generated("", [], abstained=True, model=self.model, unavailable=True)
 
+    def complete(self, system: str, text: str) -> str | None:
+        """A plain reply to `text` under `system`, or None on any failure. Used for conversation titles (titles.py), where
+        the text is the asker's own question and never a document. One attempt: a title is not worth a retry."""
+        try:
+            return self._send(self._body(text, system)) or None
+        except (AdpError, httpx.HTTPError, ValueError, KeyError, TypeError):
+            return None
+
     def _call(self, packet: dict) -> str:
-        with self._client.stream("POST", self._url, json=self.request_body(packet),
+        return self._send(self.request_body(packet))
+
+    def _send(self, body: dict) -> str:
+        with self._client.stream("POST", self._url, json=body,
                                  headers={"Content-Type": "application/json", "Accept": "text/event-stream"}) as r:
             if r.status_code >= 400:
                 raise AdpError(r.status_code, "http")

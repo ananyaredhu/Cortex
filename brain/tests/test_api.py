@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 from brain.api.app import create_app
 from brain.auth import DevTokens
 from brain.config import Settings
+from brain.gateway.titles import rule_title
 from brain.pipeline.graph import Brain
 from brain.runtime import fixture_runtime
 from brain.tests.conftest import headers as H
@@ -224,7 +225,9 @@ def test_conversations_are_per_persona_and_survive_a_restart(client, runtime):
     _ask(client, "priya", RUNBOOK, conversation_id=first["conversation_id"])
     _ask(client, "priya", THREAT)
     convs = client.get("/v1/conversations", headers=H("priya")).json()["conversations"]
-    assert sorted(c["title"] for c in convs) == sorted([Q1, THREAT])
+    # each chat is named from its first question alone (api.md 0.3); a follow-up does not rename it
+    assert sorted(c["title"] for c in convs) == sorted([rule_title(Q1), rule_title(THREAT)])
+    assert {c["title_source"] for c in convs} == {"generated"}
     assert client.get("/v1/conversations", headers=H("sam")).json()["conversations"] == []
     b = runtime.brain                                      # a restart: a fresh Brain over the same audit log
     runtime.brain = Brain(b.settings, b.connectors, b.index, b.store, b.embedder, b.generator, runtime.audit_store)
@@ -236,7 +239,7 @@ def test_reopening_a_conversation_replays_its_turns_only_to_its_owner(client):
     cid = first["conversation_id"]
     _ask(client, "priya", RUNBOOK, conversation_id=cid)
     c = client.get(f"/v1/conversations/{cid}", headers=H("priya")).json()
-    assert c["title"] == Q1 and [t["question"] for t in c["turns"]] == [Q1, RUNBOOK]
+    assert c["title"] == rule_title(Q1) and [t["question"] for t in c["turns"]] == [Q1, RUNBOOK]
     assert c["turns"][0]["answer"] == first["answer"] and not c["turns"][0]["withheld"]
     assert [x["doc_id"] for x in c["turns"][0]["citations"]] == [x["doc_id"] for x in first["citations"]]
     assert all(x["title"] and x["why_visible"] for x in c["turns"][0]["citations"])

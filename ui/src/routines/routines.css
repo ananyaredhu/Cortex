@@ -1,0 +1,44 @@
+/* Routines: the list, the form (a small dialog) and the block on My Work. */
+.routines__bar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
+.routines__bar p { margin: 0; max-width: 60ch; }
+.routines__new { border-color: var(--border-strong); color: var(--text-strong); font-weight: var(--fw-bold); }
+.routines__empty { margin: 0; padding: var(--space-5); }
+.routines__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+.routines__item { padding: var(--space-4) var(--space-5); display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
+.routines__what { flex: 1; min-width: min(100%, 320px); display: flex; flex-direction: column; gap: 6px; }
+.routines__what p, .routines__what .h3 { margin: 0; }
+.routines__question { font-size: var(--fs-14); color: var(--text-strong); text-wrap: pretty; }
+.routines__last { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.routines__dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+.routines__actions { display: flex; flex-wrap: wrap; gap: 2px; }
+.routines__confirm { color: var(--text-strong); font-weight: var(--fw-bold); }
+
+.routine-form__scrim { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: var(--space-4); background: color-mix(in srgb, var(--ink) 45%, transparent); overflow: auto; }
+.routine-form { width: min(560px, 100%); padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-2); box-shadow: var(--shadow-3); }
+.routine-form header { display: flex; align-items: center; justify-content: space-between; }
+.routine-form header .h3, .routine-form > p { margin: 0; }
+.routine-form label, .routine-form legend { font-size: var(--fs-12); font-weight: var(--fw-bold); color: var(--text-strong); }
+.routine-form > label { margin-top: var(--space-2); }
+.routine-form input:not([type="checkbox"]), .routine-form textarea, .routine-form select { width: 100%; padding: 8px 10px; border: var(--border-1); border-radius: var(--radius-sm); background: var(--surface-card); color: var(--text-strong); font: inherit; font-size: var(--fs-14); }
+.routine-form textarea { resize: vertical; }
+.routine-form__row { margin-top: var(--space-2); display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: var(--space-3); }
+.routine-form__row > div { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.routine-form fieldset { margin: var(--space-2) 0 0; padding: 0; border: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px var(--space-4); }
+.routine-form fieldset legend { padding: 0; margin-bottom: 4px; }
+.routine-form fieldset label { display: inline-flex; align-items: center; gap: 6px; font-weight: var(--fw-regular); font-size: var(--fs-13); color: var(--text-body); }
+.routine-form input[type="checkbox"] { accent-color: var(--accent); margin: 0; }
+.routine-form footer { margin-top: var(--space-3); display: flex; justify-content: flex-end; gap: var(--space-2); }
+.routine-form__save { height: 34px; padding: 0 16px; border: 0; border-radius: var(--radius-pill); background: var(--accent); color: var(--text-on-accent); font-weight: var(--fw-bold); font-size: var(--fs-13); }
+.routine-form__save:disabled { opacity: .45; cursor: default; }
+
+/* My Work */
+.home__routines li { align-items: flex-start; }
+.home__routines .routines__dot { margin-top: 6px; }
+.home__routine { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.home__routine a { font-size: var(--fs-14); color: var(--text-strong); }
+
+/* Ask: the composer's clock, and the line over a run */
+.composer__routine { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: 50%; background: transparent; color: var(--text-muted); }
+.composer__routine:hover:not(:disabled) { background: color-mix(in srgb, var(--ink) 6%, transparent); color: var(--text-strong); }
+.composer__routine:disabled { opacity: .4; cursor: default; }
+.turn__routine { display: flex; align-items: center; gap: 6px; margin: 0 0 var(--space-2); font-size: var(--fs-12); color: var(--text-body); }

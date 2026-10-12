@@ -22,6 +22,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, FastAPI, Header, HTTPEx
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+from connectors import workflow
 from simulators.common import Gone, Invalid, NotFound, deliver, norm_email, webhook_payloads
 from simulators.jira.model import Actors, Issue, JiraSim
 from simulators.jira.seed import seed_company_a
@@ -61,6 +62,8 @@ class IssueIn(BaseModel):
     status: str | None = None
     reporter: str | None = None
     assignee: str | None = None
+    due: str | None = None            # YYYY-MM-DD
+    priority: str | None = None
     security_level: str | None = None
     parent_key: str | None = None
     links: list[str] = Field(default_factory=list)
@@ -75,9 +78,15 @@ class IssuePatch(BaseModel):
     description: str | None = None
     status: str | None = None
     assignee: str | None = None
+    due: str | None = None
+    priority: str | None = None
     links: list[str] | None = None
     version: str | None = None
     updated_at: str | None = None
+
+
+class TransitionIn(BaseModel):
+    transition: dict                  # {"id": "<status name>"}, as real Jira takes it
 
 
 class CommentIn(BaseModel):
@@ -164,6 +173,8 @@ def create_app(sim: JiraSim | None = None, *, admin_token: str | None = None,
             "status": {"name": issue.status} if issue.status else None,
             "reporter": user_json(issue.reporter),
             "assignee": user_json(issue.assignee),
+            "duedate": issue.due,
+            "priority": {"name": issue.priority} if issue.priority else None,
             "labels": issue.labels,
             "created": issue.created_at,
             "updated": issue.updated_at,
@@ -229,6 +240,20 @@ def create_app(sim: JiraSim | None = None, *, admin_token: str | None = None,
     @app.get(f"{API}/issue/{{key}}")
     def get_issue(key: str, viewer: Viewer = None) -> dict:
         return issue_json(visible(viewer, key))
+
+    @app.get(f"{API}/issue/{{key}}/transitions")
+    def get_transitions(key: str, viewer: Viewer = None) -> dict:
+        """The moves the workflow offers from the issue's status. The id of a transition is the status it leads to."""
+        issue = visible(viewer, key)
+        return {"transitions": [{"id": to, "name": to, "to": {"name": to}} for to in workflow.offered(issue.status)]}
+
+    @app.post(f"{API}/issue/{{key}}/transitions")
+    def do_transition(key: str, body: TransitionIn, background: BackgroundTasks, actor: Viewer = None) -> dict:
+        """Move the issue as `X-Sim-User` (required: a write is always somebody's). Real Jira answers 204 with no body;
+        the simulator returns the issue, which saves the connector a second call."""
+        issue = sim.transition_issue(key, str(body.transition.get("id") or ""), actor)
+        flush(background)
+        return issue_json(issue)
 
     @app.get(f"{API}/search")
     def search(viewer: Viewer = None, jql: str | None = None,
@@ -378,7 +403,8 @@ def create_app(sim: JiraSim | None = None, *, admin_token: str | None = None,
             body.project, body.summary, body.description, key=body.key, issue_type=body.issue_type,
             status=body.status, reporter=body.reporter, security_level=body.security_level,
             parent_key=body.parent_key, links=body.links, labels=body.labels, created_at=body.created_at,
-            updated_at=body.updated_at, version=body.version, assignee=body.assignee,
+            updated_at=body.updated_at, version=body.version, assignee=body.assignee, due=body.due,
+            priority=body.priority,
         )
         flush(background)
         return issue_json(issue)
@@ -386,7 +412,8 @@ def create_app(sim: JiraSim | None = None, *, admin_token: str | None = None,
     @admin.put("/admin/issues/{key}")
     def edit_issue(key: str, body: IssuePatch, background: BackgroundTasks) -> dict:
         issue = sim.update_issue(key, summary=body.summary, description=body.description, status=body.status,
-                                 links=body.links, version=body.version, updated_at=body.updated_at, assignee=body.assignee)
+                                 links=body.links, version=body.version, updated_at=body.updated_at, assignee=body.assignee,
+                                 due=body.due, priority=body.priority)
         flush(background)
         return issue_json(issue)
 

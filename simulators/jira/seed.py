@@ -56,5 +56,6 @@ def seed_company_a(sim: JiraSim, data: dict | None = None) -> None:
             project_key, doc["title"], doc["body"], key=key, reporter=doc["author"], security_level=level,
             links=doc["links"], labels=doc.get("tags", []), created_at=doc["created_at"],
             updated_at=doc["updated_at"], version=doc["version"],
-            status=fields.get("status"), assignee=by_name.get(fields.get("assignee")),
+            status=fields.get("status"), assignee=fields.get("assignee_email") or by_name.get(fields.get("assignee")),
+            due=fields.get("due"), priority=fields.get("priority"),
         )

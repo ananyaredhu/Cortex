@@ -1,15 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, SquareKanban } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import type { Source, Team } from "../api/types";
-import { keyAndTitle, shortId, when } from "../ask/format";
+import { shortId, when } from "../ask/format";
 import { usePersona } from "../auth/PersonaContext";
-import { PERSONAS } from "../auth/personas";
-import { Avatar } from "../components/Avatar";
+import type { PersonaId } from "../auth/personas";
 import { SourceGlyph } from "../components/SourceGlyph";
 import "../home/home.css";
+import { Board } from "./Board";
 import { isoDate, shortDay as day, sprintDay } from "./dates";
 import "./team.css";
 import { Timeline } from "./Timeline";
@@ -20,21 +20,6 @@ import { Timeline } from "./Timeline";
  * The timeline's dates and the sprint's name, dates and goal are kept by hand in the project registry; Jira's own sprint
  * field is not ingested, so the sprint's numbers follow a rule the API states (docs/02-contracts/api.md).
  */
-
-// The board's columns, in this order; a status outside them gets its own column after these, and an issue with none
-// goes under "No status".
-const COLUMNS = ["To Do", "In Progress", "In Review", "Done"];
-const NO_STATUS = "No status";
-
-type Issue = Team["issues"]["items"][number];
-
-function columns(items: Issue[]): { status: string; items: Issue[] }[] {
-  const by = new Map<string, Issue[]>();
-  for (const i of items) by.set(i.status ?? NO_STATUS, [...(by.get(i.status ?? NO_STATUS) ?? []), i]);
-  const extra = [...by.keys()].filter((s) => !COLUMNS.includes(s) && s !== NO_STATUS).sort();
-  const order = [...COLUMNS, ...extra, ...(by.has(NO_STATUS) ? [NO_STATUS] : [])];
-  return order.map((status) => ({ status, items: by.get(status) ?? [] }));
-}
 
 /** `today` is for tests; the page uses the viewer's own date. */
 export function TeamPage({ today }: { today?: string }) {
@@ -67,6 +52,7 @@ export function TeamPage({ today }: { today?: string }) {
         <TeamCard
           key={t.project_id}
           team={t}
+          persona={persona.id}
           today={now}
           onAsk={() => navigate("/ask", { state: { ask: `What is the status of the ${t.name.toLowerCase()}, and what is blocking it?` } })}
         />
@@ -112,8 +98,8 @@ function SprintStrip({ sprint, name, today }: { sprint: NonNullable<Team["sprint
   );
 }
 
-function TeamCard({ team: t, today, onAsk }: { team: Team; today: string; onAsk: () => void }) {
-  const { total, done, by_status, items } = t.issues;
+function TeamCard({ team: t, persona, today, onAsk }: { team: Team; persona: PersonaId; today: string; onAsk: () => void }) {
+  const { total, done, by_status } = t.issues;
   const id = `team-${t.project_id}`;
   return (
     <section className="card team__card" aria-labelledby={id}>
@@ -159,41 +145,7 @@ function TeamCard({ team: t, today, onAsk }: { team: Team; today: string; onAsk:
         ))}
       </div>
 
-      <div>
-        <h3 className="h3">
-          <SquareKanban size={16} aria-hidden /> Board
-        </h3>
-        {items.length === 0 ? (
-          <p className="muted small">No tickets you can see.</p>
-        ) : (
-          <div className="team__board">
-            {columns(items).map((col) => (
-              <section key={col.status} className="team__col" aria-label={`${t.name}: ${col.status}`}>
-                <h4 className="team__col-head">
-                  {col.status} <span className="muted mono">{col.items.length}</span>
-                </h4>
-                <ul>
-                  {col.items.map((i) => {
-                    const { key, title } = keyAndTitle(i);
-                    return (
-                      <li key={i.doc_id}>
-                        <a className={`team__ticket${i.mine ? " team__ticket--mine" : ""}`} href={i.url} target="_blank" rel="noreferrer">
-                          <span>{title}</span>
-                          <span className="team__ticket-foot">
-                            <span className="mono">{key}</span>
-                            {i.mine && <span className="team__mine">Yours</span>}
-                            {i.assignee && <Avatar src={PERSONAS.find((p) => p.name === i.assignee)?.avatar} name={i.assignee} size={22} />}
-                          </span>
-                        </a>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </section>
-            ))}
-          </div>
-        )}
-      </div>
+      <Board team={t} persona={persona} />
 
       <div className="team__cols">
         <div>

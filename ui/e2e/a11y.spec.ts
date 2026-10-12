@@ -24,6 +24,7 @@ const SCREENS: { name: string; persona: PersonaId; path: string; prepare?: (page
     prepare: (page) => ask(page, "What's the status of the database migration, and were there blockers raised in Slack last week?"),
   },
   { name: "Ask, refusal", persona: "sam", path: "/ask", prepare: (page) => ask(page, "Show me the security incident report from the Q3 breach") },
+  { name: "Routines", persona: "priya", path: "/routines", prepare: (page) => expect(page.getByRole("button", { name: "New routine" })).toBeVisible() },
   { name: "Compare", persona: "priya", path: "/compare" },
   {
     name: "Audit console with results",

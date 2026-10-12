@@ -3,6 +3,9 @@
 It is NOT a real or simulated platform: permissions are the token-overlap rule only.
 Real connectors and simulators must pass the same contract tests with richer semantics.
 """
+import re
+
+from connectors import workflow
 from connectors.base import (
     AccessDecision,
     AclEvidence,
@@ -12,10 +15,12 @@ from connectors.base import (
     DocumentNotFound,
     PlatformIdentity,
     Source,
+    TransitionRefused,
 )
 from fixtures.loader import State, can_see, persona_by_email, persona_by_id
 
 POLICY_VERSION = "fixture-0.2"
+_STATUS_LINE = re.compile(r"\bStatus: [A-Za-z][A-Za-z ]*[A-Za-z]")
 
 _SOURCE_PREFIXES = {
     "slack": ("channel:",),
@@ -110,3 +115,20 @@ class FixtureConnector:
 
     def version(self, doc_id: str) -> str:
         return self._doc(doc_id)["version"]
+
+    def transition(self, identity: PlatformIdentity, doc_id: str, status: str) -> Document:
+        """(0.5, Jira only) Move an issue along the shared workflow as `identity`. An issue the identity cannot open does
+        not exist for it. The issue's text and its field change together, its version moves and the feed reports an upsert."""
+        if self.source != "jira" or not self.check_access(identity, doc_id).allowed:
+            raise DocumentNotFound(doc_id)
+        d = self._doc(doc_id)
+        fields = dict(d.get("fields") or {})
+        to = workflow.match(fields.get("status"), status)
+        if to is None:
+            raise TransitionRefused(doc_id)
+        now = self.state.data["now"]
+        moves = d.get("moves", 0) + 1
+        body = _STATUS_LINE.sub(f"Status: {to}", d["body"], count=1) if _STATUS_LINE.search(d["body"]) else f"{d['body']} Status: {to}."
+        d.update(body=body, fields={**fields, "status": to}, updated_at=now, version=f"{now}#moved{moves}", moves=moves)
+        self._log.append(Change("upsert", doc_id, now))
+        return self.fetch(doc_id)

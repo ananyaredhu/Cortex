@@ -1,11 +1,13 @@
-import { useQueryClient } from "@tanstack/react-query";
-import { PanelRight } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { CalendarClock, PanelRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
 import { api, ApiError } from "../api/client";
 import type { AskResponse, ConversationTurn, Source } from "../api/types";
 import { usePersona } from "../auth/PersonaContext";
 import { Avatar } from "../components/Avatar";
+import { whenIn } from "../routines/format";
+import { RoutineForm, type RoutineSeed } from "../routines/RoutineForm";
 import { AnswerCard } from "./AnswerCard";
 import { Composer } from "./Composer";
 import { EmptyState, Suggestions } from "./EmptyState";
@@ -21,6 +23,11 @@ interface Turn {
   error?: string;
   /** A reopened answer the asker may no longer see: a cited document was revoked since (api.md, conversations). */
   withheld?: boolean;
+  /** A reopened turn that was a routine's run (api.md 0.3), and when it ran. */
+  routineId?: string | null;
+  askedAt?: string;
+  /** What was searched, so "Make this a routine" keeps the same scope. */
+  sources?: Source[];
 }
 
 /** "idle": a live chat. "loading": fetching a reopened conversation. "missing": not the caller's, or gone. */
@@ -93,6 +100,8 @@ export function AskPage() {
           times: {},
           answer: t.withheld ? undefined : restored(t, c.conversation_id),
           withheld: t.withheld,
+          routineId: t.routine_id,
+          askedAt: t.asked_at,
         }));
         setTurns(loaded);
         setSelected([...loaded].reverse().find((t) => t.answer)?.id ?? null);
@@ -119,7 +128,7 @@ export function AskPage() {
   const ask = async (question: string, sources: Source[] = []) => {
     const id = nextId.current++;
     const asker = persona.id;
-    setTurns((ts) => [...ts, { id, question, times: {} }]);
+    setTurns((ts) => [...ts, { id, question, times: {}, sources }]);
     setSelected(id);
     setWhyLit(false);
     try {
@@ -151,6 +160,14 @@ export function AskPage() {
     ask(q);
   }, [location.key]);
 
+  // The chat's name, once it has one (a generated title or the person's own); the same query the sidebar keeps fresh.
+  const named = useQuery({ queryKey: ["conversations", persona.id], queryFn: () => api(persona.id).conversations() });
+  const title = named.data?.conversations.find((c) => c.conversation_id === conversationId)?.title;
+  // The person's routines, to say which one produced a reopened run; asked for only when a turn is one.
+  const [routineSeed, setRoutineSeed] = useState<RoutineSeed | null>(null);
+  const fromRoutine = turns.some((t) => t.routineId);
+  const routines = useQuery({ queryKey: ["routines", persona.id], queryFn: () => api(persona.id).routines(), enabled: fromRoutine });
+  const routineOf = (id: string) => routines.data?.routines.find((r) => r.routine_id === id);
   const shown = turns.find((t) => t.id === selected)?.answer ?? null;
   // Nothing asked yet: the greeting, the composer and the suggestions sit together in the middle of the page.
   const fresh = turns.length === 0 && load !== "loading";
@@ -169,7 +186,7 @@ export function AskPage() {
     <div className={`ask${trust ? " ask--trust" : ""}`}>
       <div className={`ask__main${fresh ? " ask__main--fresh" : ""}`}>
         <header className="ask__head">
-          <span className="ask__title">{turns[0]?.question || "New question"}</span>
+          <span className="ask__title">{(turns.length > 0 && title) || turns[0]?.question || "New question"}</span>
           {persona.guest && <span className="guest-badge">{persona.guest}</span>}
           {!trustOpen && !fresh && (
             <button type="button" className="ghost" aria-expanded={false} onClick={() => openTrust(true)}>
@@ -199,6 +216,13 @@ export function AskPage() {
                 className={`turn${t.id === selected ? " turn--selected" : ""}`}
                 onClick={() => t.answer && setSelected(t.id)}
               >
+                {t.routineId && (
+                  <p className="turn__routine">
+                    <CalendarClock size={13} aria-hidden /> From your routine
+                    {routineOf(t.routineId) ? ` “${routineOf(t.routineId)!.name}”` : ""}
+                    {t.askedAt ? ` · ${whenIn(t.askedAt, routineOf(t.routineId)?.timezone ?? "UTC")}` : ""}
+                  </p>
+                )}
                 {t.question && (
                   <div className="turn__q">
                     <Avatar src={persona.avatar} name={persona.name} size={28} />
@@ -210,6 +234,7 @@ export function AskPage() {
                     asker={persona.id}
                     answer={t.answer}
                     onChoose={(q) => ask(q)}
+                    onRoutine={t.question ? () => setRoutineSeed({ question: t.question, sources: t.sources }) : undefined}
                     onTrust={() => {
                       setSelected(t.id);
                       setTrustOpen(true);
@@ -239,12 +264,13 @@ export function AskPage() {
         </div>
 
         <div className="ask__composer">
-          <Composer busy={busy} onAsk={ask} />
+          <Composer busy={busy} onAsk={ask} onRoutine={(question, sources) => setRoutineSeed({ question, sources })} />
           {fresh && <Suggestions onAsk={(q) => ask(q)} />}
         </div>
         <p className="footnote ask__promise">Cortex never shows what you couldn’t open yourself. Every question is logged.</p>
       </div>
 
+      {routineSeed && <RoutineForm persona={persona.id} seed={routineSeed} onClose={() => setRoutineSeed(null)} />}
       {trust && <TrustPanel answer={shown} highlightWhy={whyLit} onClose={() => openTrust(false)} />}
     </div>
   );

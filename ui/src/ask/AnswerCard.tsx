@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, Check, CloudOff, Copy, ExternalLink, ShieldCheck, ShieldQuestion, Sparkles, WifiOff } from "lucide-react";
+import { AlertTriangle, CalendarClock, Check, CloudOff, Copy, ExternalLink, ShieldCheck, ShieldQuestion, Sparkles, WifiOff } from "lucide-react";
 import { useId, useState } from "react";
 import { api } from "../api/client";
 import type { AskResponse, Citation } from "../api/types";
@@ -22,12 +22,14 @@ export function AnswerCard({
   onWhyMore,
   onTrust,
   onChoose,
+  onRoutine,
 }: {
   asker: PersonaId;
   answer: AskResponse;
   onWhyMore?: () => void; // absent where there is no Trust panel (split-screen)
   onTrust?: () => void; // phones: the "Trust" pill opens this answer's Trust panel as a bottom sheet
   onChoose: (question: string) => void;
+  onRoutine?: () => void; // "Make this a routine": absent where there is no question to save (split-screen)
 }) {
   // `active` lights a marker and its source row together. The excerpt opens from a marker only, and floats
   // over the card at that marker, so nothing below it moves.
@@ -173,6 +175,11 @@ export function AnswerCard({
         <button type="button" className="ghost" onClick={copy}>
           {copied ? <Check size={14} aria-hidden /> : <Copy size={14} aria-hidden />} {copied ? "Copied" : "Copy"}
         </button>
+        {onRoutine && (
+          <button type="button" className="ghost" onClick={onRoutine}>
+            <CalendarClock size={14} aria-hidden /> Make this a routine
+          </button>
+        )}
         {onWhyMore && (
           <button type="button" className="ghost ghost--accent" onClick={onWhyMore} aria-controls="trust-why">
             <ShieldQuestion size={14} aria-hidden /> Why might I not see everything?

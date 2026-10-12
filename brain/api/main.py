@@ -27,4 +27,7 @@ try:
 except UnsafeConfiguration as exc:
     raise SystemExit(str(exc)) from exc
 
-app = create_app(fixture_runtime(fixture_settings_from_env()) if _fixture else env_runtime(_settings))
+_runtime = fixture_runtime(fixture_settings_from_env()) if _fixture else env_runtime(_settings)
+if _runtime.settings.routines:                          # BRAIN_ROUTINES=1: run due routines whether or not anyone has the UI open
+    _runtime.start_routine_loop()
+app = create_app(_runtime)

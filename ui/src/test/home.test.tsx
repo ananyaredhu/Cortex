@@ -117,6 +117,46 @@ it("filters tickets to the person's own", async () => {
   expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
 });
 
+it("shows a ticket's deadline and priority, and filters by them", async () => {
+  // 0.3: /mywork carries the fields itself. One ticket is long overdue, one is far off, the rest have no deadline.
+  const dated: MyWork = {
+    ...WORK,
+    issues: WORK.issues.map((i) =>
+      i.doc_id === "jira:PAYINC-9"
+        ? { ...i, status: "To Do", due_date: "2020-01-06", priority: "High" }
+        : i.doc_id === "jira:PAYINC-10"
+          ? { ...i, status: "Done", due_date: "2020-01-07", priority: "Low" }
+          : i.doc_id === "jira:PAYINC-11"
+            ? { ...i, due_date: "2999-01-01" }
+            : i,
+    ),
+  };
+  renderHome(dated);
+  const tickets = await section("My tickets");
+  expect(await within(tickets).findByText(/Overdue · due 6 Jan/)).toBeInTheDocument();
+  expect(within(tickets).getByText("High")).toBeInTheDocument();
+  expect(within(tickets).getByText(/^Due 7 Jan/)).toBeInTheDocument(); // finished, so not overdue
+
+  await addFilter("Deadline");
+  await userEvent.click(screen.getByRole("checkbox", { name: "Overdue" }));
+  expect(within(tickets).getAllByRole("listitem")).toHaveLength(1);
+  expect(within(tickets).getByRole("link", { name: "Root cause" })).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("checkbox", { name: "Due later" }));
+  expect(within(tickets).getAllByRole("listitem")).toHaveLength(3);
+  await userEvent.click(screen.getByRole("button", { name: "Clear all" }));
+  await addFilter("Priority");
+  await userEvent.click(screen.getByRole("checkbox", { name: "Low" }));
+  expect(within(tickets).getAllByRole("listitem")).toHaveLength(1);
+});
+
+it("offers no deadline or priority filter while no ticket has one", async () => {
+  renderHome();
+  await section("My tickets");
+  await userEvent.click(screen.getByRole("button", { name: "Add filter" }));
+  expect(screen.queryByRole("button", { name: /^Deadline/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /^Priority/ })).not.toBeInTheDocument();
+});
+
 it("is one column with no changed-answers box and no questions box", async () => {
   renderHome({ ...WORK, alerts: [{ request_id: "r1", changed_doc: "confluence:PAY/runbook", changed_at: "2026-10-10T09:00:00Z", summary: "", question: "Q?" }] });
   await section("My tickets");

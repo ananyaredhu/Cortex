@@ -1,4 +1,4 @@
-// Types for docs/02-contracts/api.md (0.2). Keep in step with the contract: change the contract first.
+// Types for docs/02-contracts/api.md (0.2, and the 0.3 proposals). Keep in step with the contract: change the contract first.
 // Fields marked "0.2" are optional: the real API may not send them yet, so every consumer must cope with absence.
 
 export type Source = "confluence" | "jira" | "slack" | "gdrive";
@@ -67,7 +67,9 @@ export const STAGES: Stage[] = ["retrieve", "authorize", "verify_live", "generat
 
 export interface Conversation {
   conversation_id: string;
+  /** The name the person gave it, else a title generated from the first question alone, else that question (0.3). */
   title: string;
+  title_source?: "question" | "generated" | "custom"; // 0.3
   last_asked_at: string;
 }
 
@@ -84,6 +86,7 @@ export interface ConversationTurn {
   refused: boolean;
   abstained: boolean;
   unavailable?: boolean; // the answer service failed for this turn
+  routine_id?: string | null; // 0.3: the routine whose run this was
 }
 
 export interface ConversationDetail extends Conversation {
@@ -101,7 +104,10 @@ export interface StaleAlert {
 
 export interface MyWork {
   user: { display_name: string; roles: string[] };
-  issues: { doc_id: string; title: string; status?: string | null; url?: string }[];
+  issues: ({ doc_id: string; title: string; status?: string | null; url?: string } & IssueExtras & {
+      assignee?: string | null; // 0.3
+      mine?: boolean; // 0.3
+    })[];
   projects: string[];
   channels: string[];
   /** (0.2, optional) What to call each channel, taken from threads the caller may open. A real Slack ID says nothing. */
@@ -109,6 +115,56 @@ export interface MyWork {
   recent_pages: { doc_id: string; title: string; updated_at: string; url?: string }[];
   suggested_questions: string[];
   alerts: StaleAlert[];
+  routines?: Routine[]; // 0.3: what GET /v1/routines returns
+}
+
+// Routines (api.md 0.3, docs/routines.md): a question its owner has Cortex ask again on a schedule, as themselves.
+export interface RoutineSchedule {
+  frequency: "daily" | "weekdays" | "weekly";
+  weekday: number | null; // Monday = 0; set only for weekly
+  time: string; // "HH:MM" in the routine's time zone
+}
+
+/** One run. There is no answer text here: a run opens through its conversation, which may withhold it. */
+export interface RoutineRun {
+  request_id: string;
+  conversation_id: string | null; // null for a skipped run
+  ran_at: string;
+  outcome: "answered" | "abstained" | "unavailable" | "skipped";
+  unread: boolean;
+}
+
+export interface Routine {
+  routine_id: string;
+  name: string;
+  question: string;
+  sources: Source[];
+  schedule: RoutineSchedule;
+  timezone: string; // IANA name
+  status: "active" | "paused";
+  paused_reason: string | null; // null when the owner paused it
+  next_run_at: string | null;
+  last_run: RoutineRun | null;
+}
+
+export type RoutineDraft = Pick<Routine, "name" | "question" | "sources" | "schedule" | "timezone">;
+
+/** (0.3) What an issue also carries in /v1/team and /v1/mywork; each may be absent or null. */
+export interface IssueExtras {
+  updated_at?: string | null;
+  due_date?: string | null; // YYYY-MM-DD
+  priority?: string | null; // the platform's name, e.g. "High"
+  /** The caller is the assignee by account, so the card may be offered for moving. POST /v1/issues/move decides again. */
+  can_move?: boolean;
+}
+
+/** POST /v1/issues/move (0.3): the issue as Jira now holds it. `indexed` is false when the index will catch up at the next sync. */
+export interface MovedIssue {
+  request_id: string;
+  doc_id: string;
+  status: string | null;
+  updated_at: string | null;
+  indexed: boolean;
 }
 
 // GET /v1/team: the registry projects the caller is a member of. Every count covers only documents they may open.
@@ -128,7 +184,7 @@ export interface Team {
     done: number;
     by_status: { status: string; count: number }[];
     // assignee is a display name read from the issue; mine marks the caller's own issues
-    items: { doc_id: string; title: string; status: string | null; assignee: string | null; mine: boolean; url: string }[];
+    items: ({ doc_id: string; title: string; status: string | null; assignee: string | null; mine: boolean; url: string } & IssueExtras)[];
   };
   updates: { doc_id: string; title: string; source: Source; place: string; author: string | null; updated_at: string; url: string }[];
 }

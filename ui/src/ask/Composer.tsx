@@ -1,4 +1,4 @@
-import { ArrowUp } from "lucide-react";
+import { ArrowUp, CalendarClock } from "lucide-react";
 import { useState } from "react";
 import { SOURCES, type Source } from "../api/types";
 import { SourceGlyph, SOURCE_LABEL } from "../components/SourceGlyph";
@@ -8,9 +8,11 @@ import { SourceGlyph, SOURCE_LABEL } from "../components/SourceGlyph";
 export function Composer({
   busy,
   onAsk,
+  onRoutine,
 }: {
   busy: boolean;
   onAsk: (question: string, sources: Source[]) => void;
+  onRoutine?: (question: string, sources: Source[]) => void; // absent where routines are not offered (split-screen)
 }) {
   const [draft, setDraft] = useState("");
   const [scope, setScope] = useState<Source[]>([]); // empty = all sources
@@ -56,6 +58,18 @@ export function Composer({
           ))}
         </div>
         <span className="composer__hint mono muted">Ctrl Enter</span>
+        {onRoutine && (
+          <button
+            type="button"
+            className="composer__routine"
+            aria-label="Ask this on a schedule"
+            title="Ask this on a schedule"
+            disabled={!draft.trim()}
+            onClick={() => onRoutine(draft.trim(), scope)}
+          >
+            <CalendarClock size={18} />
+          </button>
+        )}
         <button type="submit" className="composer__send" aria-label="Ask" disabled={busy || !draft.trim()}>
           <ArrowUp size={18} />
         </button>

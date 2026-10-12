@@ -59,6 +59,8 @@ class Settings:
     link_per_source: int = 2                  # allowed link targets kept per source
     link_total: int = 4                       # allowed link targets kept in all
     link_discount: float = 0.5                # a link target ranks at this fraction of the hit that linked to it
+    routines: bool = False                    # run due routines on a schedule (BRAIN_ROUTINES=1); the endpoints are served either way
+    routines_tick_s: float = 30.0             # how often the scheduler looks for due routines
     generator_backend: str = "auto"           # auto | adp | openai | template
     generator_base_url: str | None = None
     generator_api_key: str | None = None
@@ -101,6 +103,7 @@ class Settings:
             audit_head_path=env("AUDIT_HEAD_PATH") or None,
             audit_head_adopt=env("AUDIT_HEAD_ADOPT") == "1",
             baseline_interval_s=float(env("BRAIN_BASELINE_INTERVAL_S") or cls.baseline_interval_s),
+            routines=(env("BRAIN_ROUTINES") or "0").strip() == "1",
             identity_ttl_s=float(env("BRAIN_IDENTITY_TTL_S") or cls.identity_ttl_s),
             decision_ttl_s=float(env("BRAIN_DECISION_TTL_S") or cls.decision_ttl_s),
             audit_planner_base_url=env("AUDIT_PLANNER_BASE_URL") or None,

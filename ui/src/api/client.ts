@@ -11,10 +11,14 @@ import type {
   ExplainAccess,
   FreshnessReport,
   LeakCiReport,
+  MovedIssue,
   MyWork,
   PolicyDecision,
   PolicyVersions,
   Replay,
+  Routine,
+  RoutineDraft,
+  RoutineRun,
   Stage,
   StaleAlert,
   Team,
@@ -63,8 +67,21 @@ export function api(persona: PersonaId) {
       askStream(persona, req, onStage),
     conversations: () => call<{ conversations: Conversation[] }>(persona, "/v1/conversations"),
     conversation: (id: string) => call<ConversationDetail>(persona, `/v1/conversations/${encodeURIComponent(id)}`),
+    /** Name one's own conversation; `null` goes back to the generated title (api.md 0.3). */
+    renameConversation: (id: string, title: string | null) =>
+      call<Conversation>(persona, `/v1/conversations/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ title }) }),
     mywork: () => call<MyWork>(persona, "/v1/mywork"),
     team: () => call<{ teams: Team[] }>(persona, "/v1/team"),
+    routines: () => call<{ routines: Routine[] }>(persona, "/v1/routines"),
+    createRoutine: (draft: RoutineDraft) => call<Routine>(persona, "/v1/routines", post(draft)),
+    updateRoutine: (id: string, patch: Partial<RoutineDraft> & { status?: Routine["status"] }) =>
+      call<Routine>(persona, `/v1/routines/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(patch) }),
+    deleteRoutine: (id: string) => call<{ deleted: string }>(persona, `/v1/routines/${encodeURIComponent(id)}`, { method: "DELETE" }),
+    /** Run now: an ordinary question from the caller, marked as the routine's. */
+    runRoutine: (id: string) => call<AskResponse>(persona, `/v1/routines/${encodeURIComponent(id)}/run`, { method: "POST" }),
+    routineRuns: (id: string) => call<{ runs: RoutineRun[] }>(persona, `/v1/routines/${encodeURIComponent(id)}/runs`),
+    /** Move one's own Jira issue to another status; the Brain decides again whether the caller may (api.md 0.3). */
+    moveIssue: (docId: string, status: string) => call<MovedIssue>(persona, "/v1/issues/move", post({ doc_id: docId, status })),
     alerts: () => call<{ alerts: StaleAlert[] }>(persona, "/v1/alerts"),
     explainAccess: (docId: string) =>
       call<ExplainAccess>(persona, `/v1/explain-access?doc_id=${encodeURIComponent(docId)}`),
