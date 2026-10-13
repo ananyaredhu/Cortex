@@ -14,6 +14,7 @@ import { DemoControls } from "./demo/DemoControls";
 import { COMPARE_PEOPLE, DEMO_CONTROLS } from "./demo/sim";
 import { HomePage } from "./home/HomePage";
 import { RoutinesPage } from "./routines/RoutinesPage";
+import { SourceViewerProvider } from "./source/SourceViewer";
 import { TeamPage } from "./team/TeamPage";
 
 export function App() {
@@ -23,6 +24,7 @@ export function App() {
   useEffect(() => setNavOpen(false), [location.key, persona.id]);
 
   return (
+    <SourceViewerProvider>
     <div className="app">
       <a className="skip-link" href="#main">
         Skip to content
@@ -53,5 +55,6 @@ export function App() {
       </main>
       {DEMO_CONTROLS && <DemoControls />}
     </div>
+    </SourceViewerProvider>
   );
 }

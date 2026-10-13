@@ -3,6 +3,7 @@ import { SquareKanban } from "lucide-react";
 import { type DragEvent, useState } from "react";
 import { api, ApiError } from "../api/client";
 import type { Team } from "../api/types";
+import { SourceLink } from "../source/SourceViewer";
 import { keyAndTitle } from "../ask/format";
 import type { PersonaId } from "../auth/personas";
 import { PERSONAS } from "../auth/personas";
@@ -130,9 +131,9 @@ export function Board({ team: t, persona }: { team: Team; persona: PersonaId }) 
                         e.dataTransfer.effectAllowed = "move";
                       }}
                     >
-                      <a href={i.url} target="_blank" rel="noreferrer" draggable={false}>
+                      <SourceLink docId={i.doc_id} href={i.url} draggable={false}>
                         {title}
-                      </a>
+                      </SourceLink>
                       <span className="team__ticket-foot">
                         <span className="mono">{issueKey}</span>
                         {i.mine && <span className="team__mine">Yours</span>}

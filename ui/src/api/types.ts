@@ -191,6 +191,11 @@ export interface Team {
 
 export type ExplainAccess = { found: true; proof_path: string[] } | { found: false };
 
+/** `GET /v1/source` (api.md 0.4): a document's text for the in-app viewer, or the uniform `found: false`. */
+export type SourceDoc =
+  | { found: true; doc_id: string; title: string; url: string; source: Source; as_of: string | null; text: string; truncated: boolean; why_visible: string[]; flags: string[] }
+  | { found: false };
+
 export interface AuditDecision {
   doc_id?: string;
   doc_id_hash?: string;

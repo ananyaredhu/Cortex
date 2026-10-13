@@ -5,6 +5,7 @@ import { api } from "../api/client";
 import type { AskResponse, Citation } from "../api/types";
 import type { PersonaId } from "../auth/personas";
 import { SourceGlyph, SOURCE_LABEL } from "../components/SourceGlyph";
+import { SourceLink, useSourceViewer } from "../source/SourceViewer";
 import { answerSegments, banners, shortId, uncitedClaims, when } from "./format";
 
 // The excerpt popover's width and its gap from the card's edge, in px (.cite-tip in ask.css).
@@ -33,6 +34,7 @@ export function AnswerCard({
 }) {
   // `active` lights a marker and its source row together. The excerpt opens from a marker only, and floats
   // over the card at that marker, so nothing below it moves.
+  const viewer = useSourceViewer();
   const [active, setActive] = useState<number | null>(null);
   const [tipAt, setTipAt] = useState<{ n: number; left: number; top: number } | null>(null);
   const tipId = useId();
@@ -105,7 +107,7 @@ export function AnswerCard({
               onMouseLeave={closeTip}
               onFocus={(e) => openTip(s.n, e.currentTarget)}
               onBlur={closeTip}
-              onClick={() => window.open(s.citation.url, "_blank", "noopener,noreferrer")}
+              onClick={() => (viewer ? viewer.open({ docId: s.citation.doc_id, title: s.citation.title, asker }) : window.open(s.citation.url, "_blank", "noopener,noreferrer"))}
             >
               {s.n}
             </button>
@@ -218,9 +220,9 @@ function SourceRow({
         <span className="source__where mono">
           {SOURCE_LABEL[c.source]} · {shortId(c.doc_id)}
         </span>
-        <a href={c.url} target="_blank" rel="noreferrer" className="source__title">
+        <SourceLink docId={c.doc_id} title={c.title} asker={asker} href={c.url} className="source__title">
           {c.title} <ExternalLink size={12} aria-hidden />
-        </a>
+        </SourceLink>
       </span>
       <span className="source__meta">
         <span className="source__asof mono muted">as of {when(c.as_of)}</span>
