@@ -45,6 +45,7 @@ class Routine:
     last_run: dict | None = None         # {request_id, conversation_id, ran_at, outcome}
     skips: int = 0                       # scheduled runs in a row skipped because the owner could not be resolved
     retried: bool = False                # the one retry after an unavailable answer service has been used
+    running_since: str | None = None     # set while a run is being answered, so the owner can see it is under way
 
 
 class RoutineStore(Protocol):

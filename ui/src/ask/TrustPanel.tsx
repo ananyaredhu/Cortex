@@ -17,10 +17,13 @@ const FRESH: Record<FreshnessStatus, { label: string; tone: string }> = {
  */
 export function TrustPanel({
   answer,
+  recordedAt,
   highlightWhy,
   onClose,
 }: {
   answer: AskResponse | null;
+  /** Set for a reopened answer: the panel then shows what was recorded when it was answered, and says so. */
+  recordedAt?: string;
   highlightWhy: boolean;
   onClose: () => void;
 }) {
@@ -102,6 +105,7 @@ export function TrustPanel({
                 );
               })}
             </ul>
+            {recordedAt && answer.freshness && <p className="small">As it was when this was answered, {when(recordedAt)}.</p>}
             <p className="muted small">Target: changes searchable within 5 minutes, never more than 1 hour.</p>
           </section>
 
@@ -130,7 +134,7 @@ export function TrustPanel({
                 )}
               </>
             ) : (
-              <p className="muted small">No statements to check.</p>
+              <p className="muted small">{recordedAt && answer.citations.length > 0 ? "Not recorded for this answer." : "No statements to check."}</p>
             )}
           </section>
 

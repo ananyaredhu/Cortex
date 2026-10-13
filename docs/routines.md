@@ -63,6 +63,13 @@ A routine run is an ordinary `/ask`: same pipeline, same permission checks at th
 | N5 | Routines and their run history survive a restart of the Brain. |
 | N6 | Admin shows how many runs happened, failed and were skipped in the last day, as totals only. |
 
+### Added 13 Oct (branch `ws-c/routines-run-state`)
+| ID | Requirement |
+|---|---|
+| F10 | A run that is being answered says so wherever the routine is named: a "Running now" label and a moving bar on its card, a dot beside Routines in the sidebar, and on My Work. "Run now" is not offered while it runs. The routine carries `running` for this (api.md). |
+| F11 | Each routine has a history page (`/routines/{id}` in the UI): every run, newest first, skipped ones included, with the chosen run's answer beside the list and a link that opens it in Ask. The answer is read through the run's conversation, so S3 holds there unchanged. |
+| F12 | A run opened in Ask has a filled Trust panel: the sources searched, freshness, grounding and policy version recorded when it ran, marked as being from that time. |
+
 ## 4. How it works
 
 ### Data
@@ -97,7 +104,8 @@ A loop in the Brain's runtime, next to the existing identity baseline sweep: eve
 - **Routines list:** a section reachable from the sidebar, in two tabs. *Yours*: each routine with its schedule, next run, last outcome, and pause, edit, delete, run now; with none yet, a prompt to create the first one or start from a template. *Templates*: eight starting points (morning brief, stand-up prep, week ahead, weekly wrap-up, blocker watch, decision log, incident follow-ups, design discussions) in `ui/src/routines/templates.ts`, each run against the real Brain on 12 Oct. The first four ask about "my" tickets and rely on the `my-work` skill (skills-format 0.3). Two were dropped because nothing can answer them yet: pages changed in the last week (no search by date) and threads the person has not replied to (no lookup of who was asked). A template only fills the form; every field can be changed before saving, and what is saved is an ordinary routine. Templates read and report, never act (see "Out").
 - **Instructions, not a question.** The form's text box is labelled "Instructions" and takes several steps ("1. List my open tickets. 2. Say what changed."). It is still the routine's `question` on the wire and in the audit log, and a run is still one ordinary `/ask` (S6, S8): the wording changed, the contract did not.
 - **My Work:** a "Routines" block above "My tickets", one line per routine with the first lines of the latest answer and an unread dot. A routine card can be dragged into Current focus like any other row.
-- A run opened in Ask looks like any reopened conversation, with a line saying which routine produced it and when.
+- A run opened in Ask looks like any reopened conversation, with a line saying which routine produced it and when, and a link to all of that routine's runs.
+- **Routine history:** the routine's name in the list, and "History", open its runs and their answers on one page (F11).
 
 ## 5. Tests that must exist before it is switched on
 - **Revoked before a run:** a routine cites a document; the owner loses access; the next run does not use, cite or mention it, and the response is the same as if the document had never existed.

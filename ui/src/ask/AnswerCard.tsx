@@ -1,11 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, CalendarClock, Check, CloudOff, Copy, ExternalLink, ShieldCheck, ShieldQuestion, Sparkles, WifiOff } from "lucide-react";
+import { AlertTriangle, CalendarClock, Check, CloudOff, Copy, ExternalLink, Pin, PinOff, ShieldCheck, ShieldQuestion, Sparkles, WifiOff } from "lucide-react";
 import { useId, useState } from "react";
 import { api } from "../api/client";
 import type { AskResponse, Citation } from "../api/types";
 import type { PersonaId } from "../auth/personas";
 import { SourceGlyph, SOURCE_LABEL } from "../components/SourceGlyph";
 import { SourceLink, useSourceViewer } from "../source/SourceViewer";
+import { useFocus } from "../home/focus";
 import { answerSegments, banners, shortId, uncitedClaims, when } from "./format";
 
 // The excerpt popover's width and its gap from the card's edge, in px (.cite-tip in ask.css).
@@ -24,6 +25,7 @@ export function AnswerCard({
   onTrust,
   onChoose,
   onRoutine,
+  pinnable = false,
 }: {
   asker: PersonaId;
   answer: AskResponse;
@@ -31,6 +33,7 @@ export function AnswerCard({
   onTrust?: () => void; // phones: the "Trust" pill opens this answer's Trust panel as a bottom sheet
   onChoose: (question: string) => void;
   onRoutine?: () => void; // "Make this a routine": absent where there is no question to save (split-screen)
+  pinnable?: boolean; // each source can be pinned to the asker's Current focus on My Work; off in split-screen
 }) {
   // `active` lights a marker and its source row together. The excerpt opens from a marker only, and floats
   // over the card at that marker, so nothing below it moves.
@@ -39,6 +42,7 @@ export function AnswerCard({
   const [tipAt, setTipAt] = useState<{ n: number; left: number; top: number } | null>(null);
   const tipId = useId();
   const [copied, setCopied] = useState(false);
+  const focus = useFocus(asker);
   const segments = answerSegments(answer);
   const tip = tipAt ? answer.citations[tipAt.n - 1] : null;
   const openTip = (n: number, marker: HTMLElement) => {
@@ -167,6 +171,8 @@ export function AnswerCard({
                 citation={c}
                 lit={active === i + 1}
                 onHover={(on) => setActive(on ? i + 1 : null)}
+                pinned={pinnable ? focus.ids.includes(c.doc_id) : undefined}
+                onPin={() => (focus.ids.includes(c.doc_id) ? focus.remove(c.doc_id) : focus.put(c.doc_id))}
               />
             ))}
           </ol>
@@ -198,12 +204,16 @@ function SourceRow({
   citation: c,
   lit,
   onHover,
+  pinned,
+  onPin,
 }: {
   asker: PersonaId;
   n: number;
   citation: Citation;
   lit: boolean;
   onHover: (on: boolean) => void;
+  pinned?: boolean; // undefined: no pin here
+  onPin: () => void;
 }) {
   const [why, setWhy] = useState(false);
   const proof = useQuery({
@@ -224,6 +234,18 @@ function SourceRow({
           {c.title} <ExternalLink size={12} aria-hidden />
         </SourceLink>
       </span>
+      {pinned !== undefined && (
+        <button
+          type="button"
+          className="home__pin source__pin"
+          aria-pressed={pinned}
+          aria-label={`${pinned ? "Remove" : "Add"} ${c.title} ${pinned ? "from" : "to"} Current focus`}
+          title={pinned ? "Remove from Current focus on My work" : "Pin to Current focus on My work"}
+          onClick={onPin}
+        >
+          {pinned ? <PinOff size={14} aria-hidden /> : <Pin size={14} aria-hidden />}
+        </button>
+      )}
       <span className="source__meta">
         <span className="source__asof mono muted">as of {when(c.as_of)}</span>
         <button type="button" className="ghost small" aria-expanded={why} onClick={() => setWhy(!why)}>

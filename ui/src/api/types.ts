@@ -73,8 +73,8 @@ export interface Conversation {
   last_asked_at: string;
 }
 
-/** One turn of a reopened conversation (GET /v1/conversations/{id}): what the audit log holds, no claims or
- *  freshness. `withheld` means a cited document is no longer visible to the asker: the answer is not shown again. */
+/** One turn of a reopened conversation (GET /v1/conversations/{id}): what the audit log holds, so no claims.
+ *  `withheld` means a cited document is no longer visible to the asker: the answer is not shown again. */
 export interface ConversationTurn {
   request_id: string;
   asked_at: string;
@@ -87,6 +87,13 @@ export interface ConversationTurn {
   abstained: boolean;
   unavailable?: boolean; // the answer service failed for this turn
   routine_id?: string | null; // 0.3: the routine whose run this was
+  // 0.3: the trust signals as they were when the turn was answered; each is null on a withheld turn. A turn logged
+  // before they were recorded has only `coverage`, and only for the sources it cited.
+  coverage?: Coverage | null;
+  freshness?: Freshness | null;
+  grounding?: AskResponse["grounding"];
+  policy_version?: string | null;
+  unavailable_sources?: Source[] | null;
 }
 
 export interface ConversationDetail extends Conversation {
@@ -145,6 +152,7 @@ export interface Routine {
   paused_reason: string | null; // null when the owner paused it
   next_run_at: string | null;
   last_run: RoutineRun | null;
+  running?: boolean; // a run is being answered right now
 }
 
 export type RoutineDraft = Pick<Routine, "name" | "question" | "sources" | "schedule" | "timezone">;

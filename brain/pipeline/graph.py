@@ -51,7 +51,8 @@ NODE_STAGE = {"identity": "retrieve", "understand": "retrieve", "retrieve": "ret
 UNVERIFIED = "freshness_unverified"      # evidence whose live version check failed; the indexed copy was served
 TEAM_DOCS = 500              # documents read per caller for Team focus; its counts cover at most this many
 MY_ISSUES = 8                # the asker's own issues a "my work" skill adds to the candidates (skills-format, `adds`)
-STALE_AFTER_S = 300          # a source whose last successful pass is older than this is reported "stale"
+TRUST_FIELDS = ("coverage", "freshness", "grounding", "policy_version", "unavailable_sources")   # null on a withheld turn
+STALE_AFTER_S = 300         # a source whose last successful pass is older than this is reported "stale"
 
 
 @dataclass
@@ -627,6 +628,12 @@ class Brain:
             "flags": state["flags"],
             "links_followed": [{"doc_id": t, "via_link_from": f} for t, f in sorted(state.get("linked", {}).items())],
             "latency_ms": int((time.monotonic() - state["started"]) * 1000),
+            # What the Trust panel showed the asker, so a reopened answer (a routine's run among them) can show it again.
+            # Nothing here depends on a document the asker could not open: which sources were searched, how fresh each
+            # was, and the checker's score for the claims that were shown.
+            "trust": {"searched": list(state["searched"]), "unavailable_sources": list(resp["unavailable_sources"]),
+                      "per_source": resp["freshness"]["per_source"], "stale_refetched": resp["freshness"]["stale_refetched"],
+                      "grounding": resp["grounding"], "policy_version": resp["policy_version"]},
         }
         if req.routine_id:
             event["routine_id"] = req.routine_id
@@ -905,7 +912,24 @@ class Brain:
         return {"request_id": event["request_id"], "asked_at": event.get("ts"), "question": event["query"]["text"],
                 "skill": event["query"].get("skill"), "answer": answer.get("text") if ok else None, "withheld": not ok,
                 "citations": citations, "refused": bool(answer.get("refused")), "abstained": bool(answer.get("abstained")),
-                "unavailable": bool(answer.get("unavailable")), "routine_id": event.get("routine_id")}
+                "unavailable": bool(answer.get("unavailable")), "routine_id": event.get("routine_id"),
+                **(self._trust(event, citations) if ok else dict.fromkeys(TRUST_FIELDS))}
+
+    @staticmethod
+    def _trust(event: dict, citations: list[dict]) -> dict:
+        """The trust signals of a turn that may be shown again, as they were when it was answered (api.md 0.3). `shown`
+        counts the citations given back with this turn, never anything else. An event logged before these were recorded
+        has only what its citations say: a source that was cited was searched; about the others nothing is known."""
+        logged = event.get("trust")
+        shown = {s: sum(c["source"] == s for c in citations) for s in SOURCES}
+        if logged is None:
+            return dict.fromkeys(TRUST_FIELDS) | {"coverage": {s: {"searched": True, "shown": n} for s, n in shown.items() if n}}
+        dated = [c["as_of"] for c in citations if c["as_of"]]
+        return {"coverage": {s: {"searched": s in logged["searched"], "shown": shown[s]} for s in SOURCES},
+                "freshness": {"oldest_source_as_of": min(dated, default=None), "stale_refetched": logged["stale_refetched"],
+                              "per_source": logged["per_source"]},
+                "grounding": logged["grounding"], "policy_version": logged["policy_version"],
+                "unavailable_sources": logged["unavailable_sources"]}
 
     def stages(self) -> tuple[str, ...]:
         return STAGES

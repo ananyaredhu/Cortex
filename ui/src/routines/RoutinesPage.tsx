@@ -1,5 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, CalendarClock, Clock, Pause, Pencil, Play, Plus, Trash2, Zap } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { ArrowRight, CalendarClock, Clock, History, Pause, Pencil, Play, Plus, Trash2, Zap } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, ApiError } from "../api/client";
@@ -7,21 +7,24 @@ import type { Routine } from "../api/types";
 import { usePersona } from "../auth/PersonaContext";
 import { outcomeText, pausedText, scheduleText, whenIn } from "./format";
 import { RoutineForm, type RoutineSeed } from "./RoutineForm";
+import { Running } from "./Running";
 import { TEMPLATES } from "./templates";
+import { useRoutines, useRunNow } from "./useRoutines";
 import "../home/home.css";
 import "./routines.css";
 
 /**
  * A person's own routines (docs/routines.md): instructions Cortex follows again on a schedule, as them, and templates to
- * start one from. Nothing here is about anyone else's routines, and a run's answer is not on this page: it opens in Ask,
- * under the same rule as any reopened conversation.
+ * start one from. Nothing here is about anyone else's routines, and a run's answer is not on this page: it opens in Ask
+ * or in the routine's history, under the same rule as any reopened conversation. A routine that is being answered right
+ * now says so.
  */
 export function RoutinesPage() {
   const { persona } = usePersona();
   const qc = useQueryClient();
   const navigate = useNavigate();
   const key = ["routines", persona.id];
-  const list = useQuery({ queryKey: key, queryFn: () => api(persona.id).routines() });
+  const list = useRoutines(persona.id, { watch: true });
   const [tab, setTab] = useState<"yours" | "templates">("yours");
   const [form, setForm] = useState<Routine | RoutineSeed | null>(null); // a routine being edited, or what a new one starts from
   const [confirming, setConfirming] = useState<string | null>(null);
@@ -34,14 +37,9 @@ export function RoutinesPage() {
     onSettled: refresh,
   });
   const remove = useMutation({ mutationFn: (id: string) => api(persona.id).deleteRoutine(id), onSettled: refresh });
-  const run = useMutation({
-    mutationFn: (id: string) => api(persona.id).runRoutine(id),
-    onSuccess: (answer) => {
-      refresh();
-      qc.invalidateQueries({ queryKey: ["conversations", persona.id] });
-      navigate(`/ask/${encodeURIComponent(answer.conversation_id)}`);
-    },
-  });
+  const { run, isRunning } = useRunNow(persona.id);
+  // Opens the answer only if the person is still on this page when it arrives.
+  const runNow = (id: string) => run.mutate(id, { onSuccess: (answer) => navigate(`/ask/${encodeURIComponent(answer.conversation_id)}`) });
   const routines = list.data?.routines ?? [];
   const failed = change.error ?? remove.error ?? run.error;
 
@@ -132,11 +130,12 @@ export function RoutinesPage() {
 
             <ul className="routines__list">
               {routines.map((r) => (
-                <li key={r.routine_id} className="card routines__item" aria-label={r.name}>
+                <li key={r.routine_id} className={`card routines__item${isRunning(r) ? " routines__item--running" : ""}`} aria-label={r.name}>
                   <div className="routines__what">
                     <h2 className="h3">
-                      <CalendarClock size={16} aria-hidden /> {r.name}
+                      <CalendarClock size={16} aria-hidden /> <Link to={`/routines/${encodeURIComponent(r.routine_id)}`}>{r.name}</Link>
                       {r.status === "paused" && <span className="home__status">Paused</span>}
+                      {isRunning(r) && <Running />}
                     </h2>
                     <p className="routines__question">{r.question}</p>
                     <p className="muted small">
@@ -157,9 +156,12 @@ export function RoutinesPage() {
                     )}
                   </div>
                   <div className="routines__actions">
-                    <button type="button" className="ghost" disabled={run.isPending} onClick={() => run.mutate(r.routine_id)}>
-                      <Zap size={14} aria-hidden /> Run now
+                    <button type="button" className="ghost" disabled={run.isPending || isRunning(r)} onClick={() => runNow(r.routine_id)}>
+                      <Zap size={14} aria-hidden /> {isRunning(r) ? "Running…" : "Run now"}
                     </button>
+                    <Link className="ghost" to={`/routines/${encodeURIComponent(r.routine_id)}`}>
+                      <History size={14} aria-hidden /> History
+                    </Link>
                     <button
                       type="button"
                       className="ghost"

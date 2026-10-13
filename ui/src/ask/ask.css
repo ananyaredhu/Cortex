@@ -49,16 +49,17 @@
 .clarify__options { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .answer__sources-head { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2); }
 .sources { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.source { display: grid; grid-template-columns: 20px 18px minmax(0, 1fr); align-items: center; column-gap: var(--space-2); row-gap: 2px; padding: 8px 10px; border: var(--border-1); border-radius: var(--radius-sm); }
+.source { display: grid; grid-template-columns: 20px 18px minmax(0, 1fr) auto; align-items: center; column-gap: var(--space-2); row-gap: 2px; padding: 8px 10px; border: var(--border-1); border-radius: var(--radius-sm); }
 .source--lit { border-color: var(--accent); background: var(--orange-50); }
 [data-theme="dark"] .source--lit { background: var(--accent-soft); }
 .source__n { color: var(--accent-text); font-weight: 700; }
 .source__main { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .source__where { color: var(--text-muted); font-size: 11px; }
 .source__title { display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-13); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.source__meta { grid-column: 3; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 var(--space-2); }
+.source__meta { grid-column: 3 / -1; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 var(--space-2); }
 .source__asof { font-size: 11px; white-space: nowrap; }
 .source__meta .ghost { margin-right: -10px; white-space: nowrap; }
+.source__pin { grid-column: 4; grid-row: 1; }
 .source__why { grid-column: 3 / -1; color: var(--text-body); }
 .pathstep { display: inline-block; margin: 2px 4px 0 0; padding: 1px 6px; border-radius: var(--radius-xs); background: var(--bg-app); }
 .answer__actions { display: flex; flex-wrap: wrap; gap: var(--space-1); padding-top: var(--space-2); border-top: var(--border-1); }

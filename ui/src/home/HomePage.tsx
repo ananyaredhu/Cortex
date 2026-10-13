@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import { ArrowRight, CalendarClock, Repeat, ChevronDown, ChevronUp, Circle, CircleCheck, CircleDashed, CircleDot, Crosshair, ExternalLink, Flag, Pin, PinOff, X } from "lucide-react";
 import { type DragEvent, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
@@ -12,7 +12,9 @@ import { SOURCE_LABEL, SourceGlyph } from "../components/SourceGlyph";
 import { SourceLink } from "../source/SourceViewer";
 import { FilterBar } from "./FilterBar";
 import { outcomeText, scheduleText, whenIn } from "../routines/format";
+import { Running } from "../routines/Running";
 import "../routines/routines.css";
+import { useRoutines } from "../routines/useRoutines";
 import { shortDay } from "../team/dates";
 import { dueState, filterOptions, type Filters, matches } from "./filters";
 import { useFocus, type WorkItem, workItems } from "./focus";
@@ -49,6 +51,8 @@ export function HomePage() {
   const [allTickets, setAllTickets] = useState(false);
   const [over, setOver] = useState(false);
   const w = work.data;
+  // The live list where it has been read (it says when a run is under way); else what My Work came with.
+  const routines = useRoutines(persona.id).data?.routines ?? w?.routines;
 
   const all = useMemo(() => (w ? workItems(w, team.data?.teams) : { tickets: [], updates: [], places: [] }), [w, team.data]);
   const options = useMemo(() => filterOptions([...all.tickets, ...all.updates], all.places, (p) => (w ? placeLabel(w, p) : p)), [all, w]);
@@ -57,7 +61,17 @@ export function HomePage() {
   const tickets = shown(all.tickets);
   const updates = shown(all.updates);
   // A pinned id is drawn only while the API still returns the document; anything else stays out of sight.
-  const known = new Map([...all.tickets, ...all.updates].map((i) => [i.doc_id, i]));
+  const listed = new Map([...all.tickets, ...all.updates].map((i) => [i.doc_id, i]));
+  // A source pinned from an answer may be in none of My Work's lists: it is asked for by id (api.md 0.4, /v1/source),
+  // which answers alike for a document the person can no longer open and one that does not exist.
+  const elsewhere = focus.ids.filter((id) => w && !listed.has(id));
+  const fetched = useQueries({
+    queries: elsewhere.map((id) => ({ queryKey: ["source", persona.id, id], queryFn: () => api(persona.id).source(id), staleTime: 60_000 })),
+  });
+  const known = new Map(listed);
+  fetched.forEach((q) => {
+    if (q.data?.found) known.set(q.data.doc_id, { doc_id: q.data.doc_id, title: q.data.title, url: q.data.url, source: q.data.source });
+  });
   const pinned = shown(focus.ids.flatMap((id) => known.get(id) ?? []));
 
   const drag = (id: string) => (e: DragEvent) => {
@@ -203,7 +217,7 @@ export function HomePage() {
         </section>
       )}
 
-      {w?.routines && w.routines.some((r) => r.status === "active") && (
+      {routines && routines.some((r) => r.status === "active") && (
         <section className="card home__panel" aria-labelledby="h-routines">
           <div className="home__head">
             <h2 id="h-routines" className="h3">
@@ -214,7 +228,7 @@ export function HomePage() {
             </Link>
           </div>
           <ul className="home__list home__routines">
-            {w.routines
+            {routines
               .filter((r) => r.status === "active")
               .map((r) => {
                 const run = r.last_run;
@@ -227,9 +241,13 @@ export function HomePage() {
                       ) : (
                         <Link to="/routines">{r.name}</Link>
                       )}
-                      <span className="muted small">
-                        {run ? `${outcomeText(run)} · ${whenIn(run.ran_at, r.timezone)}` : `${scheduleText(r.schedule)} · first run ${whenIn(r.next_run_at, r.timezone)}`}
-                      </span>
+                      {r.running ? (
+                        <Running />
+                      ) : (
+                        <span className="muted small">
+                          {run ? `${outcomeText(run)} · ${whenIn(run.ran_at, r.timezone)}` : `${scheduleText(r.schedule)} · first run ${whenIn(r.next_run_at, r.timezone)}`}
+                        </span>
+                      )}
                     </span>
                   </li>
                 );

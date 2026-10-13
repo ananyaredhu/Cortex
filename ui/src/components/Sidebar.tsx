@@ -5,6 +5,7 @@ import logo from "../assets/logo/cortex-mark.svg";
 import { usePersona } from "../auth/PersonaContext";
 import { canAdmin, canAudit, PERSONAS } from "../auth/personas";
 import { COMPARE_PEOPLE } from "../demo/sim";
+import { useRoutines } from "../routines/useRoutines";
 import { Avatar } from "./Avatar";
 import { RecentChats } from "./RecentChats";
 import { ThemeToggle } from "./ThemeToggle";
@@ -36,6 +37,8 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
       toggleRef.current?.focus();
     }
   };
+  // Scheduled runs happen whether or not the Routines page is open, so the sidebar is where one shows from anywhere.
+  const routineRunning = useRoutines(persona.id, { watch: true }).data?.routines?.some((r) => r.running) ?? false;
 
   return (
     <aside className={`sidebar${open ? " sidebar--open" : ""}`} aria-label="Navigation">
@@ -62,6 +65,7 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
         </NavLink>
         <NavLink to="/routines">
           <CalendarClock size={16} aria-hidden /> Routines
+          {routineRunning && <span className="sidebar__running" role="img" aria-label="A routine is running" />}
         </NavLink>
         {COMPARE_PEOPLE && (
           <NavLink to="/compare">

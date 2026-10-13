@@ -98,7 +98,8 @@ Reopens one of the caller's own conversations with every turn, oldest first, so 
 Rules:
 - Someone else's conversation and a nonexistent one both answer `404 {"detail": "no such conversation"}`.
 - An answer is a derived artifact ([acl-model](acl-model.md), labels): it is shown again only if the caller may still open **every** document it cited, by its stored label and a live check. Otherwise `answer` is `null`, `citations` is `[]` and `withheld` is `true`; the question stays. Nothing in a withheld turn names the document that was revoked.
-- Turns carry what the log holds: no `claims`, `freshness`, `coverage` or `grounding`. The UI renders a reopened answer as plain text with its citations.
+- Turns carry what the log holds, so no `claims`: the UI renders a reopened answer as plain text with its citations.
+- *(0.4, proposed 13 Oct)* **Trust signals of a reopened turn.** A turn also carries `coverage`, `freshness`, `grounding`, `policy_version` and `unavailable_sources`, in the shapes `/v1/ask` gives them, **as they were when the turn was answered** (the `trust` object of its `ask` event, [audit-event-schema](audit-event-schema.md)), so the Trust panel of a reopened answer, a routine's run among them, is not empty. `freshness.per_source` is therefore the sync state at that moment, not now; the UI says so. `coverage[].shown` is counted from the citations returned with the turn and nothing else. On a withheld turn all five are `null`. A turn logged before these were recorded has only `coverage`, and only for the sources it cited (a cited source was searched; about the others nothing is said); the other four are `null`.
 - *(0.3)* A turn that was a routine's run carries `routine_id` (else `null`), so the UI can say which of the caller's routines produced it.
 
 ## `GET /v1/projects` *(0.2, 11 Oct, T7)*
@@ -177,7 +178,7 @@ A routine is a question its owner has the Brain ask again on a schedule, as them
 
 | Call | Does |
 |---|---|
-| `GET /v1/routines` | The caller's routines: `{"routines": [{"routine_id", "name", "question", "sources", "schedule", "timezone", "status", "paused_reason", "next_run_at", "last_run"}]}`. `last_run` is `{"request_id", "conversation_id", "ran_at", "outcome", "unread"}` or `null`; `outcome` is `answered`, `abstained`, `unavailable` or `skipped`. `abstained` covers a refusal too: telling the two apart here would say whether something the owner cannot open exists. `conversation_id` is `null` for a skipped run. |
+| `GET /v1/routines` | The caller's routines: `{"routines": [{"routine_id", "name", "question", "sources", "schedule", "timezone", "status", "paused_reason", "next_run_at", "last_run", "running"}]}`. `last_run` is `{"request_id", "conversation_id", "ran_at", "outcome", "unread"}` or `null`; `outcome` is `answered`, `abstained`, `unavailable` or `skipped`. `abstained` covers a refusal too: telling the two apart here would say whether something the owner cannot open exists. `conversation_id` is `null` for a skipped run. |
 | `POST /v1/routines` | Create: `{"name", "question", "sources"?, "schedule", "timezone"}`. `question` has the limits of `/ask`. `422` for a bad schedule or time zone; `409` at the limit of 5 active routines. |
 | `PATCH /v1/routines/{routine_id}` | Change `name`, `question`, `sources`, `schedule` or `timezone`; `{"status": "paused" \| "active"}` pauses and resumes. |
 | `DELETE /v1/routines/{routine_id}` | Delete: `{"deleted": "<id>"}`. Past runs stay in the audit log. |
@@ -190,6 +191,7 @@ A routine is a question its owner has the Brain ask again on a schedule, as them
 - A run whose owner cannot be resolved (account removed, or a connector failing) is `skipped`. It is never run on an earlier identity.
 - A run is a new conversation of the owner's, titled with the routine's name and the day ("Morning brief · 12 Oct"), and its turn carries `routine_id`.
 - A request body with a field outside those listed is `422`, checked before the routine is looked up, so a bad body is refused alike for one's own routine, someone else's and a missing one.
+- *(0.4, proposed 13 Oct)* `running` is `true` while a run of the routine, scheduled or "Run now", is being answered, so the UI can show it and stop offering "Run now"; clients poll `GET /v1/routines` for it. It says nothing about the answer. A run still marked after 10 minutes is taken to have died with its process and reads `false`.
 - The endpoints are always served. Scheduled runs happen only when the Brain runs with `BRAIN_ROUTINES=1`; "Run now" works either way.
 - `GET /v1/routines-totals` (admin): `{"window_hours": 24, "runs", "unavailable", "skipped"}`. Totals only: no owner, no routine, no question.
 
@@ -236,6 +238,7 @@ Simulator admin endpoints (owned by A) to revoke a permission, restrict a page, 
 
 ## Changelog
 - 0.4 (13 Oct): `GET /v1/source`, the document text for the in-app viewer.
+- 0.4 (proposed 13 Oct, on `ws-c/routines-run-state`): `coverage`, `freshness`, `grounding`, `policy_version` and `unavailable_sources` on the turns of `GET /v1/conversations/{id}`, as recorded when each was answered; `running` on a routine.
 - 0.3 (12 Oct): `POST /v1/issues/move`, the first write to a source, for the assignee's own Jira issue; `updated_at`, `due_date`, `priority` and `can_move` on issues in `/team`, and those plus `assignee` and `mine` in `/mywork`; `title_source`, generated titles (from the first question only) and `PATCH /v1/conversations/{id}`; the routines endpoints and `routines` in `/mywork`.
 - 0.2, 11 Oct: `GET /v1/team` (Team focus) with `assignee` and `mine` per issue, and optional `goal`, `start_date`, `target_date`, `milestone` and `sprint` per project in the registry file.
 - 0.2, 11 Oct: `GET /v1/projects` and `project_profile` in `/mywork` (T7).

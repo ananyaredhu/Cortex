@@ -131,7 +131,8 @@ def test_create_list_edit_pause_resume_delete(client, rt):
     made = create(client, sources=["slack", "jira", "jira"])
     assert made | {"routine_id": ""} == {
         "routine_id": "", "name": "Morning brief", "question": QUESTION, "sources": ["jira", "slack"], "schedule": WEEKDAYS_9,
-        "timezone": SGT, "status": "active", "paused_reason": None, "next_run_at": "2026-10-12T01:00:00Z", "last_run": None}
+        "timezone": SGT, "status": "active", "paused_reason": None, "next_run_at": "2026-10-12T01:00:00Z", "last_run": None,
+        "running": False}
     url = f"/v1/routines/{made['routine_id']}"
     assert listed(client) == [made]
     assert client.get("/v1/mywork", headers=H("priya")).json()["routines"] == [made]
@@ -208,6 +209,64 @@ def test_run_now_is_a_normal_question_from_the_owner(client, rt):
     last = listed(client)[0]["last_run"]
     assert (last["request_id"], last["outcome"], last["unread"]) == (answer["request_id"], "answered", False)
     assert listed(client)[0]["next_run_at"] == made["next_run_at"]      # trying it out does not move the schedule
+
+
+def test_a_run_says_it_is_running_while_it_is_answered_and_not_after(client, rt):
+    made = create(client)
+    inner, seen = rt.brain.generator, []
+
+    class Watching:
+        model = inner.model
+
+        def generate(self, packet):
+            seen.append(listed(client)[0]["running"])
+            return inner.generate(packet)
+
+    rt.brain.generator = Watching()
+    client.post(f"/v1/routines/{made['routine_id']}/run", headers=H("priya"))
+    rt.now = at("2026-10-12T01:00:00")
+    assert rt.routines.tick() == 1
+    assert seen == [True, True] and listed(client)[0]["running"] is False
+
+    # a run whose process died is not shown as running for ever
+    stuck = rt.routines.store.get(made["routine_id"])
+    stuck.running_since = iso(rt.now)
+    rt.routines.store.put(stuck)
+    assert listed(client)[0]["running"] is True
+    rt.now += timedelta(minutes=10)
+    assert listed(client)[0]["running"] is False
+
+
+def test_a_routine_deleted_while_it_runs_stays_deleted(client, rt):
+    made = create(client)
+    inner = rt.brain.generator
+
+    class Deleting:
+        model = inner.model
+
+        def generate(self, packet):
+            client.delete(f"/v1/routines/{made['routine_id']}", headers=H("priya"))
+            return inner.generate(packet)
+
+    rt.brain.generator = Deleting()
+    assert client.post(f"/v1/routines/{made['routine_id']}/run", headers=H("priya")).status_code == 200
+    assert listed(client) == []
+
+
+def test_a_reopened_run_carries_what_the_trust_panel_showed(client, rt):
+    made = create(client)
+    live = client.post(f"/v1/routines/{made['routine_id']}/run", headers=H("priya")).json()
+    turn = client.get(f"/v1/conversations/{live['conversation_id']}", headers=H("priya")).json()["turns"][0]
+    assert sum(c["shown"] for c in turn["coverage"].values()) == len(turn["citations"]) > 0
+    for field in ("coverage", "grounding", "policy_version", "unavailable_sources"):
+        assert turn[field] == live[field], field
+    assert turn["freshness"]["per_source"] == live["freshness"]["per_source"]
+
+    # an answer logged before these were recorded says only what its citations do
+    event = [e for e in rt.audit_store.all() if e["event_type"] == "ask"][-1]
+    old = rt.brain._trust({k: v for k, v in event.items() if k != "trust"}, turn["citations"])
+    assert old["grounding"] is None and old["freshness"] is None
+    assert old["coverage"] == {s: {"searched": True, "shown": c["shown"]} for s, c in turn["coverage"].items() if c["shown"]}
 
 
 def test_a_missed_day_is_recorded_as_skipped_and_never_run_late(client, rt):
