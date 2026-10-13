@@ -3,10 +3,12 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, expect, it, vi } from "vitest";
-import type { MyWork, Routine } from "../api/types";
+import type { ConversationDetail, MyWork, Routine } from "../api/types";
+import { AskPage } from "../ask/AskPage";
 import { PersonaProvider } from "../auth/PersonaContext";
 import { HomePage } from "../home/HomePage";
 import { scheduleText, whenIn } from "../routines/format";
+import { RoutineHistoryPage } from "../routines/RoutineHistoryPage";
 import { RoutinesPage } from "../routines/RoutinesPage";
 import { TEMPLATES } from "../routines/templates";
 
@@ -37,14 +39,15 @@ const serve = (state: { routines: Routine[] }, answer: (method: string, url: str
   return calls;
 };
 
-const renderPage = () =>
+const renderPage = (at = "/routines", ask = <p>opened the run</p>) =>
   render(
     <QueryClientProvider client={new QueryClient()}>
       <PersonaProvider>
-        <MemoryRouter initialEntries={["/routines"]}>
+        <MemoryRouter initialEntries={[at]}>
           <Routes>
             <Route path="/routines" element={<RoutinesPage />} />
-            <Route path="/ask/:conversationId" element={<p>opened the run</p>} />
+            <Route path="/routines/:routineId" element={<RoutineHistoryPage />} />
+            <Route path="/ask/:conversationId" element={ask} />
           </Routes>
         </MemoryRouter>
       </PersonaProvider>
@@ -193,4 +196,73 @@ it("shows active routines on My Work, the latest run linked and marked unread", 
   expect(within(block).getByRole("img", { name: "Unread" })).toBeInTheDocument();
   expect(within(block).getByText("Every weekday at 09:00 · first run Tue 13 Oct, 09:00")).toBeInTheDocument();
   expect(within(block).queryByText("Paused one")).not.toBeInTheDocument();
+});
+
+it("says a routine is running and does not offer to run it again", async () => {
+  serve({ routines: [{ ...BRIEF, running: true }] });
+  renderPage();
+  const item = await screen.findByRole("listitem", { name: "Morning brief" });
+  expect(within(item).getByRole("status")).toHaveTextContent("Running now");
+  expect(within(item).getByRole("button", { name: /Running/ })).toBeDisabled();
+  expect(within(item).getByRole("link", { name: /History/ })).toHaveAttribute("href", "/routines/rt_1");
+});
+
+// A run reopened from the log: its answer, and the trust signals recorded when it was answered (api.md 0.3).
+const RUN: ConversationDetail = {
+  conversation_id: "c_run", title: "Morning brief · 12 Oct", last_asked_at: "2026-10-12T01:00:20Z",
+  turns: [{
+    request_id: "req_1", asked_at: "2026-10-12T01:00:20Z", question: BRIEF.question, answer: "Cutover is blocked on replica lag.",
+    withheld: false, refused: false, abstained: false, routine_id: "rt_1",
+    citations: [{ doc_id: "jira:DBMIG-142", title: "Cutover", url: "https://jira.example/DBMIG-142", source: "jira", as_of: "2026-10-10T13:58:00Z", why_visible: [] }],
+    coverage: { confluence: { searched: true, shown: 0 }, jira: { searched: true, shown: 1 }, slack: { searched: true, shown: 0 }, gdrive: { searched: false, shown: 0 } },
+    freshness: { oldest_source_as_of: "2026-10-10T13:58:00Z", stale_refetched: 0, per_source: { jira: { last_sync: "2026-10-12T00:58:00Z", status: "ok" } } },
+    grounding: { score: 1, removed_claims: 0 }, policy_version: "pol-0.3", unavailable_sources: [],
+  }],
+};
+const HISTORY = {
+  runs: [
+    { request_id: "rts_2", conversation_id: null, ran_at: "2026-10-13T01:00:10Z", outcome: "skipped", unread: false },
+    { request_id: "req_1", conversation_id: "c_run", ran_at: "2026-10-12T01:00:20Z", outcome: "answered", unread: false },
+  ],
+};
+const history = (run: ConversationDetail) => (_method: string, url: string) =>
+  url.endsWith("/runs") ? new Response(JSON.stringify(HISTORY)) : url.includes("/v1/conversations/") ? new Response(JSON.stringify(run)) : undefined;
+
+it("shows a routine's runs in one place, the newest answer open beside them", async () => {
+  serve({ routines: [BRIEF] }, history(RUN));
+  renderPage("/routines/rt_1");
+  expect(await screen.findByRole("heading", { name: /Morning brief/ })).toBeInTheDocument();
+  const runs = await screen.findByRole("region", { name: /Runs/ });
+  expect(within(runs).getAllByRole("listitem")).toHaveLength(2);
+  expect(within(runs).getByText("Skipped").closest("button")).toBeNull();       // nothing was asked: nothing to open
+  expect(within(runs).getByRole("button", { name: /Mon 12 Oct, 09:00/ })).toHaveAttribute("aria-current", "true");
+  const answer = screen.getByRole("region", { name: "Answer of the selected run" });
+  expect(await within(answer).findByText("Cutover is blocked on replica lag.")).toBeInTheDocument();
+  expect(within(answer).getByRole("link", { name: /Open in Ask/ })).toHaveAttribute("href", "/ask/c_run");
+});
+
+it("withholds a past run in the history as Ask would, and treats an unknown routine like someone else's", async () => {
+  serve({ routines: [BRIEF] }, history({ ...RUN, turns: [{ ...RUN.turns[0], answer: null, withheld: true, citations: [], coverage: null, freshness: null, grounding: null }] }));
+  const first = renderPage("/routines/rt_1");
+  expect(await screen.findByText(/This answer isn’t shown again/)).toBeInTheDocument();
+  expect(screen.queryByText("Cutover is blocked on replica lag.")).not.toBeInTheDocument();
+  first.unmount();
+  renderPage("/routines/rt_nope");
+  expect(await screen.findByRole("alert")).toHaveTextContent("That routine isn’t available.");
+});
+
+it("fills the Trust panel of a reopened run from what was recorded when it ran", async () => {
+  serve({ routines: [BRIEF] }, (_method, url) =>
+    url.includes("/v1/conversations/") ? new Response(JSON.stringify(RUN)) : url === "/v1/conversations" ? new Response(JSON.stringify({ conversations: [] })) : undefined,
+  );
+  renderPage("/ask/c_run", <AskPage />);
+  const trust = await screen.findByRole("complementary", { name: "Trust panel" });
+  const jira = await within(trust).findByRole("row", { name: /Jira/ });
+  expect(jira).toHaveTextContent("Yes");
+  expect(within(jira).getByRole("cell", { name: "1" })).toBeInTheDocument();
+  expect(within(trust).getByRole("row", { name: /Drive/ })).toHaveTextContent("No");
+  expect(trust).toHaveTextContent("100%");
+  expect(trust).toHaveTextContent("pol-0.3");
+  expect(trust).toHaveTextContent("As it was when this was answered, 12 Oct, 01:00 UTC.");
+  expect(await screen.findByRole("link", { name: "All runs" })).toHaveAttribute("href", "/routines/rt_1");
 });

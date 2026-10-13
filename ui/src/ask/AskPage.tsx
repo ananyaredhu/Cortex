@@ -1,16 +1,18 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CalendarClock, PanelRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useLocation, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { api, ApiError } from "../api/client";
-import type { AskResponse, ConversationTurn, Source } from "../api/types";
+import type { AskResponse, Source } from "../api/types";
 import { usePersona } from "../auth/PersonaContext";
 import { Avatar } from "../components/Avatar";
 import { whenIn } from "../routines/format";
 import { RoutineForm, type RoutineSeed } from "../routines/RoutineForm";
+import { useRoutines } from "../routines/useRoutines";
 import { AnswerCard } from "./AnswerCard";
 import { Composer } from "./Composer";
 import { EmptyState, Suggestions } from "./EmptyState";
+import { recorded, restored } from "./restored";
 import { Stepper, type StageTimes } from "./Stepper";
 import { TrustPanel } from "./TrustPanel";
 import "./ask.css";
@@ -20,6 +22,8 @@ interface Turn {
   question: string;
   times: StageTimes;
   answer?: AskResponse;
+  /** A reopened answer as the Trust panel shows it: with the trust signals recorded when it was answered. */
+  recorded?: AskResponse;
   error?: string;
   /** A reopened answer the asker may no longer see: a cited document was revoked since (api.md, conversations). */
   withheld?: boolean;
@@ -43,22 +47,6 @@ function initialTrustOpen(): boolean {
   } catch {
     return true;
   }
-}
-
-/** A turn from the audit log as the answer card expects it: what the log holds, nothing invented. */
-function restored(t: ConversationTurn, conversationId: string): AskResponse {
-  return {
-    request_id: t.request_id,
-    conversation_id: conversationId,
-    answer: t.answer ?? "",
-    claims: [],
-    citations: t.citations,
-    refused: t.refused,
-    abstained: t.abstained,
-    generator_unavailable: t.unavailable ?? false,
-    skill: t.skill ?? null,
-    grounding: null,
-  };
 }
 
 export function AskPage() {
@@ -99,6 +87,7 @@ export function AskPage() {
           question: t.question,
           times: {},
           answer: t.withheld ? undefined : restored(t, c.conversation_id),
+          recorded: t.withheld ? undefined : recorded(t, c.conversation_id),
           withheld: t.withheld,
           routineId: t.routine_id,
           askedAt: t.asked_at,
@@ -166,9 +155,10 @@ export function AskPage() {
   // The person's routines, to say which one produced a reopened run; asked for only when a turn is one.
   const [routineSeed, setRoutineSeed] = useState<RoutineSeed | null>(null);
   const fromRoutine = turns.some((t) => t.routineId);
-  const routines = useQuery({ queryKey: ["routines", persona.id], queryFn: () => api(persona.id).routines(), enabled: fromRoutine });
+  const routines = useRoutines(persona.id, { enabled: fromRoutine });
   const routineOf = (id: string) => routines.data?.routines.find((r) => r.routine_id === id);
-  const shown = turns.find((t) => t.id === selected)?.answer ?? null;
+  const chosen = turns.find((t) => t.id === selected);
+  const shown = chosen?.recorded ?? chosen?.answer ?? null;
   // Nothing asked yet: the greeting, the composer and the suggestions sit together in the middle of the page.
   const fresh = turns.length === 0 && load !== "loading";
   // The Trust panel is about an answer, so it waits for the first question.
@@ -221,6 +211,11 @@ export function AskPage() {
                     <CalendarClock size={13} aria-hidden /> From your routine
                     {routineOf(t.routineId) ? ` “${routineOf(t.routineId)!.name}”` : ""}
                     {t.askedAt ? ` · ${whenIn(t.askedAt, routineOf(t.routineId)?.timezone ?? "UTC")}` : ""}
+                    {routineOf(t.routineId) && (
+                      <Link className="ghost ghost--accent small" to={`/routines/${encodeURIComponent(t.routineId)}`}>
+                        All runs
+                      </Link>
+                    )}
                   </p>
                 )}
                 {t.question && (
@@ -233,6 +228,7 @@ export function AskPage() {
                   <AnswerCard
                     asker={persona.id}
                     answer={t.answer}
+                    pinnable
                     onChoose={(q) => ask(q)}
                     onRoutine={t.question ? () => setRoutineSeed({ question: t.question, sources: t.sources }) : undefined}
                     onTrust={() => {
@@ -271,7 +267,7 @@ export function AskPage() {
       </div>
 
       {routineSeed && <RoutineForm persona={persona.id} seed={routineSeed} onClose={() => setRoutineSeed(null)} />}
-      {trust && <TrustPanel answer={shown} highlightWhy={whyLit} onClose={() => openTrust(false)} />}
+      {trust && <TrustPanel answer={shown} recordedAt={chosen?.recorded ? chosen.askedAt : undefined} highlightWhy={whyLit} onClose={() => openTrust(false)} />}
     </div>
   );
 }

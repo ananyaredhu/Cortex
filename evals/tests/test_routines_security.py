@@ -17,6 +17,7 @@ SGT = "Asia/Singapore"
 THREAT = "What are the open concerns in the auth service threat model?"      # cites the private auth channel (scenario 4)
 PRIVATE = "slack:C_AUTHPRIV/thread-1"
 SECRET = "refresh token storage"
+TRUST = ("coverage", "freshness", "grounding", "policy_version", "unavailable_sources")   # what a reopened turn adds (api.md 0.4)
 MONDAY, TUESDAY, WEDNESDAY, THURSDAY = (f"2026-10-{d}T01:00:00" for d in (12, 13, 14, 15))
 
 
@@ -91,6 +92,39 @@ def test_access_revoked_after_a_run_withholds_the_stored_run_everywhere():
         assert SECRET not in shown and "C_AUTHPRIV" not in shown, path
 
 
+def test_a_withheld_run_gives_back_none_of_its_trust_signals():
+    """A reopened run carries what its Trust panel showed (api.md 0.4). Once the run is withheld, so are they: a count of
+    cited Slack threads, or a grounding score, would say that the answer had rested on something in Slack."""
+    client, runtime = _target()
+    _create(client)
+    _run(runtime, MONDAY)
+    monday = _last(client)
+    url = f"/v1/conversations/{monday['conversation_id']}"
+    before = client.get(url, headers=H("priya")).json()["turns"][0]
+    assert before["coverage"]["slack"]["shown"] > 0 and before["grounding"] and before["freshness"]
+
+    runtime.advance("e2", True)
+    after = client.get(url, headers=H("priya")).json()["turns"][0]
+    assert after["withheld"] is True
+    assert {f: after[f] for f in TRUST} == dict.fromkeys(TRUST)
+    # and what the log keeps for the panel counts nothing that was not shown: no candidates, no denied documents
+    logged = _asks(runtime)[-1]["trust"]
+    assert set(logged) == {"searched", "unavailable_sources", "per_source", "stale_refetched", "grounding", "policy_version"}
+    assert set(logged["grounding"]) == {"score", "removed_claims", "lower_confidence"}
+
+
+def test_a_run_logged_before_trust_was_recorded_says_only_what_its_citations_do():
+    client, runtime = _target()
+    _create(client)
+    _run(runtime, MONDAY)
+    event = _asks(runtime)[-1]
+    turn = client.get(f"/v1/conversations/{event['conversation_id']}", headers=H("priya")).json()["turns"][0]
+    old = runtime.brain._trust({k: v for k, v in event.items() if k != "trust"}, turn["citations"])
+    assert sum(c["shown"] for c in old["coverage"].values()) == len(turn["citations"])
+    assert all(c["shown"] > 0 for c in old["coverage"].values())          # an uncited source is not mentioned at all
+    assert {f: old[f] for f in TRUST if f != "coverage"} == dict.fromkeys(f for f in TRUST if f != "coverage")
+
+
 def test_a_document_the_owner_cannot_open_changes_nothing_in_a_run():
     """The Leak-CI add/remove test, applied to routine runs: plant, edit and remove a hidden page on the routine's topic."""
     def run_with(change) -> str:
@@ -99,8 +133,10 @@ def test_a_document_the_owner_cannot_open_changes_nothing_in_a_run():
         change(FixturePlanter(runtime), runtime)
         _run(runtime, MONDAY)
         turn = client.get(f"/v1/conversations/{_last(client)['conversation_id']}", headers=H("priya")).json()["turns"][0]
+        # the trust signals too, bar the sync times, which the extra ingest passes move for everyone alike
         return json.dumps({"answer": turn["answer"], "citations": [c["doc_id"] for c in turn["citations"]],
-                           "outcome": _last(client)["outcome"]}, sort_keys=True)
+                           "outcome": _last(client)["outcome"],
+                           "trust": {f: turn[f] for f in TRUST if f != "freshness"}}, sort_keys=True)
 
     def planted(planter, runtime):
         planter.plant("confluence", "auth service threat model open concerns", mode="space", visible_to=("dana",),

@@ -88,6 +88,19 @@ describe("AnswerCard", () => {
     expect(screen.getByText("No sources to show for this answer.")).toBeInTheDocument();
   });
 
+  it("pins a source to the asker's Current focus, keeping only its id, and offers no pin in split-screen", () => {
+    localStorage.clear();
+    const plain = wrap(<AnswerCard asker="priya" answer={ANSWER} onChoose={() => {}} />);
+    expect(screen.queryByRole("button", { name: /Current focus/ })).not.toBeInTheDocument();
+    plain.unmount();
+    wrap(<AnswerCard asker="priya" answer={ANSWER} onChoose={() => {}} pinnable />);
+    const title = ANSWER.citations[0].title;
+    fireEvent.click(screen.getByRole("button", { name: `Add ${title} to Current focus` }));
+    expect(localStorage.getItem("cortex.focus.priya")).toBe(JSON.stringify([ANSWER.citations[0].doc_id]));
+    fireEvent.click(screen.getByRole("button", { name: `Remove ${title} from Current focus` }));
+    expect(localStorage.getItem("cortex.focus.priya")).toBe("[]");
+  });
+
   it("shows the source excerpt when a citation marker gets focus", () => {
     wrap(<AnswerCard asker="sam" answer={ANSWER} onWhyMore={() => {}} onChoose={() => {}} />);
     fireEvent.focus(screen.getAllByRole("button", { name: /Source 1:/ })[0]);

@@ -60,3 +60,36 @@
 .composer__routine:hover:not(:disabled) { background: color-mix(in srgb, var(--ink) 6%, transparent); color: var(--text-strong); }
 .composer__routine:disabled { opacity: .4; cursor: default; }
 .turn__routine { display: flex; align-items: center; gap: 6px; margin: 0 0 var(--space-2); font-size: var(--fs-12); color: var(--text-body); }
+
+/* A run under way: a labelled pill wherever the routine is named, a moving bar on its card, a dot in the sidebar. */
+.routine-running { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: var(--radius-pill); background: var(--accent-soft); color: var(--text-strong); font-size: var(--fs-12); font-weight: var(--fw-regular); white-space: nowrap; }
+.routines__item { position: relative; overflow: hidden; }
+.routines__item--running::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 3px; background: linear-gradient(90deg, transparent, var(--accent), transparent); background-size: 40% 100%; background-repeat: no-repeat; animation: routine-bar 1.4s linear infinite; }
+@keyframes routine-bar { from { background-position: -70% 0; } to { background-position: 170% 0; } }
+.routines__what .h3 { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.routines__what .h3 a { color: inherit; text-decoration: none; }
+.routines__what .h3 a:hover { text-decoration: underline; }
+.sidebar__running { margin-left: auto; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: routine-pulse 1.2s ease-in-out infinite; }
+@keyframes routine-pulse { 50% { opacity: .35; transform: scale(.8); } }
+@media (prefers-reduced-motion: reduce) {
+  .routines__item--running::before { animation: none; background-size: 100% 100%; }
+  .sidebar__running { animation: none; }
+}
+
+/* A routine's history: its runs beside the chosen run's answer */
+.routine-history__back { align-self: flex-start; margin-bottom: var(--space-3); padding-left: 0; }
+.routine-history__body { margin-top: var(--space-5); display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: var(--space-5); align-items: start; }
+.routine-history__runs h2 { margin: 0 0 var(--space-2); }
+.routine-history__runs ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.routine-history__run { width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 8px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--text-body); font: inherit; font-size: var(--fs-13); text-align: left; }
+button.routine-history__run:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); }
+.routine-history__run--on { background: var(--surface-card); box-shadow: var(--shadow-1); color: var(--text-strong); }
+.routine-history__run--on .routine-history__when { font-weight: var(--fw-bold); }
+.routine-history__run--skipped { opacity: .7; }
+.routine-history__answer { min-width: 0; }
+.routine-history__answer-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-2); }
+@media (max-width: 720px) {
+  .routine-history__body { grid-template-columns: minmax(0, 1fr); }
+  .routine-history__runs ol { flex-direction: row; overflow-x: auto; }
+  .routine-history__run { width: auto; white-space: nowrap; }
+}

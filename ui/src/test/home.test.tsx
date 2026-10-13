@@ -183,3 +183,27 @@ it("draws nothing for a pinned document the API no longer returns", async () => 
   expect(within(focus).getAllByRole("listitem")).toHaveLength(1);
   expect(focus).not.toHaveTextContent(/runbook/i);
 });
+
+it("draws a source pinned from an answer that is in none of My Work's lists, and nothing for one that can't be opened", async () => {
+  localStorage.setItem("cortex.focus.priya", '["slack:D1/1.2","confluence:SEC/breach"]');
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockImplementation(async (url: string) => {
+      const found = { found: true, doc_id: "slack:D1/1.2", title: "DM dana, priya thread", url: "https://x/dm", source: "slack", as_of: null, text: "", truncated: false, why_visible: [], flags: [] };
+      const body = url.includes("/v1/source?") ? (url.includes("slack") ? found : { found: false }) : url.endsWith("/v1/team") ? { teams: [TEAM] } : WORK;
+      return new Response(JSON.stringify(body));
+    }),
+  );
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <PersonaProvider>
+        <MemoryRouter>
+          <HomePage />
+        </MemoryRouter>
+      </PersonaProvider>
+    </QueryClientProvider>,
+  );
+  const focus = await section("Current focus");
+  expect(await within(focus).findByRole("link", { name: "DM dana, priya thread" })).toBeInTheDocument();
+  expect(within(focus).getAllByRole("listitem")).toHaveLength(1);
+});

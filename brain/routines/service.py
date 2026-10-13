@@ -32,6 +32,7 @@ MAX_QUESTION = 2000
 RETRY_AFTER = timedelta(minutes=5)       # N3: one retry when the answer service was unavailable
 UNOPENED_AFTER = timedelta(days=14)      # N4: nobody has opened it for this long -> paused
 SKIPS_BEFORE_PAUSE = 3                   # N3: scheduled runs in a row with an unresolvable owner
+RUN_TIMEOUT = timedelta(minutes=10)      # a run still marked as running after this long died with its process
 SYSTEM = "system:routines"
 
 Directory = Callable[[str], Principal | None]       # canonical email -> the principal sign-in would give, or None
@@ -79,7 +80,10 @@ class RoutineService:
             last = {**last, "unread": ran and (r.last_opened_at is None or r.last_opened_at < last["ran_at"])}
         return {"routine_id": r.routine_id, "name": r.name, "question": r.question, "sources": r.sources,
                 "schedule": r.schedule, "timezone": r.timezone, "status": r.status, "paused_reason": r.paused_reason,
-                "next_run_at": r.next_run_at, "last_run": last}
+                "next_run_at": r.next_run_at, "last_run": last, "running": self._running(r)}
+
+    def _running(self, r: Routine) -> bool:
+        return r.running_since is not None and self._clock() - parse_iso(r.running_since) < RUN_TIMEOUT
 
     def mine(self, principal: Principal) -> list[dict]:
         return [self.view(r) for r in self.store.of_owner(principal.email)]
@@ -204,11 +208,19 @@ class RoutineService:
         if r is None:
             return None
         now = self._clock()
-        response = self._ask(principal, r, now)
-        fresh = self.store.get(routine_id) or r                 # the scheduler may have moved it meanwhile
-        self._record(fresh, response, now)
-        fresh.last_opened_at = iso(now + timedelta(seconds=1))   # they are looking at it: not unread
-        self.store.put(fresh)
+        r.running_since = iso(now)
+        self.store.put(r)
+        try:
+            response = self._ask(principal, r, now)
+        finally:
+            fresh = self.store.get(routine_id)                  # the scheduler may have moved it meanwhile
+            if fresh is not None:                               # None: deleted while it ran, and it stays deleted
+                fresh.running_since = None
+                self.store.put(fresh)
+        if fresh is not None:
+            self._record(fresh, response, now)
+            fresh.last_opened_at = iso(now + timedelta(seconds=1))   # they are looking at it: not unread
+            self.store.put(fresh)
         return response
 
     def runs(self, principal: Principal, routine_id: str) -> list[dict] | None:
@@ -279,7 +291,12 @@ class RoutineService:
                 self._pause(r, "owner_unresolved")
             return None
         runner = Principal(principal.email, principal.roles, principal.display_name, client="routine")
-        response = self._ask(runner, r, now)
+        r.running_since = iso(now)
+        self.store.put(r)
+        try:
+            response = self._ask(runner, r, now)
+        finally:
+            r.running_since = None                              # stored with the outcome below, or with the skip on an error
         if response.get("generator_unavailable") and not r.retried:      # N3: once more in a few minutes
             r.retried, r.next_run_at = True, iso(now + RETRY_AFTER)
         else:

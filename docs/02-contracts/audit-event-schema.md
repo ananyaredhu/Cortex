@@ -102,9 +102,12 @@ Four new event types and one new value, all in the hash chain like any other eve
 
 **`ask` events from a routine run** have `actor.client: "routine"` (besides `ui` and `mcp`) and a top-level `routine_id`. `actor.user_id` is the owner, whose identity was resolved for that run. Everything else is as for a typed question, so replay and time-travel treat a run like any other ask.
 
+**`trust` on `ask` events** *(proposed 13 Oct)*: `{"searched": ["jira", "slack"], "unavailable_sources": [], "per_source": {"jira": {"last_sync": "...", "status": "ok"}}, "stale_refetched": 0, "grounding": {"score": 0.96, "removed_claims": 0, "lower_confidence": 0} | null, "policy_version": "pol-0.3"}`: what the Trust panel showed the asker, kept so that a reopened answer can show it again ([api](api.md), conversations). None of it depends on a document the asker could not open: which sources the request searched, each source's sync state at that moment, and the checker's score for the claims that were shown. It holds no count of candidates or denied documents. Absent on events logged before 13 Oct.
+
 Event types then read: `ask`, `search`, `mcp_call`, `audit_query`, `admin_view`, `acl_change_observed`, `alert_sent`, `checkpoint`, `identity_snapshot`, `issue_transition`, `conversation_title`, `routine_change`, `routine_skipped`.
 
 ## Changelog
+- 0.1, 13 Oct (proposed): `trust` on `ask` events.
 - 0.1, 12 Oct: `issue_transition`, `conversation_title`, `routine_change` and `routine_skipped` events; `actor.client: "routine"` and `routine_id` on `ask` events.
 - 0.1, 11 Oct: `checks.fields` (`pass`, `fail` or `nothing_to_check`: whether what the claims said about structured fields matched the documents') and `checks.field_mismatches` (`[{field, doc_ids}]` for each claim dropped, without the values) (fix F23).
 - 0.1, 11 Oct: `query.projects` (ids of the registry projects the question named, among those the asker may see) (T7).
