@@ -102,7 +102,7 @@ class MemoryIndex:
         return sorted(hits, key=lambda h: (-h.score, h.chunk_id))[:k]
 
     def title_search(self, source: str, terms: list[str], tokens: list[str], k: int) -> list[Hit]:
-        """Documents whose title holds the terms (ticket keys, names): a document's title is not in its chunks (T10)."""
+        """Documents whose title holds the terms (ticket keys, names): a document's title is not in its chunks."""
         stems = {_stem(t) for t in terms}
         held = {c.doc_id: c for c in self._rows(source, tokens)}
         terms = [t for t in terms if TITLE_TERM.fullmatch(t)]
@@ -200,7 +200,7 @@ class PostgresIndex:
         self._conn = conn
         self._lock = threading.Lock()
         self.rank_normalization = 0          # ts_rank_cd's normalization bit mask; 2 (divide by length) measured no gain with the title leg
-        self.title_leg = True                # also search titles, which are not in the chunks (T10)
+        self.title_leg = True                # also search titles, which are not in the chunks
 
     @classmethod
     def connect(cls, url: str) -> "PostgresIndex":

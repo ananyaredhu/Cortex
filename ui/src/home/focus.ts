@@ -68,7 +68,7 @@ const read = (persona: string): string[] => {
 /**
  * The person's Current focus: an ordered list of document ids, kept in this browser.
  * Only ids are stored, never titles or links: a card is drawn from what the API returns now, so a document
- * the person can no longer open simply is not there (ui/MOCKUP-DRIFT.md #51).
+ * the person can no longer open simply is not there.
  */
 export function useFocus(persona: string) {
   const [ids, setIds] = useState(() => read(persona));

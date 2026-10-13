@@ -1,4 +1,4 @@
-"""The outbox of permission events (`ingestion_events`): what Workstream B reads to drop caches and audit."""
+"""The outbox of permission events (`ingestion_events`): what the Brain reads to drop caches and audit."""
 from connectors.ingestion import FakeEmbedder, IngestionEvent, Ingestor
 from connectors.stub.fixture_connector import FixtureConnector
 from simulators.confluence.testing import SeededConfluence

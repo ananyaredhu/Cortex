@@ -1,4 +1,4 @@
-"""The reads Workstream B's retrieval makes on the index (connector-interface.md, "Reading the index").
+"""The reads the Brain's retrieval makes on the index (connector-interface.md, "Reading the index").
 
 Postgres only: the point is that db/init.sql, filled by ingestion, supports these queries as written in the contract.
 """

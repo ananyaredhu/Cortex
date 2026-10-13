@@ -210,7 +210,7 @@ def create_app(runtime: Runtime) -> FastAPI:
 
     @app.get("/v1/projects")
     def projects(p: Current):
-        """The caller's projects (T7): only those, and only the places in them, that they may open something in."""
+        """The caller's projects: only those, and only the places in them, that they may open something in."""
         return {"projects": runtime.brain.project_profile(p)}
 
     @app.get("/v1/team")
@@ -336,7 +336,7 @@ def create_app(runtime: Runtime) -> FastAPI:
 
     @app.get("/v1/leakci/latest")
     def leakci(p: Current):
-        """The scoreboard Leak-CI wrote last (`python -m evals.leakci`, Workstream C), or an empty one."""
+        """The scoreboard Leak-CI wrote last (`python -m evals.leakci`), or an empty one."""
         require(p, ADMIN_ROLES)
         path = Path(settings.leakci_scoreboard)
         if not path.is_absolute():

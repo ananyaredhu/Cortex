@@ -82,7 +82,7 @@ def test_hidden_listing_is_the_complement_of_visible(index):
 
 
 def test_container_listings_for_the_project_registry(index):
-    """`parents_visible`, `documents_under` and `documents_all` (T7) agree with `documents_visible` on both stores."""
+    """`parents_visible`, `documents_under` and `documents_all` agree with `documents_visible` on both stores."""
     for who in ("sam", "priya", "maya", "dana"):
         visible = index.documents_visible(TOKENS[who])
         assert index.parents_visible(TOKENS[who]) == {d.parent_id for d in visible if d.parent_id}
@@ -116,7 +116,7 @@ def test_concurrent_searches_share_one_connection_safely(index):
     assert errors == []
 
 
-# -- the title leg (T10): a title is not in the chunks, but it carries ticket keys and names --------------------------------------
+# -- the title leg: a title is not in the chunks, but it carries ticket keys and names --------------------------------------
 def test_a_ticket_key_finds_its_ticket_by_title(index):
     found = [c.doc_id for c in hybrid_search(index, "what is DBMIG-150 about", TOKENS["priya"], SOURCES)]
     assert "jira:DBMIG-150" in found[:2]                          # DBMIG-142's body also names it, so the two may share the top

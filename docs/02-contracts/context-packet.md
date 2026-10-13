@@ -1,7 +1,7 @@
 # Context packet
 
-version: 0.1 (draft, freezes Day 3)
-Owner: Workstream B. This is the **only thing the LLM plane receives** besides the system prompt.
+version: 0.1
+Owner: the Brain. This is the **only thing the LLM plane receives** besides the system prompt.
 
 Context engineering is an explicit pipeline stage: select, compress, order and budget what the model sees, with provenance and permissions attached.
 

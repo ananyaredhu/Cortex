@@ -1,4 +1,4 @@
-"""Proposals for the project registry (backlog T7, item 2): `python -m brain.projects.suggest [--fixture]`.
+"""Proposals for the project registry: `python -m brain.projects.suggest [--fixture]`.
 
 An administrator's tool, run from a terminal, never reachable through the API. It reads the whole index, finds pairs of places that
 look related and are not yet in one registered project, and prints them with the evidence. **Nothing is applied**: a proposal is

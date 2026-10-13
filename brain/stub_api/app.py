@@ -1,7 +1,7 @@
 """Stub of the Brain HTTP API (docs/02-contracts/api.md, v0.2) backed by the shared fixtures.
 
-Purpose: let Workstream C build the UI and the golden-test harness before Workstream B's real pipeline
-exists, and give B a reference for response shapes. It is NOT the real system: retrieval is keyword
+Purpose: let the UI and the golden-test harness be built and run without the real pipeline, and give a reference
+for response shapes. It is NOT the real system: retrieval is keyword
 overlap, the "LLM" is a template, and permissions are the token-overlap rule only.
 
 Auth (stub only): `Authorization: Bearer dev:<persona_id>`, e.g. `Bearer dev:priya`.

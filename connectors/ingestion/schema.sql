@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS ingestion_cursors (
     updated_at  timestamptz NOT NULL DEFAULT now()
 );
 
--- Outbox of permission events for Workstream B (see README.md here). Append-only, written only by ingestion.
+-- Outbox of permission events for the Brain (see README.md here). Append-only, written only by ingestion.
 -- A consumer remembers the last seq it handled and reads `WHERE seq > that ORDER BY seq`.
 CREATE TABLE IF NOT EXISTS ingestion_events (
     seq            bigserial PRIMARY KEY,

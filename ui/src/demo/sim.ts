@@ -1,6 +1,6 @@
 /**
  * Demo-only helpers. They call the stub API's /sim endpoints; against the real system the same controls
- * should call Workstream A's simulator admin endpoints (simulators/README.md). Only built in when
+ * should call the simulators' admin endpoints (simulators/README.md). Only built in when
  * DEMO_CONTROLS is true (`npm run dev:demo`), never in a production build.
  */
 export const DEMO_CONTROLS =

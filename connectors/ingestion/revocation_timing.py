@@ -1,4 +1,4 @@
-"""Revocation-to-enforcement timing on the simulators: Workstream A's stages, with a hook for B's.
+"""Revocation-to-enforcement timing on the simulators: the ingestion stages, with a hook for the Brain's.
 
     python -m connectors.ingestion.revocation_timing              # 5 rounds of each scenario
     python -m connectors.ingestion.revocation_timing --rounds 10

@@ -1,7 +1,7 @@
 # MCP tools
 
-version: 0.2 (built in `mcp_server/server.py`; changes need all three reviewers)
-Producer: Workstream B. Consumer: C (WorkBuddy and CodeBuddy setup).
+version: 0.2 (built in `mcp_server/server.py`)
+Producer: the Brain. Consumers: MCP clients (CodeBuddy, WorkBuddy).
 
 The MCP server is **another front door into the same pipeline as the UI**. It contains no separate logic: each tool authenticates the caller, calls a Brain method (the one the HTTP API uses, or `search` / `get_source`) and returns the result. Permission checks, uniform refusals and the audit log are the ones the UI gets.
 
@@ -42,7 +42,7 @@ CodeBuddy (`~/.codebuddy/.mcp.json` or project `.mcp.json`):
   }
 }
 ```
-Keep the token in an environment variable. Never commit it or show it in screenshots. WorkBuddy documents HTTP servers with custom headers too; the first real connection from WorkBuddy is still to be confirmed (see [06-risks-and-checks](../06-risks-and-checks.md), check #7).
+Keep the token in an environment variable. Never commit it or show it in screenshots. WorkBuddy documents HTTP servers with custom headers too; the first real connection from WorkBuddy is still to be confirmed.
 
 **Static header only.** The SDK also publishes standard OAuth metadata at `/.well-known/oauth-protected-resource/mcp`, naming the Brain as the authorization server. The Brain does not implement the OAuth authorize/token endpoints (the mock IdP is a different, simpler call), so a client must be given the token as a header; one that insists on OAuth discovery will not connect.
 

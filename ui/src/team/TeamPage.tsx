@@ -15,7 +15,7 @@ import "./team.css";
 import { Timeline } from "./Timeline";
 
 /**
- * Team focus: the projects the person is a member of, from /v1/team (ui/MOCKUP-DRIFT.md #24).
+ * Team focus: the projects the person is a member of, from /v1/team.
  * Every count is over documents this person may open, so two members of one project can see different numbers.
  * The timeline's dates and the sprint's name, dates and goal are kept by hand in the project registry; Jira's own sprint
  * field is not ingested, so the sprint's numbers follow a rule the API states (docs/02-contracts/api.md).

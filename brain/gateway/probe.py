@@ -1,4 +1,4 @@
-"""The model probe (ADR-001, check #1): `python -m brain.gateway.probe [--rounds 3]`.
+"""The model probe (ADR-001): `python -m brain.gateway.probe [--rounds 3]`.
 
 Sends the configured generator a small, fixture-safe context packet and reports: reachable, latency per round,
 whether the reply parsed as JSON claims, whether every citation names a packet document, and the model label.

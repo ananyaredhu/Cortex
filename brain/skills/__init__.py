@@ -1,4 +1,4 @@
-"""Runtime skills (docs/02-contracts/skills-format.md, backlog T5): task-specific procedures for the answer service.
+"""Runtime skills (docs/02-contracts/skills-format.md): task-specific procedures for the answer service.
 
 A skill is instructions only. It can narrow where the Brain looks (`sources`), raise or lower how much evidence reaches the
 model (`max_evidence`), name a fixed lookup whose results join the search hits (`adds`) and tell the model how to structure

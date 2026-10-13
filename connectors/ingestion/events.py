@@ -4,8 +4,8 @@ Two kinds, matching "Two kinds of permission change" in acl-model.md:
 - principal_change: a person's memberships changed. No document did, so the index is untouched.
 - acl_change:       a document's own ACL changed. Ingestion rewrites the index right after emitting the event.
 
-The consumer (Workstream B) drops what it cached for that person or document and records an
-`acl_change_observed` audit event. The audit log is hash-chained and B's audit service is its only writer,
+The consumer (the Brain) drops what it cached for that person or document and records an
+`acl_change_observed` audit event. The audit log is hash-chained and the Brain's audit service is its only writer,
 so ingestion never inserts into `audit_events`. It appends to an outbox (`ingestion_events`) instead, and
 the consumer reads rows past the last `seq` it handled. See README.md in this directory.
 """

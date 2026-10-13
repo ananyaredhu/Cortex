@@ -1,9 +1,9 @@
-"""Check #2: time grounding-model candidates on this CPU. `python -m brain.checker.timing [--models a,b] [--pairs 40]`.
+"""Time grounding-model candidates on this CPU. `python -m brain.checker.timing [--models a,b] [--pairs 40]`.
 
 For each model: load time, milliseconds per (evidence, claim) pair, peak memory, and accuracy on a labeled set built
 from the fixtures (a sentence of a document against its own document is "supported"; against another document
 "unsupported"). Fixture text only; nothing leaves the machine except the model download. Paste the output into
-ADR-003 and check #2. Models download into HF_HOME on first use: ask before running with a new one.
+ADR-003. Models download into HF_HOME on first use: ask before running with a new one.
 """
 import argparse
 import json

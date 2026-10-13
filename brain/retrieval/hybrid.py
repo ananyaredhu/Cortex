@@ -16,7 +16,7 @@ the and what whats were was there that this with from show have about which for 
 when into last week what's its it's they them their been being will would should could than then also just like
 """.split())
 RRF_K = 60
-TITLE_WEIGHT = 1.0       # how much a title match counts against a body match in the rank fusion (T10)
+TITLE_WEIGHT = 1.0       # how much a title match counts against a body match in the rank fusion
 
 
 @dataclass

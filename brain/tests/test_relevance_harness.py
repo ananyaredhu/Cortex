@@ -1,4 +1,4 @@
-"""The relevance harness (T10) without a database: its questions, its metrics and its corpus rows."""
+"""The relevance harness without a database: its questions, its metrics and its corpus rows."""
 import json
 
 import pytest

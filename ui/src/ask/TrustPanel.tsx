@@ -13,7 +13,7 @@ const FRESH: Record<FreshnessStatus, { label: string; tone: string }> = {
 
 /**
  * Per-answer trust signals. Section 1 counts only what the asker was shown: the contract forbids
- * candidate or denied counts (api.md 0.2, `coverage`; ui/MOCKUP-DRIFT.md #7).
+ * candidate or denied counts (api.md 0.2, `coverage`).
  */
 export function TrustPanel({
   answer,

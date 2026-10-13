@@ -1,6 +1,6 @@
-# Running Workstream A's services in a deployment
+# Running the connector services in a deployment
 
-For C's deployment (`deploy/`, which runs all of this with Docker Compose: `deploy/README.md`). What A's side needs
+For a deployment (`deploy/`, which runs all of this with Docker Compose: `deploy/README.md`). What the connector side needs
 to run, what it needs from the host, and how to tell it is healthy. The local development set-up is the same with fewer safeguards.
 
 ## Processes

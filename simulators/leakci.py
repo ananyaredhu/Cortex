@@ -1,4 +1,4 @@
-"""Hidden documents for Leak-CI (Workstream C): plant, edit and remove documents that an asker may not see, each
+"""Hidden documents for Leak-CI: plant, edit and remove documents that an asker may not see, each
 carrying a unique canary string, through the Confluence and Jira simulators' admin endpoints.
 
     python -m simulators.leakci plant confluence --topic "Q3 breach security incident report"

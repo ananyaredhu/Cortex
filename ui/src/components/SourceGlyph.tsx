@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import type { Source } from "../api/types";
 
 // Each product's own mark, in its own colours, so a row reads as "Jira" or "Drive" at a glance
-// (ui/MOCKUP-DRIFT.md #49; the mockup used generic glyphs). The marks belong to their owners and only say where a document lives.
+// (the mockup used generic glyphs). The marks belong to their owners and only say where a document lives.
 const ATLASSIAN_BLUE = "#2684FF";
 const LOGO: Record<Source, { viewBox: string; paths: ReactNode }> = {
   confluence: {

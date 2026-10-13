@@ -1,4 +1,4 @@
-"""The project registry and the context profile (backlog T7).
+"""The project registry and the context profile.
 
 Nothing in the sources says that the Jira project DBMIG, the Slack channel `#db-migration` and a Confluence space are one project.
 The registry says so, by hand, in `registry.json`. With it the Brain can resolve "our migration" to the documents that belong to

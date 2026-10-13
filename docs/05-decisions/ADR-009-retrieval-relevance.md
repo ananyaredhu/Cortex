@@ -1,9 +1,9 @@
-# ADR-006 · Retrieval relevance at scale: search titles too
+# ADR-009 · Retrieval relevance at scale: search titles too
 
-**Status:** Accepted (11 Oct). Measured with `python -m brain.relevance.run` (backlog T10). Keyword leg only; no real embeddings exist at scale.
+**Status:** Accepted (11 Oct). Measured with `python -m brain.relevance.run`. Keyword leg only; no real embeddings exist at scale.
 
 ## Context
-Praew's scale work showed access correctness and speed on 12,000 pages. It did not show whether the right document reaches the candidates. The permission check sees only the top 8 candidates, so a right document that is not among them is an answer the Brain cannot give.
+The scale run showed access correctness and speed on 12,000 pages. It did not show whether the right document reaches the candidates. The permission check sees only the top 8 candidates, so a right document that is not among them is an answer the Brain cannot give.
 
 ## Method
 Company A's 18 documents plus a growing prefix of the generated company (`simulators/scale.py`): 1,000, 4,000 and 12,000 Confluence pages and their Slack threads, in a throwaway database, with each persona's real tokens. 43 labeled questions with known right documents (`brain/relevance/questions.json`): 19 natural, 14 paraphrases, 3 keyword, 2 ticket-key, 5 golden. Real retrieval code (`hybrid_search`, 8 candidates, vector leg off). The generated text is filler from a 100-word vocabulary, so every question's words are common among the distractors: **harsher than real prose**. By construction the filler holds nothing relevant, so the labels are exact.

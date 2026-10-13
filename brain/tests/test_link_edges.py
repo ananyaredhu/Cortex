@@ -1,4 +1,4 @@
-"""Link-edge expansion (backlog T4): a stored link leads to another document only if the asker may open that one too.
+"""Link-edge expansion: a stored link leads to another document only if the asker may open that one too.
 
 The fixtures link Jira DBMIG-142 to its Slack thread and to DBMIG-150; Sam (contractor) sees only the onboarding page
 and the vendor notes. Tests that need a link from a visible document to a forbidden one add it to the in-memory index.

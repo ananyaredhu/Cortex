@@ -1,8 +1,8 @@
-"""Revocation-to-enforcement timing, B's stage: `python -m brain.timing [--rounds 5]`.
+"""Revocation-to-enforcement timing, the Brain's stage: `python -m brain.timing [--rounds 5]`.
 
-Runs Workstream A's scenarios (`connectors/ingestion/revocation_timing.py`) with the `enforced` hook filled in: after
+Runs the ingestion scenarios (`connectors/ingestion/revocation_timing.py`) with the `enforced` hook filled in: after
 each revocation, the Brain is asked, as the affected persona, a question that cited the document before, until the
-answer no longer cites it. The Brain here reads the timing database that A's script fills (keyword leg only: that
+answer no longer cites it. The Brain here reads the timing database that the ingestion script fills (keyword leg only: that
 index has no vectors), talks to the same simulators, and syncs the outbox before every request, as the API does.
 Prints persona names, fixture document IDs and timings only.
 """

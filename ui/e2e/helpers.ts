@@ -32,7 +32,7 @@ export async function ask(page: Page, question: string) {
 
 /**
  * The fixture doc ids of the sources an answer card lists ("Jira · DBMIG-142" → "DBMIG-142").
- * The real Brain cites what Slack and Drive assigned ("C0C654ZPPB9/1791121167.965749"); Workstream A's
+ * The real Brain cites what Slack and Drive assigned ("C0C654ZPPB9/1791121167.965749"); the
  * gitignored seed manifests map those back to the fixture ids (evals/ids.py does the same for the golden runner).
  */
 export async function citedIds(card: ReturnType<Page["locator"]>): Promise<string[]> {

@@ -18,7 +18,7 @@ All four sit behind one [connector interface](../02-contracts/connector-interfac
 ## Consequences
 - Fidelity where free APIs allow it; honest disclosure of where we simulate.
 - Free Slack has no guest accounts, so the contractor persona, Sam, has **no Slack account** (decided 5 Oct). Sam has no Slack access, which fails closed; the fixtures were changed to match. Guest rules stay covered by the Slack connector's tests.
-- An Atlassian paid-plan trial window, or a sandbox from Tencent or Aspire, can give a real recording of permissions. Decide on Day 2 (check #5).
+- An Atlassian paid-plan trial window, or a sandbox from Tencent or Aspire, can give a real recording of permissions.
 
 ## To verify
 Slack internal-app limits and free-plan history; Atlassian free-plan limits and trial length; ask in the track group whether simulated connectors are acceptable.
