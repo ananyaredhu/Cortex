@@ -75,7 +75,7 @@ export function AskPage() {
   const endRef = useRef<HTMLDivElement>(null);
   const nextId = useRef(1);
 
-  // A new persona, "Ask Cortex" or a sidebar entry starts afresh: never show one persona's answers to another.
+  // A new persona, "Ask" in the sidebar or a recent question starts afresh: never show one persona's answers to another.
   // With a conversation in the URL the thread is reopened from the server, which applies the ownership rule.
   // The refs make each reset and each "ask again" happen once per navigation, even when effects run twice.
   const resetFor = useRef("");

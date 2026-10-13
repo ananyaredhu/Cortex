@@ -24,11 +24,30 @@
 .home__focus-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .home__focus-body a { text-decoration: none; font-weight: var(--fw-medium, 500); color: var(--text-strong); }
 .home__focus-body a:hover { text-decoration: underline; }
-/* A ticket: the title, then a line of what is known about it. */
-.home__list li.home__ticket { align-items: flex-start; padding: 10px 0; }
-.home__ticket-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+/* Tickets as a table without lines: title, key, status, assignee, due, priority, "Yours", pin. Each field has its own
+   column, so a field a ticket lacks leaves its cell empty and the rest still line up. */
 .home__ticket-main a { font-size: var(--fs-14); color: var(--text-strong); }
-.home__ticket-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px var(--space-2); font-size: var(--fs-12); color: var(--text-body); }
+.home__ticket-meta { font-size: var(--fs-12); color: var(--text-body); }
+@media (min-width: 901px) {
+  .home__tickets { display: grid; grid-template-columns: minmax(0, 1fr) repeat(7, auto); column-gap: var(--space-4); }
+  .home__tickets li.home__ticket { display: grid; grid-template-columns: subgrid; grid-column: 1 / -1; align-items: center; padding: 10px 0; }
+  .home__ticket-main, .home__ticket-meta { display: contents; }
+  .home__ticket > *, .home__ticket-main > *, .home__ticket-meta > * { grid-row: 1; justify-self: start; }
+  .home__ticket-main a { grid-column: 1; }
+  .home__ticket .home__key { grid-column: 2; }
+  .home__ticket .home__status { grid-column: 3; }
+  .home__ticket .home__who { grid-column: 4; }
+  .home__ticket .home__due { grid-column: 5; }
+  .home__ticket .home__priority { grid-column: 6; }
+  .home__ticket .home__mine { grid-column: 7; }
+  .home__ticket .home__pin { grid-column: 8; }
+}
+/* Narrow: the title, then a line of what is known about it. */
+@media (max-width: 900px) {
+  .home__list li.home__ticket { align-items: flex-start; padding: 10px 0; }
+  .home__ticket-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+  .home__ticket-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px var(--space-2); }
+}
 .home__who, .home__due { display: inline-flex; align-items: center; gap: 4px; }
 .home__due--overdue { font-weight: var(--fw-bold); color: var(--text-strong); }
 /* Filters: a chip per filter in use, each opening its values, and "Add filter". */

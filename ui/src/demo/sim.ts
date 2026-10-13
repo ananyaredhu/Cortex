@@ -6,6 +6,12 @@
 export const DEMO_CONTROLS =
   import.meta.env.MODE === "demo" || import.meta.env.MODE === "idp" || import.meta.env.VITE_DEMO_CONTROLS === "1";
 
+/**
+ * Compare people (/compare) asks one question as several personas side by side. It exists to show the access rules in
+ * a demo and is not a product screen: off unless the UI runs in demo mode (`npm run dev:demo`) or VITE_COMPARE_PEOPLE=1.
+ */
+export const COMPARE_PEOPLE = import.meta.env.MODE === "demo" || import.meta.env.VITE_COMPARE_PEOPLE === "1";
+
 export async function sim(path: string, body?: unknown): Promise<unknown> {
   const res = await fetch(path, {
     method: "POST",

@@ -26,7 +26,7 @@ Pick who you are with the persona switcher (bottom left). To see the stale and u
 | `src/home/` | My Work: changed answers ("Needs you"), tickets, recent pages, projects and channels, suggested questions |
 | `src/audit/` | Audit console: page, chain widget, entry drawer with replay |
 | `src/admin/` | Admin: connector cards, lag chart, Leak-CI, policy versions, evaluate sandbox |
-| `src/compare/` | Split-screen: one question, one column per persona, each its own request |
+| `src/compare/` | Split-screen: one question, one column per persona, each its own request. Demo only: shown in demo mode (`npm run dev:demo`) or with `VITE_COMPARE_PEOPLE=1`, hidden otherwise |
 | `src/demo/` | Demo controls (only with `npm run dev:demo`) |
 | `e2e/` | Playwright specs. `uniform-refusal.spec.ts` is a security check: it lives here for the Node tooling, and its API-level twin is in `evals/tests/` |
 | `src/ask/` | The Ask screen: page, answer card, Trust panel, stepper, composer, empty state, and `format.ts` (claims to markers, banners) |
