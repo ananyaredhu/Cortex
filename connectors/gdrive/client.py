@@ -32,6 +32,11 @@ class DriveError(Exception):
         self.reason = reason
 
     @property
+    def log_detail(self) -> str:
+        """What ingestion may write to its log: the status and Google's reason string, never an ID or a URL."""
+        return f"{self.status} {self.reason}"
+
+    @property
     def not_visible(self) -> bool:
         """This account cannot see or read the thing. Another account might."""
         return self.status in (403, 404) and self.reason not in _SLOW_DOWN
