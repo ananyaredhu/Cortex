@@ -1,4 +1,4 @@
-# Internal Brain
+# Cortex
 
 A permission-aware AI knowledge system over Confluence, Jira, Slack and Google Drive, built for the **FinTech track (Aspire)** of the Tencent Cloud AI CAN DO IT Hackathon Singapore 2026.
 
