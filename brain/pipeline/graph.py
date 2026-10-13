@@ -706,6 +706,7 @@ class Brain:
             if len(hits) == limit:
                 break
         self._log_tool(principal, "search", query, decisions, {"result": {"doc_ids": [h["doc_id"] for h in hits]}}, started)
+        self._pad(started)
         return hits
 
     def get_source(self, principal: Principal, doc_id: str, *, max_chars: int = 8000) -> dict | None:

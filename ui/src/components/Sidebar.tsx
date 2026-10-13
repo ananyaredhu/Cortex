@@ -1,4 +1,4 @@
-import { CalendarClock, ChevronsUpDown, Columns3, Home, MessageSquare, ScrollText, Settings2, Users, X } from "lucide-react";
+import { CalendarClock, ChevronsUpDown, Columns3, Home, MessageSquare, ScrollText, Search, Settings2, Users, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { NavLink } from "react-router-dom";
 import logo from "../assets/logo/cortex-mark.svg";
@@ -6,6 +6,7 @@ import { usePersona } from "../auth/PersonaContext";
 import { canAdmin, canAudit, PERSONAS } from "../auth/personas";
 import { COMPARE_PEOPLE } from "../demo/sim";
 import { useRoutines } from "../routines/useRoutines";
+import { SHORTCUT, useSearch } from "../search/SearchPalette";
 import { Avatar } from "./Avatar";
 import { RecentChats } from "./RecentChats";
 import { ThemeToggle } from "./ThemeToggle";
@@ -14,6 +15,7 @@ import { ThemeToggle } from "./ThemeToggle";
 export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: () => void }) {
   const { persona, setPersona } = usePersona();
   const [menuOpen, setMenuOpen] = useState(false);
+  const search = useSearch();
   const toggleRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLUListElement>(null);
 
@@ -57,6 +59,20 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
         <NavLink to="/ask">
           <MessageSquare size={16} aria-hidden /> Ask
         </NavLink>
+        {search && (
+          <button
+            type="button"
+            aria-haspopup="dialog"
+            aria-keyshortcuts="Control+K Meta+K"
+            onClick={() => {
+              onClose?.();
+              search.open();
+            }}
+          >
+            <Search size={16} aria-hidden /> Search
+            <kbd className="sidebar__kbd">{SHORTCUT}</kbd>
+          </button>
+        )}
         <NavLink to="/" end>
           <Home size={16} aria-hidden /> My work
         </NavLink>

@@ -55,5 +55,6 @@ Keep the token in an environment variable. Never commit it or show it in screens
 - A client's own model sits on top and may rephrase what a tool returns. The tools return `claims` and `citations` for that reason: a client should show them as they are.
 
 ## Changelog
+- 0.2, 13 Oct: `search` is also served to the UI as `GET /v1/search` ([api](api.md) 0.5), and its replies are now held to the floor latency like `get_source`'s. Names, descriptions and schemas are unchanged.
 - 0.2: built. SDK 2.x `MCPServer`; endpoint, settings and results written down; no user argument; host check; pinned fingerprint; `audit_query` no longer returns verify status.
 - 0.1: first draft.

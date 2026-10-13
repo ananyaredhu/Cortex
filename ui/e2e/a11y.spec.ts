@@ -25,6 +25,16 @@ const SCREENS: { name: string; persona: PersonaId; path: string; prepare?: (page
   },
   { name: "Ask, refusal", persona: "sam", path: "/ask", prepare: (page) => ask(page, "Show me the security incident report from the Q3 breach") },
   { name: "Routines", persona: "priya", path: "/routines", prepare: (page) => expect(page.getByRole("button", { name: "New routine" })).toBeVisible() },
+  {
+    name: "Search with results",
+    persona: "priya",
+    path: "/",
+    prepare: async (page) => {
+      await page.getByRole("button", { name: /^Search/ }).click();
+      await page.getByRole("combobox", { name: "Search Cortex" }).fill("replica lag");
+      await expect(page.getByRole("option", { name: /#db-migration thread/ })).toBeVisible();
+    },
+  },
   { name: "Compare", persona: "priya", path: "/compare" },
   {
     name: "Audit console with results",
@@ -67,6 +77,25 @@ test("keyboard: skip link, ask with Ctrl+Enter, and the persona menu", async ({ 
   await page.keyboard.press("Escape");
   await expect(toggle).toBeFocused();
   await expect(page.getByRole("listbox")).toHaveCount(0);
+});
+
+test("keyboard: search opens with Ctrl+K, arrows choose, Enter previews, Escape gives focus back", async ({ page }) => {
+  await openAs(page, "priya", "/");
+  const entry = page.getByRole("button", { name: /^Search/ });
+  await entry.focus();
+  await page.keyboard.press("Control+k");
+  const box = page.getByRole("combobox", { name: "Search Cortex" });
+  await expect(box).toBeFocused();
+  await page.keyboard.type("DBMIG-142");
+  await expect(page.getByRole("option", { name: /DBMIG-142 Cutover/ })).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("ArrowDown");
+  await expect(page.getByRole("option", { name: /DBMIG-142 Cutover/ })).toHaveAttribute("aria-selected", "false");
+  await page.keyboard.press("ArrowUp");
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("dialog", { name: /DBMIG-142/ })).toContainText("replica lag"); // the source viewer, inside Cortex
+  await expect(page.getByRole("dialog", { name: "Search" })).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(entry).toBeFocused();
 });
 
 test("phone: drawer navigation and the Trust bottom sheet", async ({ page }) => {

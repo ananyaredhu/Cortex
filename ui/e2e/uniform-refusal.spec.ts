@@ -16,3 +16,18 @@ test("a forbidden and a nonexistent report render identically", async ({ page })
   expect(await missing.innerHTML()).toBe(forbiddenHtml);
   expect((await trust.innerText()).replace(/req_\w+/g, "req_X")).toBe(forbiddenTrust);
 });
+
+test("searching for a forbidden and for a nonexistent report shows the same list", async ({ page }) => {
+  await openAs(page, "sam", "/");
+  await page.getByRole("button", { name: /^Search/ }).click();
+  const dialog = page.getByRole("dialog", { name: "Search" });
+  const box = dialog.getByRole("combobox", { name: "Search Cortex" });
+  const shown = async (q: string) => {
+    await box.fill(q);
+    await expect(dialog.getByRole("status")).toHaveText(`Nothing you can open matches “${q}”.`);
+    return (await dialog.getByRole("listbox").innerText()).replaceAll(q, "Q");
+  };
+  const forbidden = await shown("q3 breach security incident report");
+  expect(await shown("q9 quantum hologram audit report")).toBe(forbidden);
+  expect(forbidden).not.toMatch(/breach report|CANARY/i);
+});
