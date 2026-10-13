@@ -70,6 +70,21 @@ class Wakeups:
         return pending
 
 
+def build_connectors(names: list[str], factories=SOURCES) -> tuple[dict, dict[str, str]]:
+    """(the connectors that could be built, source -> exception class for those that could not).
+
+    A source that is not set up (a missing token or key, an unreadable account file) is reported and left out, so the
+    others keep syncing, instead of the whole process dying at start. Restart after fixing the setting."""
+    built, unavailable = {}, {}
+    for name in names:
+        try:
+            built[name] = factories[name]()
+        except Exception as exc:                            # noqa: BLE001 - reported by class only: messages can hold paths
+            unavailable[name] = type(exc).__name__
+            logging.getLogger(__name__).warning("source %s is not set up (%s): left out until restart", name, type(exc).__name__)
+    return built, unavailable
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="python -m connectors.ingestion", description=__doc__.splitlines()[0])
     mode = parser.add_mutually_exclusive_group(required=True)
@@ -101,17 +116,26 @@ def main() -> None:
     if args.recrawl:
         for name in names:
             store.clear_cursor(name)
-    connectors = {n: SOURCES[n]() for n in names}
+    connectors, unavailable = build_connectors(names)
+    if not connectors:
+        raise SystemExit(f"no source could be set up: {unavailable}")
     embedder = from_env()
     ingestor = Ingestor(connectors.values(), store, embedder)
     failed = 0
     wake = Wakeups()
+
+    def run_pass():
+        """One pass over every source, with the ones that could not be set up shown as errors too."""
+        report = ingestor.run_once()
+        report.errors.update(unavailable)
+        return report
+
     server = listener = None
-    if args.drive_webhook is not None:
+    if args.drive_webhook is not None and "gdrive" in connectors:
         receiver = webhook.Receiver(watch.webhook_token(), lambda: {c.id for c in watch.load_channels()}, lambda: wake.ring("gdrive"))
         # 127.0.0.1 unless the reverse proxy is on another host of a private network (a container: deploy/)
         server = webhook.serve(receiver, args.drive_webhook, host=os.environ.get("DRIVE_WEBHOOK_HOST") or "127.0.0.1")
-    if args.slack_events:
+    if args.slack_events and "slack" in connectors:
         slack = connectors["slack"]
 
         def on_hint(hint: Hint) -> None:
@@ -126,7 +150,7 @@ def main() -> None:
         if server is not None or listener is not None:
             # The model loads on first use, which took about 90 s on 6 Oct. Pay it now, not on the first event.
             embedder.embed(["warm up"])
-        first = ingestor.run_once()
+        first = run_pass()
         print(json.dumps(first.as_json()), flush=True)
         if args.once and first.errors:
             failed = 1                          # --once: tell the caller a source failed
@@ -146,7 +170,7 @@ def main() -> None:
                     print(json.dumps({"trigger": TRIGGERS[name], **outcome,
                                       METRIC: {name: ingestor.freshness.summary().get(name)},
                                       PIPELINE_METRIC: {name: ingestor.lag.summary().get(name)}}), flush=True)
-            print(json.dumps(ingestor.run_once().as_json()), flush=True)
+            print(json.dumps(run_pass().as_json()), flush=True)
     except KeyboardInterrupt:
         pass
     finally:

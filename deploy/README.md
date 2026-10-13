@@ -55,10 +55,15 @@ dev login off. The images contain no `.env`, token or account file (`.dockerigno
    | `connectors/gdrive/token-gdrive-*.json` | the same names |
    | `connectors/slack/token-slack-*.json` (only for Slack DMs) | the same names |
 
-   Fill in the Slack and Google values in `.env`, set `BRAIN_SOURCES=confluence,jira,slack,gdrive`, then
+   Fill in the Slack and Google values in `.env` (Drive needs `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET`, from
+   the same OAuth client the token files were made with; a source that is not set up is left out of ingestion and the Brain
+   with a warning, so its documents never appear), set `BRAIN_SOURCES=confluence,jira,slack,gdrive`, then
    `docker compose up -d`. For Drive push notifications:
    `docker compose exec ingestion python -m connectors.gdrive.watch start https://<SITE_HOST>/drive/notify`
    (channels last 7 days: run it again weekly, or Drive falls back to the poll).
+   If the OAuth consent screen is in "Testing" status, Google expires the refresh tokens after 7 days: a Drive pass then fails
+   with `DriveError: 400 token_refresh_failed` in the ingestion log. Sign the accounts in again (`python -m connectors.gdrive.authorize`)
+   or publish the consent screen.
 6. Check it, below.
 
 ## Is it up?

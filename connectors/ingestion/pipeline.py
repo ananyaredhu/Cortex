@@ -121,8 +121,9 @@ class Ingestor:
             delay = min(BACKOFF_BASE * 2 ** (health.failures - 1), BACKOFF_MAX) * self._jitter()
             delay = max(delay, float(getattr(exc, "retry_after", 0) or 0))   # a rate limit's Retry-After
             health.retry_at = self._monotonic() + delay
-            log.warning("%s: pass failed (%s), %d in a row; next attempt in %.0f s",
-                        source, health.last_error, health.failures, delay)
+            detail = getattr(exc, "log_detail", None)           # opt-in: only exceptions that promise it holds no IDs or URLs
+            log.warning("%s: pass failed (%s%s), %d in a row; next attempt in %.0f s",
+                        source, health.last_error, f": {detail}" if detail else "", health.failures, delay)
             return None
         if health.failures:
             log.info("%s: recovered after %d failed passes", source, health.failures)
