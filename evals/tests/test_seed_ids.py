@@ -1,6 +1,6 @@
 """The golden runner against a system that cites real Slack and Drive IDs (evals/ids.py).
 
-Manifests come from Workstream A's fakes, which assign their own IDs, so no real platform is needed. The last test
+Manifests come from the connectors' fakes, which assign their own IDs, so no real platform is needed. The last test
 checks the local manifests of the real workspace and Drive when they exist.
 """
 import pytest

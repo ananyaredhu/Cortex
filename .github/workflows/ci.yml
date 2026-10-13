@@ -8,7 +8,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    # Postgres with pgvector, so the database tests run in CI instead of being skipped (fix F8). Each test makes its own throwaway
+    # Postgres with pgvector, so the database tests run in CI instead of being skipped. Each test makes its own throwaway
     # schema from db/init.sql, so nothing here needs seeding.
     services:
       postgres:
@@ -44,7 +44,7 @@ jobs:
           git diff --exit-code fixtures/company_a.json
 
   # The UI (ui/): type-check, unit tests and a production build. The Playwright suite (npm run e2e) needs a 700 MB browser
-  # and runs by hand for now. Node 22 is the version the team's setup guide (docs/setup-ui-laptop.md) installs.
+  # and runs by hand for now. Node 22 is the version it is developed and tested on.
   ui:
     runs-on: ubuntu-latest
     defaults:

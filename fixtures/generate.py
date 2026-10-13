@@ -3,7 +3,7 @@
 Run:  python fixtures/generate.py
 Edit this file (not the JSON) to change the fixtures, then regenerate and commit both.
 
-The corpus is fictional. It covers the five handbook scenarios plus the two CTO questions
+The corpus is fictional. It covers the five scenarios plus the two CTO questions
 (see docs/04-scenarios.md). Token format follows docs/02-contracts/acl-model.md (v0.2): a public Slack
 channel is readable by every full org member, so its threads carry `public:org` as well as the channel
 token (the channel token is what a guest holds). Sam has no Slack account: the free workspace has no guest

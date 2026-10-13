@@ -1,8 +1,8 @@
 # Connector interface
 
 version: 0.4
-**0.5 is proposed (12 Oct, by C) and not yet approved; it is built on the branch `ws-c/ui-adjustments` (Jira simulator, its connector, the fixture connector, contract tests 7 and 8):** the Jira `due`, `priority` and `assignee_email` fields, and `WritableConnector.transition`, the first write a connector makes. See "Writing: moving a Jira issue" below.
-Producer: Workstream A. Consumers: B (ingestion, PDP, JIT checks).
+**0.5 (12 Oct):** the Jira `due`, `priority` and `assignee_email` fields, and `WritableConnector.transition`, the first write a connector makes. See "Writing: moving a Jira issue" below.
+Producer: the connectors. Consumers: the Brain (ingestion, PDP, JIT checks).
 
 Every source (Slack, Google Drive, Confluence, Jira), real or simulated, implements the same protocol and passes the same **contract tests**. Simulators must be proven faithful by running the same tests against the real API wherever one exists.
 
@@ -43,7 +43,7 @@ class DocumentNotFound(LookupError):
     """Raised by `fetch` and `version`. Never raised by `check_access`, which returns a deny instead."""
 
 
-# (0.5, proposed) Implemented by the Jira connector only. Every other connector stays read-only.
+# (0.5) Implemented by the Jira connector only. Every other connector stays read-only.
 class WritableConnector(Connector, Protocol):
     def transition(self, identity: "PlatformIdentity", doc_id: str, status: str) -> "Document":
         """Move one issue to `status`, acting as `identity`, and return the issue as the platform now holds it
@@ -84,7 +84,7 @@ class Document:
     acl: "AclEvidence"
     fields: dict[str, str]     # (0.4) what the platform holds as a field, not as text: lower-case name -> value, both strings.
                                # {} when it has none. Jira: "status", "assignee" (display name). Untrusted source data, like body.
-                               # (0.5, proposed) Jira also: "due" (YYYY-MM-DD), "priority" (the platform's name) and
+                               # (0.5) Jira also: "due" (YYYY-MM-DD), "priority" (the platform's name) and
                                # "assignee_email" (canonical email, only when the assignee's account is mapped).
 
 class AclEvidence:
@@ -179,7 +179,7 @@ LIMIT :k;
 | Confluence | One page | `confluence:<space>/<page id>` | `confluence:<space>` | Page version |
 | Jira | One issue, including its comments. After the description the `body` carries one line `Status: <name>` and one line `Assignee: <display name>` when the issue has them (Team focus reads these lines). The same two values are in `fields` as `status` and `assignee` (0.4): the lines are for a reader and for search, the fields are for code that must compare a value exactly | `jira:<issue key>` | `jira:<project key>` | Updated timestamp |
 
-*(0.5, proposed)* A Jira issue's `body` also carries `Due: <YYYY-MM-DD>` and `Priority: <name>` lines when the issue has them, after `Assignee:`, and `fields` carries `due`, `priority` and `assignee_email`. The lines let a question such as "what is due this week?" be answered and checked; the fields are what `/v1/team` and `/v1/mywork` read. `assignee_email` is a field only, never a line in `body`: it exists so that code can tell whose an issue is by account rather than by display name, and it is absent when the assignee's account has no canonical mapping (then nobody is treated as the assignee).
+*(0.5)* A Jira issue's `body` also carries `Due: <YYYY-MM-DD>` and `Priority: <name>` lines when the issue has them, after `Assignee:`, and `fields` carries `due`, `priority` and `assignee_email`. The lines let a question such as "what is due this week?" be answered and checked; the fields are what `/v1/team` and `/v1/mywork` read. `assignee_email` is a field only, never a line in `body`: it exists so that code can tell whose an issue is by account rather than by display name, and it is absent when the assignee's account has no canonical mapping (then nobody is treated as the assignee).
 
 Real platforms assign their own IDs (Slack channel IDs, Drive file IDs), so they will not equal the IDs in `fixtures/`. A real backend ships a **seed manifest** that maps each fixture `doc_id` and container to its native ID; the contract tests translate through it.
 
@@ -193,9 +193,9 @@ Real platforms assign their own IDs (Slack channel IDs, Drive file IDs), so they
 - `check_access` must never return `allowed=True` on an error or timeout: **fail closed**.
 - A deny for a forbidden document and for a nonexistent document has `allowed=False` and `proof_path=[]`. `acl_snapshot_hash` is empty when the document does not exist and may be set when it does (the audit log needs it for replay), so an `AccessDecision` **never leaves the policy plane**: it is not serialized to the LLM plane or to the user.
 - Rate limits: connectors back off and surface lag as a metric (`freshness_lag_seconds`).
-- Credentials are read-only, least-privilege, and live only in the connector process. *(0.5, proposed)* One exception: the Jira connector's credential may also transition issues, and nothing else (see "Writing" below). A connector that reads with per-person credentials (Drive's refresh tokens, Slack's user tokens for DMs) answers `check_access` for a person-private document with **that person's own** credential, and denies when it has none.
+- Credentials are read-only, least-privilege, and live only in the connector process. *(0.5)* One exception: the Jira connector's credential may also transition issues, and nothing else (see "Writing" below). A connector that reads with per-person credentials (Drive's refresh tokens, Slack's user tokens for DMs) answers `check_access` for a person-private document with **that person's own** credential, and denies when it has none.
 
-## Writing: moving a Jira issue *(0.5, proposed)*
+## Writing: moving a Jira issue *(0.5)*
 `transition` exists for one caller: the Brain's `POST /v1/issues/move` ([api](api.md) 0.3), after the policy plane has decided that the person may open the issue and is its assignee. It is the only write in this interface.
 - **The platform stays the source of truth.** The connector changes the status in Jira and returns what Jira then holds. It keeps no status of its own and never edits the index; the Brain passes the returned `Document` to ingestion's upsert path, the same one a change event takes.
 - **The change still appears in the feed.** After a transition, `list_changes` emits an `upsert` for the issue as for any edit. Ingestion meets a version it already has and does nothing more, so the next sync cannot undo or contradict the move.
@@ -212,11 +212,11 @@ Real platforms assign their own IDs (Slack channel IDs, Drive file IDs), so they
 4. Inheritance: container-level permissions apply to children (Confluence space to page, Drive folder to file).
 5. Negative: `check_access` for a nonexistent doc and for a forbidden doc return the same shape. `fetch` and `version` raise `DocumentNotFound` for a nonexistent doc.
 6. Initial load: `list_changes(None)`, followed until `has_more` is false, returns an `upsert` for every seeded document of that source.
-7. *(0.5, proposed; Jira only)* Transition: move a seeded issue as its assignee, then the returned `Document` has the new `status` field and `Status:` line and a new `version`; `fetch` and `version` agree with it; `list_changes` emits one `upsert` for it; nobody's `check_access` result has changed. A move the workflow does not offer raises `TransitionRefused` and leaves `version` unchanged. A nonexistent issue raises `DocumentNotFound`.
-8. *(0.5, proposed; Jira only)* Fields: `due`, `priority` and `assignee_email` match the seed, and are absent (not empty strings) on an issue that has none.
+7. *(0.5; Jira only)* Transition: move a seeded issue as its assignee, then the returned `Document` has the new `status` field and `Status:` line and a new `version`; `fetch` and `version` agree with it; `list_changes` emits one `upsert` for it; nobody's `check_access` result has changed. A move the workflow does not offer raises `TransitionRefused` and leaves `version` unchanged. A nonexistent issue raises `DocumentNotFound`.
+8. *(0.5; Jira only)* Fields: `due`, `priority` and `assignee_email` match the seed, and are absent (not empty strings) on an issue that has none.
 
 ## Changelog
-- 0.5 (proposed 12 Oct, not approved; built on `ws-c/ui-adjustments`): Jira `fields` gain `due`, `priority` and `assignee_email`, with `Due:` and `Priority:` lines in `body`; `WritableConnector.transition` and `TransitionRefused` for the Jira connector, with the one write scope it needs; contract tests 7 and 8. Why: My Work and Team focus need deadlines, and a person should be able to move their own ticket from the board without the board and Jira ever disagreeing.
+- 0.5 (12 Oct): Jira `fields` gain `due`, `priority` and `assignee_email`, with `Due:` and `Priority:` lines in `body`; `WritableConnector.transition` and `TransitionRefused` for the Jira connector, with the one write scope it needs; contract tests 7 and 8. Why: My Work and Team focus need deadlines, and a person should be able to move their own ticket from the board without the board and Jira ever disagreeing.
 - 0.4, 11 Oct: `Document.fields` (`dict[str, str]`, default `{}`) and the `documents.fields` column. The Jira connector fills `status` and `assignee` from the issue's own fields; the other connectors return `{}` for now. Why: a grounding model cannot be trusted to tell "Status: In Progress" from "the status is Done" (fix F23), and text that code must parse back into values is not a contract. The `Status:` and `Assignee:` lines stay in `body`. Contract test 1 now checks the field against the seed. `db/init.sql` has the column; ingestion adds it at start-up to a database created earlier.
 - 0.3, 11 Oct addition: a Jira issue's `body` carries `Status: <name>` and `Assignee: <display name>` lines (the status line was already written; the assignee line and the simulator's `assignee` field are new). No change to the interface.
 - 0.3, 11 Oct addition: Slack DMs and group DMs are documents (same thread unit and `doc_id` shape, conversation IDs may start with `D`); `check_access` on a person-private document uses the asker's own credential. Rules in acl-model.md, "Slack DMs". No change to the interface.

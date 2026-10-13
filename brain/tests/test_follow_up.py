@@ -1,4 +1,4 @@
-"""Router rewrite and conversation memory (backlog T6): a follow-up is understood from the earlier turns, and memory never
+"""Router rewrite and conversation memory: a follow-up is understood from the earlier turns, and memory never
 carries anything the person may no longer see."""
 import pytest
 

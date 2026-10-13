@@ -1,4 +1,4 @@
-# ADR-005 · A small, explicit project registry
+# ADR-008 · A small, explicit project registry
 
 **Status:** Accepted (11 Oct), built in `brain/projects/`.
 

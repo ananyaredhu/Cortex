@@ -1,7 +1,7 @@
 # Audit event schema
 
-version: 0.1 (draft, freezes Day 3)
-Producer: Workstream B (audit service). Consumers: C (console, evals), B (audit agent).
+version: 0.1
+Producer: the Brain (audit service). Consumers: the console, the evals and the audit agent.
 
 The log must be **tamper-evident**, **complete** (who, what, retrieved IDs, final answer, time, allow/deny per document) and **queryable**.
 
@@ -79,7 +79,7 @@ Audit queries (natural language or structured) are read-only and run **under RBA
 ## Conversations
 `ask` events carry `conversation_id` (the one returned by `/ask`). The Brain keeps no other record of conversations: `/v1/conversations` and `/v1/conversations/{id}` are rebuilt from these events, under the same ownership rule (only the asker's own events), so history survives a restart.
 
-## Proposed events (12 Oct, with api.md 0.3; not approved; built on `ws-c/ui-adjustments`)
+## Events added with api.md 0.3 (12 Oct)
 Four new event types and one new value, all in the hash chain like any other event.
 
 **`issue_transition`**: every call to `POST /v1/issues/move`, whatever its outcome.
@@ -105,7 +105,7 @@ Four new event types and one new value, all in the hash chain like any other eve
 Event types then read: `ask`, `search`, `mcp_call`, `audit_query`, `admin_view`, `acl_change_observed`, `alert_sent`, `checkpoint`, `identity_snapshot`, `issue_transition`, `conversation_title`, `routine_change`, `routine_skipped`.
 
 ## Changelog
-- 0.1, 12 Oct (proposed): `issue_transition`, `conversation_title`, `routine_change` and `routine_skipped` events; `actor.client: "routine"` and `routine_id` on `ask` events.
+- 0.1, 12 Oct: `issue_transition`, `conversation_title`, `routine_change` and `routine_skipped` events; `actor.client: "routine"` and `routine_id` on `ask` events.
 - 0.1, 11 Oct: `checks.fields` (`pass`, `fail` or `nothing_to_check`: whether what the claims said about structured fields matched the documents') and `checks.field_mismatches` (`[{field, doc_ids}]` for each claim dropped, without the values) (fix F23).
 - 0.1, 11 Oct: `query.projects` (ids of the registry projects the question named, among those the asker may see) (T7).
 - 0.1, 11 Oct: `checks.grounding_lower_confidence` (claims kept between the grounding floor and threshold) and the `lower_confidence` value of `checks.grounding_model` (fix F21).

@@ -4,7 +4,7 @@ import { SOURCES, type Source } from "../api/types";
 import { SourceGlyph, SOURCE_LABEL } from "../components/SourceGlyph";
 
 // Scope chips map to the request's `sources`. No time-range chip yet: the stub ignores `time_range`
-// and B hasn't built it (ui/MOCKUP-DRIFT.md #16). No microphone until voice exists (#21).
+// and B hasn't built it. No microphone until voice exists (#21).
 export function Composer({
   busy,
   onAsk,

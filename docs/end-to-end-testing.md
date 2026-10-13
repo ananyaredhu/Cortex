@@ -1,6 +1,6 @@
-# Full end-to-end test on the real stack (runbook)
+# Full end-to-end test on the real stack
 
-**For:** whoever runs it (Praew's laptop: it has the real Slack workspace, the Google accounts, the identity map and the seed manifests).
+**For:** whoever runs it, on a machine that has the real Slack workspace, the Google accounts, the identity map and the seed manifests.
 **Goal:** prove every piece works together with real Postgres, real Slack and Drive, bge-m3, the ADP agent and the UI.
 **Time:** about 90 minutes. **Do the steps in order**: some depend on the one before, and two steps cannot run at the same time as ingestion.
 
@@ -11,7 +11,7 @@ Three rules that avoid most trouble:
 
 Every command is run from the repository root, in a terminal where `.venv` exists (`make setup` once if it does not). Lines starting with `#` are comments, not commands.
 
-**On Windows** (Praew's laptop) there is no `make`, and `python` must be the one in `.venv`. Use Git Bash and these instead:
+**On Windows** there is no `make`, and `python` must be the one in `.venv`. Use Git Bash and these instead:
 
 | The runbook says | Run |
 |---|---|
@@ -52,7 +52,7 @@ BRAIN_DEV_AUTH=1                                # the Playwright tests (step 9) 
 BRAIN_MCP=1
 SIM_ADMIN_TOKEN=<any long random string>        # the simulators' admin endpoints need it
 ```
-**Pass:** nothing is missing. **If not:** do not continue, ask Ananya.
+**Pass:** nothing is missing. **If not:** do not continue; fix the missing item first.
 
 **0.4 Free disk and memory.** About 6 GB of disk and 4 GB of free memory (bge-m3 uses about 2 GB, the checker about 1 GB).
 
@@ -121,20 +121,20 @@ Nine scripted questions with expected citations. Pace: one case every 11 seconds
 ```bash
 python -m evals.golden --target http://localhost:8000
 ```
-**Pass:** every line starts with `pass`, the last line says `... failed 0`, and the exit code is 0. Lines starting with `hand` are the scripted cases (the runbook edit and Priya leaving a channel): they need a change in a platform, so they are done by hand in step 10. **If a case says `FAIL`:** it prints why (a missing or forbidden citation, or forbidden text). Send that line to Ananya.
+**Pass:** every line starts with `pass`, the last line says `... failed 0`, and the exit code is 0. Lines starting with `hand` are the scripted cases (the runbook edit and Priya leaving a channel): they need a change in a platform, so they are done by hand in step 10. **If a case says `FAIL`:** it prints why (a missing or forbidden citation, or forbidden text). Investigate that line before going on.
 
 ## Step 6 · Red team (attacks through the API)
 Three suites of attacks (`evals/redteam.py`, cases in `evals/redteam_cases.json`): an injection planted in a Slack message (10 questions), injections typed as the question (22), and a forbidden document against one that does not exist (4 pairs, plus two checks of the access explainer). About 45 questions, 11 seconds apart, so about 12 minutes. It plants nothing and writes nothing: ingestion keeps running.
 ```bash
 python -m evals.redteam --target http://localhost:8000
 ```
-**Pass:** the three suites say `... passed, 0 failed` and the last line starts with `0 leaks, 0 failed probes`. The suite `revocation-race` is **skipped** on a real stack (it needs the development controls; scenario 4 in step 10 covers it by hand): a `skip` line for it is normal. A line starting with `LEAK` is never acceptable: send it to Ananya at once. A line starting with `FAIL` that says "the answer service was unavailable" means ADP throttled the run: wait 5 minutes and rerun just that suite, for example `--only injection-question`. The result is also written to `evals/scoreboard/redteam-latest.json`.
+**Pass:** the three suites say `... passed, 0 failed` and the last line starts with `0 leaks, 0 failed probes`. The suite `revocation-race` is **skipped** on a real stack (it needs the development controls; scenario 4 in step 10 covers it by hand): a `skip` line for it is normal. A line starting with `LEAK` is never acceptable: stop and investigate it before anything else. A line starting with `FAIL` that says "the answer service was unavailable" means ADP throttled the run: wait 5 minutes and rerun just that suite, for example `--only injection-question`. The result is also written to `evals/scoreboard/redteam-latest.json`.
 
 ## Step 7 · MCP server
 ```bash
 python -m mcp_server.smoke --url http://localhost:8000
 ```
-**Pass:** all 11 checks print `PASS`. The check script translates the real Slack and Drive IDs back to the fixture IDs using the seed manifests from Step 2. If a line fails, send it to Ananya.
+**Pass:** all 11 checks print `PASS`. The check script translates the real Slack and Drive IDs back to the fixture IDs using the seed manifests from Step 2. If a line fails, investigate it before continuing.
 
 ## Step 8 · Leak-CI (needs ingestion stopped)
 Leak-CI plants hidden documents, ingests them itself, asks, edits, removes and asks again. **It cannot run while the ingestion process is running** (two writers).
@@ -145,7 +145,7 @@ python -m evals.leakci --target http://localhost:8000
 ```
 3. When it ends, start ingestion again in T4 with the same command as in step 3, wait for it to catch up, and run `python -m connectors.ingestion.check_index` once more.
 
-**Pass:** the last line says `0 leaks, 0 failed checks in 6 cases`. Leak-CI writes the scoreboard that the Admin page shows. **If a "control" case fails once and passes on the second try**, that is the known flakiness described in `docs/status/ws-c.md`; a leak is never acceptable: send it to Ananya at once.
+**Pass:** the last line says `0 leaks, 0 failed checks in 6 cases`. Leak-CI writes the scoreboard that the Admin page shows. **If a "control" case fails once and passes on the second try**, that is the known flakiness described in `docs/status/ws-c.md`; a leak is never acceptable: stop and investigate it before anything else.
 
 ## Step 9 · The UI, and the browser tests
 ```bash
@@ -189,8 +189,8 @@ Do these in the UI, in order, leaving 15 to 20 seconds between questions. For ea
 
 ---
 
-## What to send back
-A short list: the step number, the result (pass or fail), and for a failure the **exact printed line** and the time. Paste them to Ananya (no tokens, no screenshots with keys). The most valuable results are steps 5, 6 and 8 (they print counts) and the screenshots from step 10.
+## What to record
+A short list: the step number, the result (pass or fail), and for a failure the **exact printed line** and the time. Keep them with the test notes (no tokens, no screenshots with keys). The most valuable results are steps 5, 6 and 8 (they print counts) and the screenshots from step 10.
 
 ## If something goes wrong
 | You see | Likely cause | Do |

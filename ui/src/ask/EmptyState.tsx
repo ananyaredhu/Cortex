@@ -3,7 +3,7 @@ import { ArrowUpRight } from "lucide-react";
 import { api } from "../api/client";
 import { usePersona } from "../auth/PersonaContext";
 
-/** A new question starts with a greeting and nothing else; the composer sits right under it (ui/MOCKUP-DRIFT.md #52). */
+/** A new question starts with a greeting and nothing else; the composer sits right under it. */
 export function EmptyState() {
   const { persona } = usePersona();
   return (

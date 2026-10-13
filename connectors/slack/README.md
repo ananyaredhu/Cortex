@@ -16,7 +16,7 @@ authorized (see "DMs and group DMs"). Implements `docs/02-contracts/connector-in
 
 ## First steps with a new token
 ```
-python -m connectors.slack.check_rate_limit     # check #3: is the app exempt from the 1-request-per-minute cut?
+python -m connectors.slack.check_rate_limit     # is the app exempt from the 1-request-per-minute cut?
 python -m connectors.slack.build_manifest       # match the workspace to the fixtures; lists anything missing
 python -m connectors.ingestion --once --sources confluence,jira,slack
 ```

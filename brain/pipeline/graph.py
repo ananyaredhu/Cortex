@@ -272,7 +272,7 @@ class Brain:
         return {"asker": self.resolver.resolve(state["principal"].email)}
 
     def _understand(self, state: State) -> dict:
-        """The router and the rewrite (backlog T5, T6): which skill applies, and what a follow-up is really asking for."""
+        """The router and the rewrite: which skill applies, and what a follow-up is really asking for."""
         req, p = state["request"], state["principal"]
         history = self._history(p, req.conversation_id)
         query, rewritten = rewrite_query(req.question, history)
@@ -362,7 +362,7 @@ class Brain:
 
     def _with_projects(self, candidates: list[Candidate], resolved: list[ProjectView], asker: AskerIdentity,
                        searched: list[str]) -> list[Candidate]:
-        """A question that names a project (T7): raise the rank of documents inside it and add a few it missed. Boost, never
+        """A question that names a project: raise the rank of documents inside it and add a few it missed. Boost, never
         filter: nothing is removed, and everything added goes through the live permission check like any hit."""
         if not resolved:
             return candidates
@@ -409,7 +409,7 @@ class Brain:
         return out
 
     def _expand(self, state: State) -> dict:
-        """Follow the stored links of the allowed hits, one hop (backlog T4).
+        """Follow the stored links of the allowed hits, one hop.
 
         A link grants nothing: every target goes through the same live PDP check as a search hit, with the asker's own
         identity. A target that is denied, missing, deleted or in a source the asker is not searching is dropped with no
@@ -729,7 +729,7 @@ class Brain:
         return result
 
     def project_profile(self, principal: Principal) -> list[dict]:
-        """The caller's projects (T7), for `/v1/projects` and My Work: only what they may open something in."""
+        """The caller's projects, for `/v1/projects` and My Work: only what they may open something in."""
         return [v.as_json() for v in self._project_views(self.resolver.resolve(principal.email))]
 
     def team_focus(self, principal: Principal, names: dict[str, str] | None = None) -> list[dict]:

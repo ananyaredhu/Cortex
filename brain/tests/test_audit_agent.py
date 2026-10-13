@@ -1,4 +1,4 @@
-"""The audit agent (backlog T9): a question in words becomes a validated plan, which the compliance role's audit code runs.
+"""The audit agent: a question in words becomes a validated plan, which the compliance role's audit code runs.
 
 The planner never sees an audit event, only people, spaces and document titles; the summary is written by code.
 """

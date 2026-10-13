@@ -1,18 +1,15 @@
 # 00 · Overview
 
-## The challenge (Aspire, FinTech track)
-Build an **Internal Brain**: an AI system that unifies context across **Confluence, Jira, Slack and Google Drive**, answers natural-language questions with citations, and enforces each platform's access controls end to end, with a tamper-evident audit trail.
+## The problem
+Company knowledge is scattered across wikis, tickets, chat and shared files, and staff lose about 30% of their week searching. An AI assistant that unifies **Confluence, Jira, Slack and Google Drive** could fix that, but "an assistant that can read everything can leak everything". So every answer has to be scoped to what the asker may see, and every retrieval and answer has to be recorded.
 
-Company knowledge is scattered; staff lose about 30% of their week searching. But "an assistant that can read everything can leak everything", so every answer must be scoped to what the asker may see, and every retrieval and answer must be recorded.
-
-### What the handbook requires
-- Heterogeneous source integration that **does not flatten** each platform's permission model.
+### What the system must do
+- Integrate heterogeneous sources and **not flatten** each platform's permission model.
 - **Permission-aware retrieval:** know the asker, filter *before* the LLM sees anything, and handle permissions changed after ingestion.
-- Cross-platform context assembly with permission checks on every piece.
-- Security logging and audit: tamper-evident, complete (who, what, retrieved IDs, answer, time, allow/deny per document), queryable.
-- LLM safety: mitigate the model "filling in" content it was not given.
-- Five scenarios, each with a worked example: see [04-scenarios](04-scenarios.md).
-- Deliverables: live demo, architecture and trust-boundary diagram with trade-offs, full source on GitHub.
+- Assemble context across platforms with a permission check on every piece.
+- Keep a tamper-evident, complete, queryable audit trail (who, what, retrieved IDs, answer, time, allow or deny per document).
+- Make the LLM safe: stop the model "filling in" content it was not given.
+- Work through five worked scenarios: see [04-scenarios](04-scenarios.md).
 
 ## Thesis
 > **The model proposes, a deterministic policy plane disposes.**
@@ -34,31 +31,11 @@ What we add:
 
 We cannot prove nothing like this exists; we claim only that we found these gaps open in the products and papers we checked.
 
-## Scope
-Everything in tiers 1 to 3 is in scope; the tiers set **build order**, not what to cut.
-- **Tier 1 (core):** connectors, policy decision point, retrieval, query path, five scenarios, audit chain, UI, deployment.
-- **Tier 2 (differentiators):** Leak-CI, answer-level ACL labels, stale-answer alerts, replayable audit.
-- **Tier 3:** runtime skills, context profile and context engineering, MCP server, My Work home.
-- **Stretch:** sensitivity-aware model routing, mosaic/aggregation guard, honeytoken documents, voice (TRTC), access receipts for users.
+## What is in the system
+- **Core:** connectors, policy decision point, retrieval, query path, five scenarios, audit chain, UI, deployment.
+- **Differentiators:** Leak-CI, answer-level ACL labels, stale-answer alerts, replayable audit.
+- **Further features:** runtime skills, context profile and context engineering, MCP server, My Work home, routines.
 
-About 45 person-days of work for 3 people over 15 days; the risk is schedule. A **demoable build by Day 8** and a schedule review then.
-
-## Judging map (10 criteria x 10 points)
-| Criterion | Where we score |
-|---|---|
-| Impact & Relevance | 30% search-time problem plus the "can it leak everything" fear |
-| Human-Centered Design | Persona UI, "why can I see this?" explanations, My Work |
-| AI Interaction | Routing, context engineering, skills, checker, MCP |
-| Technical Execution | Policy plane, JIT checks, hash chain, contract tests, evals |
-| Feasibility | Real connectors where free, production path (OpenFGA/SpiceDB, real tenants) |
-| Demo & Storytelling | Split-screen personas across all scenarios |
-| Innovation | The list above |
-| UX & Accessibility | Keyboard, ARIA, high contrast, optional voice |
-| Responsible AI & Ethics | Zero-leak, abstention, red-team scoreboard, audit |
-| Overall Impression | Polish, live URL, demo video |
-
-Track-specific criteria are shared after registration: ask in the track's WhatsApp group.
-
-## Tencent products (mandatory and optional)
-- **Mandatory:** the project must be built on **CodeBuddy or WorkBuddy**, with proof (3+ screenshots or recordings of chat logs). We use both. See [07-submission](07-submission.md).
-- **Optional:** ADP (agent platform, DeepSeek models), TRTC ASR/TTS (voice), Miora (visuals), Hunyuan models/embeddings, Tencent Cloud Singapore for hosting.
+## Tencent products
+- **ADP** (agent platform, DeepSeek models) is an optional generator backend; **Hunyuan** models and embeddings are optional backends too.
+- **CodeBuddy and WorkBuddy** connect as MCP clients to the Brain's `/mcp` endpoint, with per-user identity: see [ADR-004](05-decisions/ADR-004-mcp.md) and [mcp-tools](02-contracts/mcp-tools.md).

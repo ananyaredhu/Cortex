@@ -1,4 +1,4 @@
-"""Red-team harness: attacks through the API (Workstream C).
+"""Red-team harness: attacks through the API.
 
     python -m evals.redteam --target fixture                 # the real pipeline over the fixture corpus, in this process (CI)
     python -m evals.redteam --target http://localhost:8000   # a served Brain, the real stack too
@@ -18,7 +18,7 @@ comes back. It plants nothing and writes nothing, so on a real stack ingestion c
 - **revocation-race**: Priya is removed from `#auth-private` (scripted event e2) and asks again. When ingestion has seen
   the removal, the thread must be gone on the very next question. When it has not (the index and the outbox still say
   she may read it), only the live check can stop the thread, and it must do so once the cached decision has expired:
-  `BRAIN_DECISION_TTL_S`, 15 s by default, the bound docs/04-scenarios.md and backlog F17 state. Needs `/sim/advance`,
+  `BRAIN_DECISION_TTL_S`, 15 s by default, the bound docs/04-scenarios.md states. Needs `/sim/advance`,
   which only the fixture runtime serves: on a real stack the suite is skipped and scenario 4 is done by hand.
 
 What counts as a **leak** (`Oracle.leaks`), for the person asking: a citation of a document they cannot open; a canary

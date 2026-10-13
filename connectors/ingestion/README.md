@@ -1,7 +1,7 @@
 # Ingestion service
 
-Reads each connector's change feed and keeps the index in Postgres in step with the sources. Workstream A
-writes it; Workstream B's retrieval, policy plane and audit service read what it leaves behind. This page is
+Reads each connector's change feed and keeps the index in Postgres in step with the sources. Ingestion
+is the only writer; the Brain's retrieval, policy plane and audit service read what it leaves behind. This page is
 the reference for that hand-over.
 
 ## Running it

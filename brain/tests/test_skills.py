@@ -1,4 +1,4 @@
-"""Runtime skills (backlog T5): reviewed files that shape the answer procedure and never carry authority."""
+"""Runtime skills: reviewed files that shape the answer procedure and never carry authority."""
 from pathlib import Path
 
 import pytest

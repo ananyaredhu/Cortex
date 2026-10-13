@@ -1,4 +1,4 @@
-"""Leak-CI: metamorphic noninterference tests (Workstream C).
+"""Leak-CI: metamorphic noninterference tests.
 
 A hidden document must make no difference to what its non-readers get. For each case in evals/leakci_cases.json
 the runner asks a question as a persona, then plants a document on the same topic that the persona may not see,

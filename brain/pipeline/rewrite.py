@@ -1,4 +1,4 @@
-"""Turns a follow-up question into a standalone search query using the conversation so far (backlog T6).
+"""Turns a follow-up question into a standalone search query using the conversation so far.
 
 "The second blocker?" has nothing to search for on its own. The earlier question does. The rewrite only decides what to *search*
 for: the model still gets the original question and the earlier turns, and every document that comes back goes through the PDP

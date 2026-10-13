@@ -1,4 +1,4 @@
-"""Time-travel queries (backlog T8): what could a person open at a past time, and what changed since.
+"""Time-travel queries: what could a person open at a past time, and what changed since.
 
 Priya is removed from the private auth channel by scripted event e2. The Brain writes her token set into the audit log
 when it changes, and ingestion keeps each document's ACL with validity intervals; together they answer the question.

@@ -107,7 +107,7 @@ class AuditService:
 
     # -- the audit agent ------------------------------------------------------------------------
     def ask(self, officer: Principal, question: str, *, planner: Planner | None = None, now: datetime | None = None) -> dict:
-        """A question in words -> a validated plan -> the same code paths the structured queries use (backlog T9).
+        """A question in words -> a validated plan -> the same code paths the structured queries use.
 
         The planner sees the question and the directory (people, spaces, titles), never an audit event. The summary is
         written here from the result, not by a model. A question that cannot be planned comes back as `clarify`."""

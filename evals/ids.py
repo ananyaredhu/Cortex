@@ -2,7 +2,7 @@
 
 The golden cases name documents by fixture ID (`slack:C_DBMIG/thread-1`, `gdrive:postmortem-pay-outage`). The stub
 API answers in those IDs; the real system cites what the platforms assigned (`slack:C07ABC123/1791619200.000100`).
-Workstream A's seed manifests map between them (connector-interface.md, "Document granularity and IDs"):
+The seed manifests map between them (connector-interface.md, "Document granularity and IDs"):
 `connectors/slack/seed-manifest.local.json` and `connectors/gdrive/seed-manifest.local.json`, both gitignored and
 built with `python -m connectors.slack.build_manifest` and `python -m connectors.gdrive.build_manifest`.
 Confluence and Jira are simulated with the fixture IDs, so they pass through unchanged.

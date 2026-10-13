@@ -1,8 +1,8 @@
 # Deployment
 
-The whole system on one Linux host with Docker: meant for a Tencent Cloud Lighthouse or CVM instance in Singapore
-(check #10 in [06-risks-and-checks](../docs/06-risks-and-checks.md) is still open: instance, domain, credits).
-What A's services need is in [connectors/DEPLOY.md](../connectors/DEPLOY.md); this folder runs them, the Brain and
+The whole system on one Linux host with Docker: any cloud VM or server will do (tested on an Ubuntu 24.04 VM with
+2 vCPU and 8 GB of memory, with the two simulators as sources).
+What the connector services need is in [connectors/DEPLOY.md](../connectors/DEPLOY.md); this folder runs them, the Brain and
 the UI together.
 
 | File | What |
@@ -101,11 +101,11 @@ own embedding backend: see the notes at the top of `evals/leakci.py` before tryi
 `http://localhost`. No model is downloaded and the image is about 420 MB. This stack is its own Compose project
 (`internal-brain-deploy`), separate from the development database of the repo root's `docker-compose.yml`.
 
-## Not done yet
-- **The host itself** (check #10): no instance has been created, so nothing here has run on Tencent Cloud, with
-  HTTPS, with the model libraries in the image, or with real Slack and Drive from inside the containers.
-- **The LLM-plane sandbox** ([01-architecture](../docs/01-architecture.md), check #9): the generator call runs in
+## Limits
+- **Real Slack and Drive from inside the containers** are set up by copying the account files into `deploy/secrets/`
+  (step 5); the simulators-only set-up is the one exercised on the VM above.
+- **The LLM-plane sandbox** ([01-architecture](../docs/01-architecture.md)): the generator call runs in
   the Brain's process. Network policy here is "one private network, one public door", not a per-plane egress list.
 - **A pipeline:** deployment is `git pull` and `docker compose up` by hand; CI does not build these images.
 - **The mock IdP is the only sign-in.** Anyone who can open the site can sign in as any fictional persona, which is
-  what the judged demo needs and must not sit in front of real data.
+  what a demo needs and must not sit in front of real data.

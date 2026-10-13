@@ -1,6 +1,6 @@
 # ACL model
 
-version: 0.2 (draft, freezes Day 3)
+version: 0.2
 Owners: A (per-source evaluators), B (policy decision point, labels on derived artifacts).
 
 ## Principle: do not flatten
@@ -60,11 +60,11 @@ Every derived artifact carries `acl_label`: the **intersection** of the ACL toke
 Derived artifacts: answers, summaries, cache entries, conversation memory, context profiles, vectors, stale-answer alerts.
 Rule: an artifact may be served to a user only if the user's access token set satisfies **every** source in its derivation (i.e. the user is authorized for each underlying source). If any source is no longer visible to them, the artifact is not served.
 
-*(Proposed 12 Oct, with api.md 0.3)*
+*(12 Oct, with api.md 0.3)*
 - **A routine run is an answer** and is labelled like one. Its stored result is shown again, on My Work or in Ask, only under the rule above; a routine stores no identity, token set or decision between runs, so access is decided afresh at each run.
 - **A generated conversation title is not a derived artifact**, because it is written from the asker's own first question and nothing else. That is a condition, not a description: a title written from an answer, a citation or a document would need a label and the withholding rule, and is not allowed.
 
-## Writes *(proposed 12 Oct, with api.md 0.3)*
+## Writes *(12 Oct, with api.md 0.3)*
 The Brain makes one write to a source: moving a Jira issue to another status (`POST /v1/issues/move`). The policy plane decides it, in plain code, with two conditions that must both hold:
 1. **Read:** the person may open the issue right now (prefilter, then the live `check_access`), exactly as for a read.
 2. **Assignee:** the person is the issue's assignee by account: the connector's `assignee_email` equals their canonical email. Display names are never compared for a decision.
@@ -78,7 +78,7 @@ Each allow/deny decision stores: `doc_id`, `allowed`, `proof_path`, `acl_snapsho
 A denied document and a nonexistent one produce the same response shape, similar timing, and no counts or titles. Link-edge expansion follows a link only if the target passes the PDP.
 
 ## Changelog
-- 0.2, 12 Oct (proposed, not approved): "Writes" (the assignee's own Jira issue, read access plus assignee by account); routine runs named as labelled answers; generated conversation titles allowed only from the asker's own question.
+- 0.2, 12 Oct: "Writes" (the assignee's own Jira issue, read access plus assignee by account); routine runs named as labelled answers; generated conversation titles allowed only from the asker's own question.
 - 0.2, 11 Oct addition: Slack DMs and group DMs. Read with each participant's own user token, indexed only when every participant has authorized, `user:` tokens only, live check with the asker's own token, a revoked authorization deletes the DMs. No new token type.
 - 0.2: canonical email and per-connector identity mapping; asker token set built from `PlatformIdentity.groups`; `public:org` excludes guests and externals; narrowing rule for intersecting permissions; document ACL change versus principal change; public Slack channels carry `public:org` plus the channel token.
 - 0.1: first draft.

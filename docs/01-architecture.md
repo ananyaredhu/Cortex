@@ -77,4 +77,4 @@ Postgres with pgvector, full-text search and a GIN index on `acl_tokens[]`. Sour
 | Single Postgres | One system to run and secure; less specialized than a dedicated vector DB |
 
 ## Sandboxing
-LLM-plane code runs with no egress except to the policy plane and the model gateway. Candidate: Tencent's open-source CubeSandbox (KVM isolation, per-sandbox network policy, egress allow-list that keeps keys out of the sandbox); fallback Docker with network policy. The handbook lists "Tencent Cloud Agent Runtime": confirm whether it is the same or compatible. See [06-risks-and-checks](06-risks-and-checks.md).
+LLM-plane code runs with no egress except to the policy plane and the model gateway. Candidate: Tencent's open-source CubeSandbox (KVM isolation, per-sandbox network policy, egress allow-list that keeps keys out of the sandbox); fallback Docker with network policy.

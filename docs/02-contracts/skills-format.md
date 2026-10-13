@@ -1,7 +1,7 @@
 # Runtime skills format
 
-version: 0.3 (built in `brain/skills/`; 0.3 is the `adds` key and the `my-work` skill, 12 Oct, proposed on `ws-c/routines-templates`)
-Owner: Workstream B. Consumers: B (router and loader), C (admin view).
+version: 0.3 (built in `brain/skills/`; 0.3 is the `adds` key and the `my-work` skill, 12 Oct)
+Owner: the Brain. Consumers: the router and loader, and the admin view.
 
 A **skill** makes the agent specific to a task: a procedure, an output format and an allowlist of tools. Skills are instructions only. **A skill never carries authority**: it cannot widen access, add tools beyond its allowlist, or change policy.
 
@@ -66,6 +66,6 @@ Optional frontmatter keys: `surface` (`ask`, the default, or `audit`) and `roles
 | `my-work` *(0.3)* | Questions about the asker's own work ("my open tickets", "my brief", "my stand-up", "waiting on me"), and the routine templates built on them. `adds: [my_issues]`, `max_evidence: 12`. |
 
 ## Changelog
-- 0.3, 12 Oct (proposed, needs B): the optional `adds` key with one lookup, `my_issues`, and the `my-work` skill.
+- 0.3, 12 Oct : the optional `adds` key with one lookup, `my_issues`, and the `my-work` skill.
 - 0.2, 11 Oct: built. `surface` and `roles` keys; validation, hashing and trigger routing as above.
 - 0.1: first draft.

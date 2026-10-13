@@ -1,4 +1,4 @@
-"""The project registry and context profile (backlog T7).
+"""The project registry and context profile.
 
 The registry relates places that belong together (a Jira project, Slack channels, a Confluence space, a Drive folder) and resolves
 "our migration" to them. It boosts and adds candidates, never filters, and it must not leak: a project, and each place under it,

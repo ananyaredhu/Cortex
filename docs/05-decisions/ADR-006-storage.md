@@ -1,6 +1,6 @@
 # ADR-006 · Storage: single Postgres with pgvector
 
-**Status:** Proposed (confirm by Day 3).
+**Status:** Accepted.
 
 ## Context
 We need vector search, keyword search, ACL-token filtering, a transactional audit store and ACL snapshots with validity intervals, on a small deployment.

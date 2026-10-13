@@ -1,4 +1,4 @@
-"""Check #3 (docs/06-risks-and-checks.md): does the 2025 rate-limit cut apply to our internal app?
+"""Does the 2025 rate-limit cut apply to our internal app?
 
 The cut limits `conversations.history` and `conversations.replies` to 1 request per minute and 15 messages per
 call for commercially distributed apps outside the Marketplace. An internal app should keep the old limits

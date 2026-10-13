@@ -1,6 +1,6 @@
 # ADR-001 · Model gateway and model tiers
 
-**Status:** Accepted. Final model choices are set after the Day-2 probe (owner: B).
+**Status:** Accepted.
 
 ## Context
 Two separate LLM uses exist.
@@ -22,7 +22,7 @@ Build-time guidance: Hy3 and Hy4 preview (0.00x) for routine work; Fast, Balance
 
 ## Consequences
 - Models can be swapped without touching the pipeline.
-- A **Day-2 probe script** measures per candidate: reachability from Singapore, latency, rate limits, structured-output or function-calling support, context length, cost. The result updates this ADR.
+- A **probe script** (`python -m brain.gateway.probe`) measures per candidate: reachability from Singapore, latency, rate limits, structured-output or function-calling support, context length, cost. The result updates this ADR.
 - Token budget is a risk: cache repeated calls, use the small model where enough, run Leak-CI as a separate batch.
 - Only authorized content is ever sent to a hosted model. Denied content never leaves the policy plane.
 

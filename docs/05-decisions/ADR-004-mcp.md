@@ -18,7 +18,7 @@ MCP servers are a known leakage vector: shared service credentials, confused-dep
 - No server-initiated streaming or subscriptions. If later needed, add a stateful path separately.
 - Clients: CodeBuddy supports `type: http` servers with `headers` and `${ENV}` variables; WorkBuddy documents STDIO, SSE and HTTP transports with custom headers.
 
-## Built (Day 9)
+## Built
 `mcp_server/server.py`; 17 tests in `brain/tests/test_mcp.py`; `python -m mcp_server.smoke` runs 11 checks with the SDK's own client over real HTTP and passes.
 
 ## Findings
@@ -27,4 +27,4 @@ MCP servers are a known leakage vector: shared service credentials, confused-dep
 - Sync tools run on a worker thread with the request's context, so the blocking `ask` does not stall other requests.
 
 ## To verify
-WorkBuddy remote MCP with an Authorization header and scheduling work in practice (check #7); which instruction file CodeBuddy reads (check #8).
+WorkBuddy remote MCP with an Authorization header and scheduling work in practice; which instruction file CodeBuddy reads.

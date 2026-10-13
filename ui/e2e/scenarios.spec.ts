@@ -4,7 +4,7 @@ import { ask, citedIds, NEEDS_SCRIPTED_EVENTS, openAs } from "./helpers";
 // The demo scenarios (docs/04-scenarios.md) through the UI. Expectations mirror the golden cases in
 // fixtures/company_a.json; the API-level versions are in evals/tests/. Scenarios 2 and 4 need the scripted events,
 // so they skip on the real Brain (there the change is made in the real source). The stale-answer alert has no screen
-// since My Work dropped its box (ui/MOCKUP-DRIFT.md #27); it is still checked at the API in evals/tests/.
+// since My Work dropped its box; it is still checked at the API in evals/tests/.
 
 const REFUSAL = "I couldn't find anything you have access to about that.";
 

@@ -40,7 +40,7 @@ models/
 .idea/
 .vscode/
 
-# raw, unchecked screenshots (check for secrets, then move to docs/proof/)
+# raw, unchecked screenshots (check them for secrets before committing any)
 screenshots-raw/
 *.tsbuildinfo
 

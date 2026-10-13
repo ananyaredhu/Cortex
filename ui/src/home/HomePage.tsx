@@ -17,14 +17,14 @@ import { dueState, filterOptions, type Filters, matches } from "./filters";
 import { useFocus, type WorkItem, workItems } from "./focus";
 import "./home.css";
 
-// How many rows a list shows before "Show all": /v1/mywork returns every ticket the person can open (ui/MOCKUP-DRIFT.md #50).
+// How many rows a list shows before "Show all": /v1/mywork returns every ticket the person can open.
 const PREVIEW = 5;
 // What a dragged row carries: the document's id and nothing else.
 const DRAG = "application/x-cortex-doc";
 
 const placeLabel = (w: MyWork, place: string) => w.channel_names?.[place] ?? shortId(place);
 
-// A ticket's status as a shape, not a colour: green, amber and red are kept for trust state (ui/MOCKUP-DRIFT.md #45).
+// A ticket's status as a shape, not a colour: green, amber and red are kept for trust state.
 function StatusMark({ status }: { status?: string | null }) {
   const Icon = !status ? CircleDashed : /^(done|closed|resolved)$/i.test(status) ? CircleCheck : /progress|review/i.test(status) ? CircleDot : Circle;
   return (
@@ -35,7 +35,7 @@ function StatusMark({ status }: { status?: string | null }) {
 }
 
 /**
- * My Work: only what /v1/mywork and /v1/team return, all of it through the PDP (ui/MOCKUP-DRIFT.md #24).
+ * My Work: only what /v1/mywork and /v1/team return, all of it through the PDP.
  * The team's side is on Team focus (/team); the mockup's sprint board and timeline need data the API doesn't have.
  */
 export function HomePage() {

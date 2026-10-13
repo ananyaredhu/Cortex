@@ -1,4 +1,4 @@
-"""The audit agent's planner: a compliance officer's question in words -> a validated plan (backlog T9).
+"""The audit agent's planner: a compliance officer's question in words -> a validated plan.
 
 The agent plans, code executes. A plan is data: `kind` is `query` (filter the audit log), `time_travel` (what could a person
 open at a time) or `verify` (is the log intact). `AuditService.ask` runs it under the compliance role and writes the

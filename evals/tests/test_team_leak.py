@@ -1,5 +1,5 @@
 """Team focus must not leak: `GET /v1/team` shows counts and lists, and a count over hidden documents is a leak
-(ui/MOCKUP-DRIFT.md #7). Every number in it must come only from documents the caller may open.
+. Every number in it must come only from documents the caller may open.
 """
 import json
 

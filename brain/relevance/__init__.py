@@ -1,6 +1,6 @@
-"""Retrieval relevance at scale (backlog T10): does the right document reach the candidates among thousands of others?
+"""Retrieval relevance at scale: does the right document reach the candidates among thousands of others?
 
-Praew's scale work showed that each persona's filter returns exactly the documents the spec allows, and that queries are fast. That is
+The scale corpus showed that each persona's filter returns exactly the documents the spec allows, and that queries are fast. That is
 access correctness and speed. This package measures the other thing: for a question with known right documents, is one of them
 among the candidates, and how high does it rank, as the corpus grows from Company A's 18 documents to 12,000 pages?
 
