@@ -277,6 +277,13 @@ def create_app(runtime: Runtime) -> FastAPI:
     def explain_access(doc_id: str, p: Current):
         return runtime.brain.explain_access(p, doc_id)
 
+    @app.get("/v1/source")
+    def source(doc_id: str, p: Current):
+        """One document's text for the in-app viewer (api.md 0.4): the same checks as `ask`, and a forbidden and a
+        nonexistent document get the same `{"found": false}` after the same delay."""
+        doc = runtime.brain.get_source(p, doc_id)
+        return {"found": False} if doc is None else {"found": True, **doc}
+
     @app.get("/v1/alerts")
     def alerts(p: Current):
         return {"alerts": runtime.brain.alerts(p)}

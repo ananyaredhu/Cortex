@@ -8,6 +8,7 @@ import { shortId, when } from "../ask/format";
 import { usePersona } from "../auth/PersonaContext";
 import type { PersonaId } from "../auth/personas";
 import { SourceGlyph } from "../components/SourceGlyph";
+import { SourceLink } from "../source/SourceViewer";
 import "../home/home.css";
 import { Board } from "./Board";
 import { isoDate, shortDay as day, sprintDay } from "./dates";
@@ -157,9 +158,9 @@ function TeamCard({ team: t, persona, today, onAsk }: { team: Team; persona: Per
               {t.updates.map((u) => (
                 <li key={u.doc_id}>
                   <SourceGlyph source={u.source} size={14} />
-                  <a href={u.url} target="_blank" rel="noreferrer">
+                  <SourceLink docId={u.doc_id} href={u.url}>
                     {u.title}
-                  </a>
+                  </SourceLink>
                   <span className="muted small team__when">
                     {u.author ? `${u.author} · ` : ""}
                     <span className="mono">{when(u.updated_at)}</span>

@@ -181,6 +181,25 @@ def test_explain_access_is_uniform_for_forbidden_and_missing(client):
     assert ok["found"] and ok["proof_path"][0] == "user:dana@companya.com"
 
 
+def test_source_viewer_shows_what_the_asker_may_open_and_nothing_else(client):
+    """`/v1/source` feeds the in-app viewer: a forbidden and a nonexistent document answer exactly alike, with no title,
+    text or URL in either, and an allowed one carries its text and the proof path."""
+    forbidden = client.get("/v1/source", params={"doc_id": "confluence:SEC/q3-breach-report"}, headers=H("sam"))
+    missing = client.get("/v1/source", params={"doc_id": "confluence:SEC/nope"}, headers=H("sam"))
+    assert forbidden.status_code == missing.status_code == 200
+    assert forbidden.json() == missing.json() == {"found": False}
+    ok = client.get("/v1/source", params={"doc_id": "jira:DBMIG-142"}, headers=H("priya")).json()
+    assert ok["found"] and ok["doc_id"] == "jira:DBMIG-142" and ok["title"] and ok["text"] and ok["source"] == "jira"
+    assert ok["why_visible"][0] == "user:priya@companya.com"
+    assert client.get("/v1/source", params={"doc_id": "jira:DBMIG-142"}).status_code == 401
+
+
+def test_source_viewer_is_logged_as_an_audited_read(client):
+    client.get("/v1/source", params={"doc_id": "jira:DBMIG-142"}, headers=H("priya"))
+    events = client.post("/v1/audit/query", json={"filter": {"user": "priya@companya.com"}}, headers=H("jordan")).json()["events"]
+    assert [(e["event_type"], e["actor"]["client"]) for e in events] == [("get_source", "ui")]
+
+
 def test_read_through_serves_the_new_version_before_ingestion_catches_up(client, runtime):
     before = _ask(client, "priya", RUNBOOK)
     assert "failover step" not in before["answer"].lower()

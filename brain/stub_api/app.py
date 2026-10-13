@@ -369,6 +369,18 @@ def explain_access(doc_id: str, authorization: str | None = Header(None)):
     return {"found": True, "proof_path": [f"user:{me['email']}", sorted(toks & set(d["acl"]["tokens"]))[0]]}
 
 
+@app.get("/v1/source")
+def source(doc_id: str, authorization: str | None = Header(None)):
+    me = _persona(authorization)
+    d = STATE.docs.get(doc_id)
+    toks = STATE.persona_tokens[me["id"]]
+    if d is None or not can_see(toks, d):
+        return {"found": False}   # identical for forbidden and nonexistent
+    return {"found": True, "doc_id": doc_id, "title": d["title"], "url": d["url"], "source": d["source"],
+            "as_of": d["updated_at"], "text": " ".join(d["body"].split()), "truncated": False,
+            "why_visible": [f"user:{me['email']}", sorted(toks & set(d["acl"]["tokens"]))[0]], "flags": []}
+
+
 @app.get("/v1/alerts")
 def alerts(authorization: str | None = Header(None)):
     me = _persona(authorization)

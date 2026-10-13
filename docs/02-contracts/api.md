@@ -1,6 +1,6 @@
 # HTTP API
 
-version: 0.3 (0.2 added the UI's optional fields; 0.3 adds the Brain's first write to a source, moving one's own Jira issue, ticket deadlines and priorities, conversation titles, and routines; implemented in `brain/api/app.py`)
+version: 0.4 (0.4 adds `GET /v1/source`, the in-app source viewer; 0.2 added the UI's optional fields; 0.3 adds the Brain's first write to a source, moving one's own Jira issue, ticket deadlines and priorities, conversation titles, and routines; implemented in `brain/api/app.py`)
 Producer: the Brain. Consumers: the UI and the console. The MCP server exposes the same pipeline: see [mcp-tools](mcp-tools.md).
 
 Base path `/v1`. JSON. **Auth:** `Authorization: Bearer <JWT>` from the mock IdP on **every** request (validated per request: signature, expiry, audience). JWT claims: `sub`, `email`, `roles`, `aud`.
@@ -196,6 +196,11 @@ A routine is a question its owner has the Brain ask again on a schedule, as them
 ## `GET /v1/explain-access?doc_id=...`
 Why can I see this? Returns `{"found": true, "proof_path": [...]}` for an allowed document. For a forbidden or nonexistent one, returns the uniform `{"found": false}`.
 
+## `GET /v1/source?doc_id=...` *(0.4)*
+One document's text, for the in-app source viewer: a citation or a ticket in the UI opens a panel that shows the document inside Cortex instead of linking to the source system (whose address a reader outside the company cannot open).
+
+Returns `{"found": true, "doc_id", "title", "url", "source", "as_of", "text", "truncated", "why_visible": [...], "flags": [...]}` for a document the caller may open, and the uniform `{"found": false}` for a forbidden or a nonexistent one, with the same status code and after the same delay. `text` is read live from the source when it can be (so it is current), cleaned of instruction-like sentences, and cut at 8,000 characters (`truncated` says so). The call is an ordinary audited read (`get_source`, client `ui`), checked by the policy decision point exactly as `/ask` checks each document. It is the HTTP form of the MCP tool `get_source` ([mcp-tools](mcp-tools.md)).
+
 ## `GET /v1/alerts`
 Stale-answer alerts: answers the user received whose sources changed afterwards (`request_id`, `changed_doc`, `changed_at`, `summary`).
 *(0.2, optional)* `question` (the user's own question, so the UI can ask it again) and `changed_title`. Alerts cover content changes to documents the user **may still see**; a document they have lost access to never produces an alert (it would reveal that it changed).
@@ -230,6 +235,7 @@ Stale-answer alerts: answers the user received whose sources changed afterwards 
 Simulator admin endpoints (owned by A) to revoke a permission, restrict a page, edit a document, and add or remove hidden documents (for Leak-CI). Documented in `simulators/README.md`. The stub API has its own: `/sim/advance`, `/sim/reset`, `/sim/tamper`.
 
 ## Changelog
+- 0.4 (13 Oct): `GET /v1/source`, the document text for the in-app viewer.
 - 0.3 (12 Oct): `POST /v1/issues/move`, the first write to a source, for the assignee's own Jira issue; `updated_at`, `due_date`, `priority` and `can_move` on issues in `/team`, and those plus `assignee` and `mine` in `/mywork`; `title_source`, generated titles (from the first question only) and `PATCH /v1/conversations/{id}`; the routines endpoints and `routines` in `/mywork`.
 - 0.2, 11 Oct: `GET /v1/team` (Team focus) with `assignee` and `mine` per issue, and optional `goal`, `start_date`, `target_date`, `milestone` and `sprint` per project in the registry file.
 - 0.2, 11 Oct: `GET /v1/projects` and `project_profile` in `/mywork` (T7).

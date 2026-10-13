@@ -9,6 +9,7 @@ import type {
   Conversation,
   ConversationDetail,
   ExplainAccess,
+  SourceDoc,
   FreshnessReport,
   LeakCiReport,
   MovedIssue,
@@ -85,6 +86,8 @@ export function api(persona: PersonaId) {
     alerts: () => call<{ alerts: StaleAlert[] }>(persona, "/v1/alerts"),
     explainAccess: (docId: string) =>
       call<ExplainAccess>(persona, `/v1/explain-access?doc_id=${encodeURIComponent(docId)}`),
+    /** A document's text for the in-app viewer (api.md 0.4); the Brain decides again whether the caller may open it. */
+    source: (docId: string) => call<SourceDoc>(persona, `/v1/source?doc_id=${encodeURIComponent(docId)}`),
     auditQuery: (body: { question?: string; filter?: AuditFilter }) =>
       call<{ events: AuditEvent[]; count: number }>(persona, "/v1/audit/query", post(body)),
     auditAsk: (question: string) => call<AuditAnswer>(persona, "/v1/audit/ask", post({ question })),

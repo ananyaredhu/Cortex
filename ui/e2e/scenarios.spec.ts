@@ -24,6 +24,18 @@ test("scenario 1: one cited answer across Jira and Slack, nothing from the priva
   await expect(trust).not.toContainText(/denied|withheld|found/i);
 });
 
+test("a cited source opens inside the app and closes with Escape", async ({ page }) => {
+  await openAs(page, "priya");
+  const card = await ask(page, "What's the status of the database migration, and were there blockers raised in Slack last week?");
+  await card.getByRole("link", { name: /DBMIG-142/ }).first().click();
+  const panel = page.getByRole("dialog");
+  await expect(panel).toContainText("replica lag");
+  await expect(panel).toContainText("Why you can see this");
+  await expect(page).toHaveURL(/\/ask/);          // still in Cortex: the click did not follow the source address
+  await page.keyboard.press("Escape");
+  await expect(panel).toHaveCount(0);
+});
+
 test("scenario 2: the runbook edit shows up on the next question", async ({ page }) => {
   test.skip(!(await openAs(page, "priya")), NEEDS_SCRIPTED_EVENTS);
   const question = "What's the latest runbook for payment-service incident failover?";

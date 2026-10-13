@@ -9,6 +9,7 @@ import { usePersona } from "../auth/PersonaContext";
 import { PERSONAS } from "../auth/personas";
 import { Avatar } from "../components/Avatar";
 import { SOURCE_LABEL, SourceGlyph } from "../components/SourceGlyph";
+import { SourceLink } from "../source/SourceViewer";
 import { FilterBar } from "./FilterBar";
 import { outcomeText, scheduleText, whenIn } from "../routines/format";
 import "../routines/routines.css";
@@ -91,9 +92,9 @@ export function HomePage() {
   const row = (i: WorkItem) => (
     <li key={i.doc_id} draggable onDragStart={drag(i.doc_id)}>
       <SourceGlyph source={i.source} size={14} />
-      <a href={i.url} target="_blank" rel="noreferrer" draggable={false}>
+      <SourceLink docId={i.doc_id} href={i.url} draggable={false}>
         {i.title} <ExternalLink size={12} aria-hidden />
-      </a>
+      </SourceLink>
       <span className="muted small mono">{when(i.updated_at)}</span>
       {pin(i)}
     </li>
@@ -107,9 +108,9 @@ export function HomePage() {
     return (
       <li key={i.doc_id} className="home__ticket" draggable onDragStart={drag(i.doc_id)}>
         <div className="home__ticket-main">
-          <a href={i.url} target="_blank" rel="noreferrer" draggable={false}>
+          <SourceLink docId={i.doc_id} href={i.url} draggable={false}>
             {title} <ExternalLink size={12} aria-hidden />
-          </a>
+          </SourceLink>
           <div className="home__ticket-meta">
             <span className="home__key mono">{key}</span>
             <StatusMark status={i.status} />
@@ -183,9 +184,9 @@ export function HomePage() {
                 <li key={i.doc_id} draggable onDragStart={drag(i.doc_id)} onDrop={drop(i.doc_id)}>
                   <SourceGlyph source={i.source} size={18} />
                   <div className="home__focus-body">
-                    <a href={i.url} target="_blank" rel="noreferrer" draggable={false}>
+                    <SourceLink docId={i.doc_id} href={i.url} draggable={false}>
                       {i.title}
-                    </a>
+                    </SourceLink>
                     <span className="muted small">
                       {SOURCE_LABEL[i.source]}
                       {i.place ? ` · ${placeLabel(w, i.place)}` : ""}
