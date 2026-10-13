@@ -5,4 +5,6 @@ interface ImportMetaEnv {
   readonly VITE_AUTH_MODE?: "dev" | "idp";
   /** "1" shows the demo controls drawer (scripted events, reset, tamper). Never in a production build. */
   readonly VITE_DEMO_CONTROLS?: string;
+  /** "1" shows the Compare people page outside demo mode. Never in a production build. */
+  readonly VITE_COMPARE_PEOPLE?: string;
 }

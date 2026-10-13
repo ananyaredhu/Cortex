@@ -1,9 +1,10 @@
-import { CalendarClock, ChevronsUpDown, Columns3, Home, MessageSquare, ScrollText, Settings2, Sparkles, Users, X } from "lucide-react";
+import { CalendarClock, ChevronsUpDown, Columns3, Home, MessageSquare, ScrollText, Settings2, Users, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 import logo from "../assets/logo/cortex-mark.svg";
 import { usePersona } from "../auth/PersonaContext";
 import { canAdmin, canAudit, PERSONAS } from "../auth/personas";
+import { COMPARE_PEOPLE } from "../demo/sim";
 import { Avatar } from "./Avatar";
 import { RecentChats } from "./RecentChats";
 import { ThemeToggle } from "./ThemeToggle";
@@ -35,7 +36,6 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
       toggleRef.current?.focus();
     }
   };
-  const navigate = useNavigate();
 
   return (
     <aside className={`sidebar${open ? " sidebar--open" : ""}`} aria-label="Navigation">
@@ -50,27 +50,24 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
         )}
       </div>
 
-      <button className="sidebar__ask" onClick={() => navigate("/ask")}>
-        <Sparkles size={16} color="var(--orange)" aria-hidden />
-        <span>Ask Cortex</span>
-      </button>
-
       <nav className="sidebar__nav" aria-label="Main">
+        <NavLink to="/ask">
+          <MessageSquare size={16} aria-hidden /> Ask
+        </NavLink>
         <NavLink to="/" end>
           <Home size={16} aria-hidden /> My work
         </NavLink>
         <NavLink to="/team">
           <Users size={16} aria-hidden /> Team focus
         </NavLink>
-        <NavLink to="/ask">
-          <MessageSquare size={16} aria-hidden /> Ask
-        </NavLink>
         <NavLink to="/routines">
           <CalendarClock size={16} aria-hidden /> Routines
         </NavLink>
-        <NavLink to="/compare">
-          <Columns3 size={16} aria-hidden /> Compare people
-        </NavLink>
+        {COMPARE_PEOPLE && (
+          <NavLink to="/compare">
+            <Columns3 size={16} aria-hidden /> Compare people
+          </NavLink>
+        )}
         {canAudit(persona) && (
           <NavLink to="/audit">
             <ScrollText size={16} aria-hidden /> Audit console

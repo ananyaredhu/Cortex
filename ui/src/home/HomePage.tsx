@@ -111,7 +111,7 @@ export function HomePage() {
             {title} <ExternalLink size={12} aria-hidden />
           </a>
           <div className="home__ticket-meta">
-            <span className="mono">{key}</span>
+            <span className="home__key mono">{key}</span>
             <StatusMark status={i.status} />
             {i.assignee && (
               <span className="home__who">
@@ -124,7 +124,7 @@ export function HomePage() {
               </span>
             )}
             {i.priority && (
-              <span className="home__who">
+              <span className="home__who home__priority">
                 <Flag size={12} aria-hidden /> {i.priority}
               </span>
             )}
@@ -253,7 +253,7 @@ export function HomePage() {
               <p className="muted small">{filtered ? "No tickets match these filters." : "No tickets you can see."}</p>
             ) : (
               <>
-                <ul id="home-tickets" className="home__list">
+                <ul id="home-tickets" className="home__list home__tickets">
                   {(allTickets ? tickets : tickets.slice(0, PREVIEW)).map(ticket)}
                 </ul>
                 {tickets.length > PREVIEW && (

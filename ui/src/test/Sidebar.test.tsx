@@ -82,3 +82,9 @@ it("shows console links only to the roles that may use them", async () => {
   expect(screen.getByText("Audit console")).toBeInTheDocument();
   expect(screen.getByText("Admin")).toBeInTheDocument();
 });
+
+it("leaves Compare people out unless the demo flag is on", async () => {
+  renderSidebar();
+  expect(await screen.findByRole("link", { name: /My work/ })).toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: /Compare people/ })).not.toBeInTheDocument();
+});
