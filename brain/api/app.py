@@ -11,7 +11,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
@@ -283,6 +283,15 @@ def create_app(runtime: Runtime) -> FastAPI:
         nonexistent document get the same `{"found": false}` after the same delay."""
         doc = runtime.brain.get_source(p, doc_id)
         return {"found": False} if doc is None else {"found": True, **doc}
+
+    @app.get("/v1/search")
+    def search(p: Current, q: Annotated[str, Query(max_length=200)] = "",
+               sources: Annotated[list[str] | None, Query()] = None, limit: Annotated[int, Query(ge=1, le=10)] = 8):
+        """Documents the caller may open that match `q`, for the UI's search (api.md 0.5): the MCP tool `search` over
+        HTTP. No model is involved; an empty list means "nothing you can open matches", whatever else exists."""
+        if not q.strip():
+            return {"results": []}
+        return {"results": runtime.brain.search(p, q, sources=sources, limit=limit)}
 
     @app.get("/v1/alerts")
     def alerts(p: Current):

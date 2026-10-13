@@ -194,6 +194,29 @@ def test_source_viewer_shows_what_the_asker_may_open_and_nothing_else(client):
     assert client.get("/v1/source", params={"doc_id": "jira:DBMIG-142"}).status_code == 401
 
 
+def test_search_returns_only_what_the_caller_may_open_and_says_nothing_else(client):
+    hits = client.get("/v1/search", params={"q": "database migration blockers replica lag"}, headers=H("priya")).json()
+    assert set(hits) == {"results"} and "jira:DBMIG-142" in [h["doc_id"] for h in hits["results"]]
+    assert set(hits["results"][0]) == {"doc_id", "title", "url", "source", "as_of", "snippet", "why_visible", "flags"}
+    only = client.get("/v1/search", params={"q": "database migration blockers", "sources": ["slack"], "limit": 1},
+                      headers=H("priya")).json()["results"]
+    assert [h["source"] for h in only] == ["slack"]
+    # a forbidden document, a nonexistent one and a blank query: one body
+    nothing = [client.get("/v1/search", params={"q": q}, headers=H("sam")).text
+               for q in ("security incident report Q3 breach", "quantum hologram audit report", "  ")]
+    assert set(nothing) == {'{"results":[]}'}
+    assert client.get("/v1/search", params={"q": "x" * 201}, headers=H("priya")).status_code == 422
+    assert client.get("/v1/search", params={"q": "migration", "limit": 11}, headers=H("priya")).status_code == 422
+    assert client.get("/v1/search", params={"q": "migration"}).status_code == 401
+
+
+def test_search_is_logged_with_the_ui_as_client_and_a_blank_query_is_not(client):
+    client.get("/v1/search", params={"q": "replica lag"}, headers=H("priya"))
+    client.get("/v1/search", params={"q": ""}, headers=H("priya"))
+    events = client.post("/v1/audit/query", json={"filter": {"user": "priya@companya.com"}}, headers=H("jordan")).json()["events"]
+    assert [(e["event_type"], e["actor"]["client"], e["query"]["text"]) for e in events] == [("search", "ui", "replica lag")]
+
+
 def test_source_viewer_is_logged_as_an_audited_read(client):
     client.get("/v1/source", params={"doc_id": "jira:DBMIG-142"}, headers=H("priya"))
     events = client.post("/v1/audit/query", json={"filter": {"user": "priya@companya.com"}}, headers=H("jordan")).json()["events"]

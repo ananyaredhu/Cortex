@@ -204,6 +204,18 @@ export type SourceDoc =
   | { found: true; doc_id: string; title: string; url: string; source: Source; as_of: string | null; text: string; truncated: boolean; why_visible: string[]; flags: string[] }
   | { found: false };
 
+/** One hit of `GET /v1/search` (api.md 0.5): a document the caller may open. `snippet` is document text, never the assistant's. */
+export interface SearchHit {
+  doc_id: string;
+  title: string;
+  url: string;
+  source: Source;
+  as_of: string | null;
+  snippet: string;
+  why_visible: string[];
+  flags: string[];
+}
+
 export interface AuditDecision {
   doc_id?: string;
   doc_id_hash?: string;

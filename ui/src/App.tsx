@@ -15,6 +15,7 @@ import { COMPARE_PEOPLE, DEMO_CONTROLS } from "./demo/sim";
 import { HomePage } from "./home/HomePage";
 import { RoutineHistoryPage } from "./routines/RoutineHistoryPage";
 import { RoutinesPage } from "./routines/RoutinesPage";
+import { SearchProvider } from "./search/SearchPalette";
 import { SourceViewerProvider } from "./source/SourceViewer";
 import { TeamPage } from "./team/TeamPage";
 
@@ -26,6 +27,7 @@ export function App() {
 
   return (
     <SourceViewerProvider>
+    <SearchProvider>
     <div className="app">
       <a className="skip-link" href="#main">
         Skip to content
@@ -57,6 +59,7 @@ export function App() {
       </main>
       {DEMO_CONTROLS && <DemoControls />}
     </div>
+    </SearchProvider>
     </SourceViewerProvider>
   );
 }

@@ -20,6 +20,8 @@ import type {
   Routine,
   RoutineDraft,
   RoutineRun,
+  SearchHit,
+  Source,
   Stage,
   StaleAlert,
   Team,
@@ -88,6 +90,9 @@ export function api(persona: PersonaId) {
       call<ExplainAccess>(persona, `/v1/explain-access?doc_id=${encodeURIComponent(docId)}`),
     /** A document's text for the in-app viewer (api.md 0.4); the Brain decides again whether the caller may open it. */
     source: (docId: string) => call<SourceDoc>(persona, `/v1/source?doc_id=${encodeURIComponent(docId)}`),
+    /** Documents the caller may open that match `q` (api.md 0.5). An empty list says nothing about what else exists. */
+    search: (q: string, sources: Source[] = [], limit = 8) =>
+      call<{ results: SearchHit[] }>(persona, `/v1/search?${new URLSearchParams([["q", q], ["limit", String(limit)], ...sources.map((s) => ["sources", s])])}`),
     auditQuery: (body: { question?: string; filter?: AuditFilter }) =>
       call<{ events: AuditEvent[]; count: number }>(persona, "/v1/audit/query", post(body)),
     auditAsk: (question: string) => call<AuditAnswer>(persona, "/v1/audit/ask", post({ question })),

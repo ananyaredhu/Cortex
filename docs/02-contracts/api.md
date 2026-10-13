@@ -1,6 +1,6 @@
 # HTTP API
 
-version: 0.4 (0.4 adds `GET /v1/source`, the in-app source viewer; 0.2 added the UI's optional fields; 0.3 adds the Brain's first write to a source, moving one's own Jira issue, ticket deadlines and priorities, conversation titles, and routines; implemented in `brain/api/app.py`)
+version: 0.5 (0.5 adds `GET /v1/search`, the UI's search; 0.4 added `GET /v1/source`, the in-app source viewer; 0.2 added the UI's optional fields; 0.3 adds the Brain's first write to a source, moving one's own Jira issue, ticket deadlines and priorities, conversation titles, and routines; implemented in `brain/api/app.py`)
 Producer: the Brain. Consumers: the UI and the console. The MCP server exposes the same pipeline: see [mcp-tools](mcp-tools.md).
 
 Base path `/v1`. JSON. **Auth:** `Authorization: Bearer <JWT>` from the mock IdP on **every** request (validated per request: signature, expiry, audience). JWT claims: `sub`, `email`, `roles`, `aud`.
@@ -203,6 +203,20 @@ One document's text, for the in-app source viewer: a citation or a ticket in the
 
 Returns `{"found": true, "doc_id", "title", "url", "source", "as_of", "text", "truncated", "why_visible": [...], "flags": [...]}` for a document the caller may open, and the uniform `{"found": false}` for a forbidden or a nonexistent one, with the same status code and after the same delay. `text` is read live from the source when it can be (so it is current), cleaned of instruction-like sentences, and cut at 8,000 characters (`truncated` says so). The call is an ordinary audited read (`get_source`, client `ui`), checked by the policy decision point exactly as `/ask` checks each document. It is the HTTP form of the MCP tool `get_source` ([mcp-tools](mcp-tools.md)).
 
+## `GET /v1/search?q=...` *(0.5)*
+Documents that match `q`, for the UI's search (the "Search" entry of the sidebar, Ctrl+K). It is the HTTP form of the MCP tool `search` ([mcp-tools](mcp-tools.md)) and runs the same code: the access prefilter, the live check on every candidate, then a cleaned snippet. No model is involved.
+
+Query: `q` (at most 200 characters, else `422`), optional `sources` (repeated: `?sources=jira&sources=slack`; absent means all) and optional `limit` (1 to 10, default 8).
+
+Response: `{"results": [{"doc_id", "title", "url", "source", "as_of", "snippet", "why_visible": [...], "flags": [...]}]}`, best match first.
+
+Rules:
+- **Only what the caller may open is returned, and nothing is said about the rest**: no total, no "more results", no count of candidates or of filtered documents. `{"results": []}` means "nothing you can open matches", and is the same body for a forbidden document, a nonexistent one and a blank `q`.
+- Every reply is held back to the floor latency (`BRAIN_FLOOR_LATENCY_MS`), like `/ask` and `/v1/source`, so a query about something hidden takes as long as one about nothing.
+- Each call is a `search` audit event with `actor.client: "ui"` and the query text ([audit-event-schema](audit-event-schema.md)); a blank `q` searches nothing and logs nothing. The UI waits for a pause in typing before it asks, and tells the person that searches are logged.
+- `snippet` is document text: sanitized like the context packet, shown as a quotation, never as the assistant's words.
+- The UI's search also lists the caller's own chats and routines and the tickets and pages already on their My Work. Those come from `/v1/conversations`, `/v1/routines`, `/v1/mywork` and `/v1/team`, matched in the browser; this endpoint returns documents only.
+
 ## `GET /v1/alerts`
 Stale-answer alerts: answers the user received whose sources changed afterwards (`request_id`, `changed_doc`, `changed_at`, `summary`).
 *(0.2, optional)* `question` (the user's own question, so the UI can ask it again) and `changed_title`. Alerts cover content changes to documents the user **may still see**; a document they have lost access to never produces an alert (it would reveal that it changed).
@@ -237,6 +251,7 @@ Stale-answer alerts: answers the user received whose sources changed afterwards 
 Simulator admin endpoints (owned by A) to revoke a permission, restrict a page, edit a document, and add or remove hidden documents (for Leak-CI). Documented in `simulators/README.md`. The stub API has its own: `/sim/advance`, `/sim/reset`, `/sim/tamper`.
 
 ## Changelog
+- 0.5 (13 Oct): `GET /v1/search`, the documents behind the UI's search; the MCP tool `search` over HTTP, now held to the floor latency on both doors.
 - 0.4 (13 Oct): `GET /v1/source`, the document text for the in-app viewer.
 - 0.4 (proposed 13 Oct, on `ws-c/routines-run-state`): `coverage`, `freshness`, `grounding`, `policy_version` and `unavailable_sources` on the turns of `GET /v1/conversations/{id}`, as recorded when each was answered; `running` on a routine.
 - 0.3 (12 Oct): `POST /v1/issues/move`, the first write to a source, for the assignee's own Jira issue; `updated_at`, `due_date`, `priority` and `can_move` on issues in `/team`, and those plus `assignee` and `mine` in `/mywork`; `title_source`, generated titles (from the first question only) and `PATCH /v1/conversations/{id}`; the routines endpoints and `routines` in `/mywork`.

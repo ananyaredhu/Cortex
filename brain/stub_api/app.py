@@ -18,8 +18,9 @@ import re
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from types import SimpleNamespace
+from typing import Annotated
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -379,6 +380,24 @@ def source(doc_id: str, authorization: str | None = Header(None)):
     return {"found": True, "doc_id": doc_id, "title": d["title"], "url": d["url"], "source": d["source"],
             "as_of": d["updated_at"], "text": " ".join(d["body"].split()), "truncated": False,
             "why_visible": [f"user:{me['email']}", sorted(toks & set(d["acl"]["tokens"]))[0]], "flags": []}
+
+
+@app.get("/v1/search")
+def search(q: str = "", sources: Annotated[list[str] | None, Query()] = None, limit: int = 8,
+           authorization: str | None = Header(None)):
+    """The UI's search (api.md 0.5): keyword overlap over the documents the persona may open, best first."""
+    me = _persona(authorization)
+    toks = STATE.persona_tokens[me["id"]]
+    scored = sorted(((_score(q, d), d) for d in STATE.visible_docs(me["id"]) if not sources or d["source"] in sources),
+                    key=lambda x: (-x[0], x[1]["doc_id"]))
+    results = []
+    for score, d in scored[:max(1, min(limit, 10))]:
+        if score:
+            snippet, flags = _sanitize(" ".join(d["body"].split())[:600])
+            results.append({"doc_id": d["doc_id"], "title": d["title"], "url": d["url"], "source": d["source"],
+                            "as_of": d["updated_at"], "snippet": snippet, "flags": flags,
+                            "why_visible": [f"user:{me['email']}", sorted(toks & set(d["acl"]["tokens"]))[0]]})
+    return {"results": results}
 
 
 @app.get("/v1/alerts")
