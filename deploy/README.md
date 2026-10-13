@@ -44,7 +44,9 @@ dev login off. The images contain no `.env`, token or account file (`.dockerigno
 4. `docker compose up -d --build`, then `docker compose ps` until `brain` is `healthy`
    (`docker compose logs -f brain` shows the models loading).
 5. **Real Slack and Drive** (scenarios 1 and 4 need Slack). Copy these from the machine where the accounts were
-   signed in into `deploy/secrets/`, with these names, `chmod 600`:
+   signed in into `deploy/secrets/`, with these names. The containers run as user 10001, so make that user the owner and
+   keep the files private (`sudo chown 10001:10001 secrets/* && sudo chmod 600 secrets/*`); with the file owned by your
+   login the services fail with "Permission denied":
 
    | In the repo checkout | In `deploy/secrets/` |
    |---|---|
