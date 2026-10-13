@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CalendarClock, PanelRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Link, useLocation, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { api, ApiError } from "../api/client";
 import type { AskResponse, Source } from "../api/types";
 import { usePersona } from "../auth/PersonaContext";
@@ -34,8 +34,8 @@ interface Turn {
   sources?: Source[];
 }
 
-/** "idle": a live chat. "loading": fetching a reopened conversation. "missing": not the caller's, or gone. */
-type Load = "idle" | "loading" | "missing";
+/** "idle": a live chat. "loading": fetching a reopened conversation. */
+type Load = "idle" | "loading";
 
 const TRUST_KEY = "cortex.trustOpen";
 
@@ -52,6 +52,7 @@ function initialTrustOpen(): boolean {
 export function AskPage() {
   const { persona } = usePersona();
   const location = useLocation();
+  const navigate = useNavigate();
   const { conversationId: routeId } = useParams<{ conversationId: string }>();
   const qc = useQueryClient();
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -98,10 +99,13 @@ export function AskPage() {
       })
       .catch((e) => {
         if (resetFor.current !== key) return;
-        setLoad(e instanceof ApiError && e.status === 404 ? "missing" : "idle");
-        if (!(e instanceof ApiError && e.status === 404)) {
-          setTurns([{ id: nextId.current++, question: "", times: {}, error: (e as Error).message }]);
+        setLoad("idle");
+        if (e instanceof ApiError && e.status === 404) {
+          // Not the caller's, or gone (the two look the same): a plain new question, with the address to match.
+          navigate("/ask", { replace: true });
+          return;
         }
+        setTurns([{ id: nextId.current++, question: "", times: {}, error: (e as Error).message }]);
       });
   }, [persona.id, location.key, routeId]);
 
@@ -191,14 +195,7 @@ export function AskPage() {
               Opening the conversation…
             </p>
           ) : turns.length === 0 ? (
-            <>
-              {load === "missing" && (
-                <p role="alert" className="banner banner--stale">
-                  That conversation isn’t available. Start a new question below.
-                </p>
-              )}
-              <EmptyState />
-            </>
+            <EmptyState />
           ) : (
             turns.map((t) => (
               <section
