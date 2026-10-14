@@ -1,6 +1,6 @@
 # Runtime skills format
 
-version: 0.3 (built in `brain/skills/`; 0.3 is the `adds` key and the `my-work` skill, 12 Oct)
+version: 0.4 (0.4, 14 Oct: action skills and slash commands, [ADR-010](../05-decisions/ADR-010-actions.md), not built; 0.3 is the `adds` key and the `my-work` skill, 12 Oct; 0.3 and earlier are built in `brain/skills/`)
 Owner: the Brain. Consumers: the router and loader, and the admin view.
 
 A **skill** makes the agent specific to a task: a procedure, an output format and an allowlist of tools. Skills are instructions only. **A skill never carries authority**: it cannot widen access, add tools beyond its allowlist, or change policy.
@@ -47,6 +47,42 @@ Optional frontmatter keys: `surface` (`ask`, the default, or `audit`) and `roles
 - **What it cannot do.** It is plain code in the pipeline (`brain/pipeline/graph.py`, `_with_my_issues`), not text a model reads; a skill can only name it. Every issue it adds goes through the same live permission check as a search hit, so an issue assigned to someone who may not open it is not added, and nothing is said about anyone else's issues. It does nothing when Jira is not among the sources searched. The account's address stays in the policy plane: the model gets the assignee's display name only. A person with no issues gets the same refusal as for a question that matches nothing. Tests: `brain/tests/test_my_work.py`, `evals/tests/test_my_work_leak.py`.
 - A name `adds` does not know is refused at load, like an unknown source.
 
+## Action skills *(0.4, 14 Oct; not built yet)*
+An **action skill** drafts writes instead of an answer: Jira cards, a Slack message, a Confluence page or a Google Doc. The model returns a proposed **action plan as data**; the policy plane decides each operation and a person confirms it ([ADR-010](../05-decisions/ADR-010-actions.md), [acl-model](acl-model.md) "Writes", [api](api.md) `/v1/actions`). A skill still carries no authority: it can only **narrow** what may be proposed.
+
+New optional frontmatter keys:
+```yaml
+kind: action                 # "answer" (the default: every skill before 0.4) or "action"
+slash: breakdown             # the command typed in the composer; [a-z-]{2,20}; unique across skills
+args:                        # what the composer offers; validated at load
+  - {name: source, type: doc_ref, required: true, multiple: true}
+  - {name: destination, type: jira_project, required: true}
+actions_allowlist: [jira.create_issue, jira.link_issues]
+max_ops: 25                  # 1 to 25; default 1
+mentions_allowed: false      # whether @channel / @here / @everyone may be drafted (default false)
+```
+
+- **`kind`.** `answer` skills behave as today. `action` skills output a plan (`output_schema: action_plan_v1`); `/ask` returns it inline when an action skill is routed, and `POST /v1/actions/plan` runs one directly.
+- **`slash`.** Optional for any skill; required for an action skill. A slash command sent by the composer is an explicit `skill_hint` and wins, under the same `surface` and `roles` rules as any hint. A skill without `slash` is reached by its triggers only.
+- **`args`.** Each entry has `name` (`[a-z_]{1,20}`), `type`, `required` (default false) and `multiple` (default false). Types: `doc_ref` (a source the person may open: `@` mention, URL, or "this page" / "the thread above"), `jira_project`, `slack_channel`, `slack_thread`, `confluence_space`, `gdrive_folder`, `person` (a display name, resolved by the policy plane), `text`, `priority`. The destination types fill only the composer's pickers, which list places the person may write to (`GET /v1/destinations`).
+- **`actions_allowlist`.** Action types the skill may propose, from: `jira.create_issue`, `jira.add_comment`, `jira.link_issues`, `slack.post_message`, `confluence.create_page`, `gdrive.create_doc`. **An operation of a type not in the list is rejected by the policy plane even if the model proposes it.** Required and non-empty for `kind: action`; not allowed for `kind: answer`. Moving an issue (`transition`) is not an action type: it shares the executor but stays a person's own drag or menu choice ([api](api.md) `POST /v1/issues/move`), never proposed by a model.
+- **`max_ops`.** A plan with more operations is cut to `max_ops` with a visible note, never executed in parts silently.
+- **`mentions_allowed`.** When true, a drafted `@channel`, `@here` or `@everyone` is kept, and the person confirms that line separately. When false (the default), it is stripped and the preview says so.
+- **Refused at load**, as today: an unknown `kind`, action type, arg type or arg key; a `slash` that clashes with another skill or breaks the pattern; `max_ops` outside 1 to 25; action keys on an `answer` skill; an action skill without `slash` or `actions_allowlist`.
+- **Audited:** `action_proposed` records `skill`, `skill_version` and `skill_sha256`, like `ask` ([audit-event-schema](audit-event-schema.md) 0.2).
+
+The v1 action skills, built from step 5 of the PRD's build order:
+| Skill (`slash`) | Allowlist | `max_ops` |
+|---|---|---|
+| `jira` | `jira.create_issue` | 1 |
+| `breakdown` | `jira.create_issue`, `jira.link_issues` | 25 |
+| `followups` | `jira.create_issue`, `slack.post_message` | 11 (10 cards and one thread reply) |
+| `slack` | `slack.post_message` | 1 |
+| `update` | `slack.post_message` | 1 |
+| `decision` | `confluence.create_page`, `slack.post_message` | 2 |
+| `page` | `confluence.create_page` | 1 |
+| `doc` | `gdrive.create_doc` | 1 |
+
 ## Loading and routing
 - **As built (0.2):** `brain.skills.Registry.load()` reads every `brain/skills/<name>/SKILL.md` once at start-up and refuses a file that is malformed, names a source or tool that does not exist, has the wrong `output_schema` or a `max_evidence` outside 1 to 12. Skills are frozen objects, never written at run time. Each skill's `sha256` covers every file in its folder.
 - **Routing, first version:** the skill whose `triggers` appear most often in the (rewritten) question wins; no match means the default procedure. An explicit `skill_hint` that names a usable skill wins; a hint for a skill of another surface or role is ignored, not obeyed. `audit-inquiry` is `surface: audit, roles: [compliance]` and is used only by the audit agent, never by `ask`. A model router is not built.
@@ -66,6 +102,7 @@ Optional frontmatter keys: `surface` (`ask`, the default, or `audit`) and `roles
 | `my-work` *(0.3)* | Questions about the asker's own work ("my open tickets", "my brief", "my stand-up", "waiting on me"), and the routine templates built on them. `adds: [my_issues]`, `max_evidence: 12`. |
 
 ## Changelog
+- 0.4, 14 Oct (not built yet): action skills. `kind`, `slash`, `args`, `actions_allowlist`, `max_ops` and `mentions_allowed`; the `action_plan_v1` output schema; the v1 action skills. ADR-010.
 - 0.3, 12 Oct : the optional `adds` key with one lookup, `my_issues`, and the `my-work` skill.
 - 0.2, 11 Oct: built. `surface` and `roles` keys; validation, hashing and trigger routing as above.
 - 0.1: first draft.

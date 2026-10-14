@@ -1,6 +1,6 @@
 # ACL model
 
-version: 0.2
+version: 0.3 (0.3, 14 Oct: "Creating items" under Writes, ADR-010; not built)
 Owners: A (per-source evaluators), B (policy decision point, labels on derived artifacts).
 
 ## Principle: do not flatten
@@ -65,11 +65,54 @@ Rule: an artifact may be served to a user only if the user's access token set sa
 - **A generated conversation title is not a derived artifact**, because it is written from the asker's own first question and nothing else. That is a condition, not a description: a title written from an answer, a citation or a document would need a label and the withholding rule, and is not allowed.
 
 ## Writes *(12 Oct, with api.md 0.3)*
-The Brain makes one write to a source: moving a Jira issue to another status (`POST /v1/issues/move`). The policy plane decides it, in plain code, with two conditions that must both hold:
+Built today, the Brain makes one write to a source (0.3 proposes more: "Creating items" below): moving a Jira issue to another status (`POST /v1/issues/move`). The policy plane decides it, in plain code, with two conditions that must both hold:
 1. **Read:** the person may open the issue right now (prefilter, then the live `check_access`), exactly as for a read.
 2. **Assignee:** the person is the issue's assignee by account: the connector's `assignee_email` equals their canonical email. Display names are never compared for a decision.
 
 Read access alone never allows a write, and no role, group or lead status does either. The platform then applies its own workflow and permissions, and may still refuse. A failure of the first condition answers like a nonexistent issue (uniform refusal); a failure of the second may say so, because the person can already see whose the issue is. A write changes no one's access: a transition does not alter the issue's ACL tokens, and the contract test checks it.
+
+### Creating items *(0.3, 14 Oct; not built yet)*
+Actions ([ADR-010](../05-decisions/ADR-010-actions.md)) let a person create Jira cards, Slack messages, Confluence pages and Google Docs from Cortex. The model only drafts a plan; each operation is decided here, in plain code (`brain/policy/writes.py`), and a person confirms it.
+
+> **No write may widen who can see something.** An operation built from sources S1…Sn may be written only to a destination whose every reader could already read every Si.
+
+This is the label rule of "Labels on derived artifacts" applied to writes: the drafted content is a derived artifact, its `acl_label` keeps one token set per cited source, and every reader of the destination must satisfy every set.
+
+**Checks, in order. The first failure decides.**
+| # | Check | On failure |
+|---|---|---|
+| P1 | **Read:** the person may open every source the operation cites, right now (prefilter, then the live `check_access`), as for a read | Those sources are dropped and the operation is redrafted or abstains. They are never mentioned (uniform refusal) |
+| P2 | **Destination visible:** the destination exists and the person can see it | The same response as for a nonexistent destination |
+| P3 | **Write permission:** the connector's live `can_create` (Jira: Create Issues; Slack: a member, channel not read-only; Confluence: add-page; Drive: writer) | May say "you can't create in DBMIG", because the person can see the destination |
+| P4 | **Audience:** let `A` be the destination's readers (`audience`, expanded to people through the identity map). Allowed only if **every person in `A`** holds tokens that satisfy every source set in the operation's label | The operation is blocked. The person is shown which of **their own cited sources** cause it (they may see these) and offered a narrower destination, removing that source's content, or cancel. Who in the audience lacks access is never named; at most a count |
+| P5 | **Enumerable audience:** `audience.principals` is not `None` | Allowed only if every cited source is `public:org` **and** `has_external` is false. Otherwise blocked as in P4. Fail closed |
+| P6 | **Content limits:** platform sizes (Slack 4,000 characters per message, Jira summary 255); no `@channel`, `@here` or `@everyone` unless the skill allows it and the person confirms that line; no link to a document some reader of the destination cannot open (the link-edge rule applied to writes) | Fixed where safe (cut, strip, remove the link) and shown in the preview |
+
+Rules that go with them:
+- **People, not tokens.** P4 compares people because token vocabularies differ across platforms: a Jira role and a Slack channel share no token. A reader's tokens are their token set as built for a read (their `user:` token plus every connector's `PlatformIdentity.groups`).
+- **A link is content.** Cortex's provenance footer and backlinks count as content: a link to a source passes P4 for that source, or is removed under P6.
+- **A reference to an item is content.** An item's key, title or link carries the label of the item's readers. For an item created earlier in the same plan, that is its destination's audience: a child operation naming it (a Slack reply listing new cards) adds that audience as a source set, and must pass P4 against it. A reference is never removed silently to make an operation pass: either it passes, or the operation is blocked, or the person removes it in the preview.
+- **Public channels.** A public Slack channel's audience is every full member of the workspace plus its guests. Content from a role-restricted place cannot go there unless every one of them may read it. The rule is not relaxed for convenience (ADR-010, Q6).
+- **Text the person typed carries no source label.** It is theirs. Text drafted from sources keeps the labels of the chunks it cites.
+- **Destinations come from the person, never from content.** An operation whose destination the person did not name or pick is rejected before any check, and flagged as a possible injection.
+- **People fields are resolved here.** Assignees and mentions are display names in the plan; the policy plane resolves them through the identity map. A name that resolves to no account or to several is left empty and flagged.
+- **A write changes no one's access.** Cortex never sets an ACL, a share or a membership. A created item is a new document with its platform's own ACL (its container's), and the contract test checks that no other document's `check_access` changes.
+- **Checked again at confirm.** The decision depends on the source versions, the person's tokens and the destination's `audience.snapshot_hash`. If any of them changed between the check and the confirm, the confirm is refused and the plan is checked again.
+- `transition` keeps its own rule (read plus assignee) and also passes P1 to P3.
+
+**Worked example (Company A fixtures).** The persona tokens and document ACLs are in `fixtures/company_a.json`.
+| Person, source | Destination and its readers | Result |
+|---|---|---|
+| Priya, `slack:C_DBMIG/thread-1` (`public:org`, `channel:C_DBMIG`) | Jira DBMIG (`role:DBMIG:developer` and `role:DBMIG:lead`: Priya, Maya) | **Allowed.** Both hold `public:org` |
+| Priya, `slack:C_AUTHPRIV/thread-1` (`channel:C_AUTHPRIV`) | `#auth` (`C_AUTH`, public: every full member) | **Blocked by P4**, naming the private auth thread as the cause. Dana, Maya and Jordan do not hold `channel:C_AUTHPRIV` |
+| Priya, the same thread | the private auth channel itself (`C_AUTHPRIV`) | **Allowed.** Its readers are exactly the source's |
+| Priya, `jira:DBMIG-142` | `#db-migration` (`C_DBMIG`, public: every full member) | **Blocked by P4.** Dana and Jordan cannot open DBMIG issues. A public channel's audience is the whole organization |
+| Priya, a reply listing new DBMIG cards (created earlier in the plan) | `#db-migration` (public) | **Blocked by P4**: the cards' readers (DBMIG roles) are narrower than the channel's. The cards themselves are still created |
+| Priya, the same reply | `#dbmig-core` (private: Priya, Maya; step-3 fixture) | **Allowed.** Every member holds a DBMIG role |
+| Sam, any source | Confluence SEC (Sam cannot see it), and a space that does not exist | **The same refusal** (P2), with similar timing |
+| Priya, `confluence:PAY/runbook-payment-service` (`public:org`) | a Drive folder shared with "anyone with the link" | **Blocked by P5** unless nobody external can read it. Here the readers cannot be listed, so it is blocked |
+
+The PRD's own examples (`#sec-incident` to `#general`, the cutover-plan page) come with the fixtures added in step 3 of its build order.
 
 ## Decisions are recorded with evidence
 Each allow/deny decision stores: `doc_id`, `allowed`, `proof_path`, `acl_snapshot_hash`, `policy_version`, `doc_version`, `evaluated_at`. This enables replay ("was this decision correct at the time?") and time-travel queries.
@@ -78,6 +121,7 @@ Each allow/deny decision stores: `doc_id`, `allowed`, `proof_path`, `acl_snapsho
 A denied document and a nonexistent one produce the same response shape, similar timing, and no counts or titles. Link-edge expansion follows a link only if the target passes the PDP.
 
 ## Changelog
+- 0.3, 14 Oct (not built yet): "Creating items" under Writes: the audience rule, checks P1 to P6, the rules that go with them, and a worked example on the fixtures. A created item has its container's ACL; Cortex never sets ACLs. ADR-010.
 - 0.2, 12 Oct: "Writes" (the assignee's own Jira issue, read access plus assignee by account); routine runs named as labelled answers; generated conversation titles allowed only from the asker's own question.
 - 0.2, 11 Oct addition: Slack DMs and group DMs. Read with each participant's own user token, indexed only when every participant has authorized, `user:` tokens only, live check with the asker's own token, a revoked authorization deletes the DMs. No new token type.
 - 0.2: canonical email and per-connector identity mapping; asker token set built from `PlatformIdentity.groups`; `public:org` excludes guests and externals; narrowing rule for intersecting permissions; document ACL change versus principal change; public Slack channels carry `public:org` plus the channel token.
