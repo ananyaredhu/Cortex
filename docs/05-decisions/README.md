@@ -13,6 +13,5 @@ Short records of the decisions that shape the system.
 | [007](ADR-007-orchestration-and-adp.md) | LangGraph orchestration; ADP as optional backend | Accepted |
 | [008](ADR-008-project-registry.md) | A small, explicit project registry | Accepted |
 | [009](ADR-009-retrieval-relevance.md) | Retrieval relevance at scale: search titles too | Accepted |
-| [010](ADR-010-actions.md) | Actions: proposals as data, human confirm, audience rule | Accepted |
 
 Template: **Context** (why), **Decision**, **Consequences**, **To verify**.

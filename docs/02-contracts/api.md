@@ -1,6 +1,6 @@
 # HTTP API
 
-version: 0.6 (0.6, 14 Oct, not built yet: the actions endpoints, `GET /v1/skills` and `GET /v1/destinations`; 0.5 adds `GET /v1/search`, the UI's search; 0.4 added `GET /v1/source`, the in-app source viewer; 0.2 added the UI's optional fields; 0.3 adds the Brain's first write to a source, moving one's own Jira issue, ticket deadlines and priorities, conversation titles, and routines; implemented in `brain/api/app.py`)
+version: 0.5 (0.5 adds `GET /v1/search`, the UI's search; 0.4 added `GET /v1/source`, the in-app source viewer; 0.2 added the UI's optional fields; 0.3 adds the Brain's first write to a source, moving one's own Jira issue, ticket deadlines and priorities, conversation titles, and routines; implemented in `brain/api/app.py`)
 Producer: the Brain. Consumers: the UI and the console. The MCP server exposes the same pipeline: see [mcp-tools](mcp-tools.md).
 
 Base path `/v1`. JSON. **Auth:** `Authorization: Bearer <JWT>` from the mock IdP on **every** request (validated per request: signature, expiry, audience). JWT claims: `sub`, `email`, `roles`, `aud`.
@@ -195,57 +195,6 @@ A routine is a question its owner has the Brain ask again on a schedule, as them
 - The endpoints are always served. Scheduled runs happen only when the Brain runs with `BRAIN_ROUTINES=1`; "Run now" works either way.
 - `GET /v1/routines-totals` (admin): `{"window_hours": 24, "runs", "unavailable", "skipped"}`. Totals only: no owner, no routine, no question.
 
-## Actions *(0.6, 14 Oct; not built yet)*
-A person creates Jira cards, Slack messages, Confluence pages and Google Docs from Cortex: the model drafts a plan, the policy plane decides each operation, the person checks a preview and confirms. Requirements are in [docs/actions-and-slash-skills.md](../actions-and-slash-skills.md), the decision in [ADR-010](../05-decisions/ADR-010-actions.md), the checks P1 to P6 in [acl-model](acl-model.md) "Writes", and the skills in [skills-format](skills-format.md) 0.4.
-
-| Call | Does |
-|---|---|
-| `GET /v1/skills` | Skills the caller may use (filtered by `surface` and `roles`): `{"skills": [{"name", "slash", "kind", "description", "args": [...], "example"}]}`, for the composer's `/` menu |
-| `GET /v1/destinations?type=jira_project&q=` | Places the caller may write to (P2 and P3), for pickers: `{"destinations": [{"id": "jira:DBMIG", "name": "DB migration", "type": "jira_project"}]}`. `type` is an `args` destination type; `q` (at most 100 characters) matches names. Only allowed destinations, no count |
-| `POST /v1/actions/plan` | `{"skill", "args", "text", "conversation_id"?}` → a plan (below). Also returned inline by `/v1/ask` as `plan` when an action skill is routed (`plan` is then present on every `/v1/ask` response, `null` when no action skill was routed) |
-| `PATCH /v1/actions/{plan_id}` | `{"operations": [{"index", "included"?, "fields"?, "destination"?}]}` → the plan checked again, with a new `payload_hash` |
-| `POST /v1/actions/{plan_id}/confirm` | `{"payload_hash"}` → per-operation outcomes |
-| `POST /v1/actions/{plan_id}/undo` *(P1)* | Delete what this plan created, within 10 minutes |
-| `GET /v1/actions?mine=1` | The caller's recent plans and outcomes, newest first (for My Work) |
-
-The plan:
-```json
-{
-  "refused": false,
-  "plan_id": "pl_7c1e",
-  "skill": "breakdown",
-  "operations": [
-    {"index": 0, "type": "jira.create_issue", "destination": "jira:DBMIG", "included": true,
-     "fields": {"issuetype": "Epic", "summary": "DB migration cutover", "description": "...", "assignee": "Priya"},
-     "citations": ["confluence:ENG/db-cutover-plan"],
-     "drafted_not_from_source": [],
-     "duplicate_of": null,
-     "policy": {"allowed": true, "checks": {"P1": "pass", "P2": "pass", "P3": "pass", "P4": "pass", "P5": "pass", "P6": "pass"},
-                "reason": null, "blocking_sources": [], "autofixes": []}}
-  ],
-  "notes": [],
-  "payload_hash": "sha256:...",
-  "expires_at": "2026-10-14T10:10:00Z"
-}
-```
-- `policy.reason` when blocked: `no_write_permission` (P3), `audience_wider_than_sources` (P4), `audience_not_enumerable` (P5) or `destination_not_named` (F6: the destination came from content, not the person). `blocking_sources` lists only the caller's own cited sources that cause a P4 or P5 block; nothing names or lists the readers who lack access. `autofixes` says what P6 changed (`{"field", "change": "truncated" | "mention_removed" | "link_removed"}`).
-- A failed P1 never appears: those sources are dropped before drafting, exactly as for `/ask`. A failed P2 (the destination does not exist or the caller cannot see it) is the uniform refusal: `200` with `{"refused": true, "plan_id": null, "operations": [], "notes": [], "payload_hash": null, "expires_at": null}`, the same shape and similar timing for a forbidden destination and a nonexistent one. Every reply is held to the floor latency (`BRAIN_FLOOR_LATENCY_MS`).
-- `duplicate_of` (F8): the `doc_id` of a likely duplicate the caller may open in the destination project; the operation is then proposed as a link, not a create. `drafted_not_from_source` names fields the grounding check could not support; the UI marks them. `notes` holds plan-level messages, such as a plan cut to `max_ops`.
-- `assignee` and mentions are display names. The account is resolved by the policy plane and never returned.
-- An edit through `PATCH` checks the changed operations again before Confirm is enabled. A `destination` in a `PATCH` is one the caller picked, so it counts as named.
-
-Confirm:
-- Refused with `409 {"error": {"code": "plan_changed"}}` when `payload_hash` is not the last checked one, or when a source version, the caller's tokens or a destination's audience changed since the check; then the UI shows the plan checked again. `410 {"error": {"code": "plan_expired"}}` after 10 minutes. A plan of someone else's and a nonexistent plan both answer `404 {"detail": "no such plan"}`.
-- Response: `{"plan_id", "outcomes": [{"index", "outcome": "created" | "refused" | "failed" | "skipped" | "blocked", "doc_id"?, "url"?, "indexed"?}]}`. `created` carries the new item's `doc_id` and `url`; `refused` means the platform said no; `failed` means an error or a timeout, and nothing is known to have been created; `skipped` means the operation depended on one that did not succeed; `blocked` means the policy did not allow it. Operations run in order, a child after its parent. **No retry on its own:** a second confirm with the same `payload_hash` runs only the operations that are not `created` (each is checked again), and the idempotency key `plan_id:op_index` makes sure nothing is created twice.
-- Every created item goes through ingestion's upsert path before the answer, as in `/v1/issues/move`; `indexed: false` means the next sync will catch up.
-- Each call is in the audit log: `action_proposed` for a plan and each `PATCH`, `action_decided` per check, `action_confirmed` and `action_executed` ([audit-event-schema](audit-event-schema.md) 0.2).
-
-Limits:
-- **Only a person in Cortex's UI confirms.** No MCP tool, routine, alert or answer can call `/confirm`. A routine may produce a plan, which waits on My Work.
-- No edit or deletion of existing content (except Undo of what the plan created), no change to anyone's permissions, no posting as someone else.
-- `POST /v1/issues/move` stays as it is, and moves onto the same executor without changing its rules.
-- Security tests in `evals/` before it is switched on: Leak-CI for writes, the red-team cases (injected destination or `@channel`, a source revoked or an audience widened between plan and confirm, a plan over `max_ops`, the downgrade matrix) and the timing check for `/actions/plan`.
-
 ## `GET /v1/explain-access?doc_id=...`
 Why can I see this? Returns `{"found": true, "proof_path": [...]}` for an allowed document. For a forbidden or nonexistent one, returns the uniform `{"found": false}`.
 
@@ -302,7 +251,6 @@ Stale-answer alerts: answers the user received whose sources changed afterwards 
 Simulator admin endpoints (owned by A) to revoke a permission, restrict a page, edit a document, and add or remove hidden documents (for Leak-CI). Documented in `simulators/README.md`. The stub API has its own: `/sim/advance`, `/sim/reset`, `/sim/tamper`.
 
 ## Changelog
-- 0.6 (14 Oct, not built yet): the actions endpoints (`/v1/actions/plan`, `PATCH`, `/confirm`, `/undo` as P1, `GET /v1/actions`), `GET /v1/skills` and `GET /v1/destinations`, and `plan` on `/v1/ask`. ADR-010.
 - 0.5 (13 Oct): `GET /v1/search`, the documents behind the UI's search; the MCP tool `search` over HTTP, now held to the floor latency on both doors.
 - 0.4 (13 Oct): `GET /v1/source`, the document text for the in-app viewer.
 - 0.4 (proposed 13 Oct, on `ws-c/routines-run-state`): `coverage`, `freshness`, `grounding`, `policy_version` and `unavailable_sources` on the turns of `GET /v1/conversations/{id}`, as recorded when each was answered; `running` on a routine.

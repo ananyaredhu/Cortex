@@ -39,10 +39,10 @@ flowchart LR
   PDP --> AUD
 ```
 Rules that define the boundaries:
-- **Zone 4 (LLM plane)** gets only sanitized, already-authorized context. No credentials, no network except to the policy plane, no write tools. It may return a proposed action plan as data, which the policy plane decides and a person confirms ([ADR-010](05-decisions/ADR-010-actions.md)).
+- **Zone 4 (LLM plane)** gets only sanitized, already-authorized context. No credentials, no network except to the policy plane, no write tools.
 - **Zone 2 (policy plane)** is plain deterministic code. No LLM may influence an allow/deny decision.
 - Denied content never leaves Zone 2, and is never sent to any model or third party. The leakage scan against denied content runs locally.
-- Credentials for source systems live only in connectors (Zone 2), with least-privilege scopes: read-only, except the narrow writes in [connector-interface](02-contracts/connector-interface.md) ("Writing"), made as the person.
+- Credentials for source systems live only in connectors (Zone 2), with read-only least-privilege scopes.
 
 ## Query path (LangGraph state machine; policy nodes are plain code)
 1. **Authenticate and resolve identity:** JWT, then per-platform identities (email, Slack ID, Jira accountId) and group memberships.
