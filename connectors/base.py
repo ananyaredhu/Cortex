@@ -1,4 +1,4 @@
-"""Shared connector types. Mirrors docs/02-contracts/connector-interface.md (v0.2).
+"""Shared connector types. Mirrors docs/02-contracts/connector-interface.md (0.6).
 
 Real connectors, simulators and the fixture connector all implement `Connector`.
 Change the contract doc first (PR with all three reviewers), then this file.
@@ -120,3 +120,37 @@ class WritableConnector(Connector, Protocol):
         """Move one issue to `status` as `identity` and return it as the platform now holds it. `status` is matched
         without regard to case against the transitions the platform offers. Raises DocumentNotFound, or
         TransitionRefused; any other error means nothing is known to have changed."""
+
+
+# -- (0.6) Creating items: connector-interface.md, "Writing: creating items" ----------------------------------------
+class WriteRefused(Exception):
+    """Raised by `CreatingConnector.create` and `delete_created` when the platform will not do it for this identity.
+    Carries nothing beyond the destination."""
+
+
+@dataclass(frozen=True)
+class Audience:
+    """Who can read what is created at a destination. Stays inside the policy plane, like `AccessDecision`."""
+    principals: tuple[str, ...] | None   # canonical emails of every reader; None when they cannot all be listed
+    has_external: bool                   # some reader is a guest or external person
+    snapshot_hash: str                   # changes whenever the audience does
+
+
+@dataclass(frozen=True)
+class CreateOp:
+    """One operation of a confirmed plan, already decided by the policy plane."""
+    type: str                            # an action type, e.g. "jira.create_issue"
+    destination: str                     # a container id: "jira:DBMIG", "slack:C_DBMIG", "slack:C_DBMIG/<ts>", ...
+    fields: dict[str, str]
+    assignee_account: str | None = None  # resolved by the policy plane, never by the model
+
+
+class CreatingConnector(Connector, Protocol):
+    """(0.6) Creating items as the person. `create` and `delete_created` arrive with step 3 of the actions build order."""
+
+    def can_create(self, identity: PlatformIdentity, destination: str) -> bool:
+        """Live: may this identity create in `destination` now? False for an unknown or invisible destination and on
+        any error (fail closed). Never raises DocumentNotFound."""
+
+    def audience(self, destination: str) -> Audience:
+        """Every reader of what is created in `destination`. Raises DocumentNotFound for an unknown destination."""

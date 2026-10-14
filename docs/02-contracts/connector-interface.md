@@ -1,7 +1,7 @@
 # Connector interface
 
 version: 0.6
-**0.6 (14 Oct, not built yet):** connectors can create items: `can_create`, `audience`, `create` and `delete_created`, for every connector. See "Writing: creating items" below and [ADR-010](../05-decisions/ADR-010-actions.md).
+**0.6 (14 Oct; `can_create` and `audience` built in the fixture connector, `create` comes with step 3):** connectors can create items: `can_create`, `audience`, `create` and `delete_created`, for every connector. See "Writing: creating items" below and [ADR-010](../05-decisions/ADR-010-actions.md).
 **0.5 (12 Oct):** the Jira `due`, `priority` and `assignee_email` fields, and `WritableConnector.transition`, the first write a connector makes. See "Writing: moving a Jira issue" below.
 Producer: the connectors. Consumers: the Brain (ingestion, PDP, JIT checks).
 

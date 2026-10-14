@@ -221,14 +221,14 @@ The plan:
      "drafted_not_from_source": [],
      "duplicate_of": null,
      "policy": {"allowed": true, "checks": {"P1": "pass", "P2": "pass", "P3": "pass", "P4": "pass", "P5": "pass", "P6": "pass"},
-                "reason": null, "blocking_sources": [], "autofixes": []}}
+                "reason": null, "blocking_sources": [], "blocking_refs": [], "blocked_readers": 0, "autofixes": []}}
   ],
   "notes": [],
   "payload_hash": "sha256:...",
   "expires_at": "2026-10-14T10:10:00Z"
 }
 ```
-- `policy.reason` when blocked: `no_write_permission` (P3), `audience_wider_than_sources` (P4), `audience_not_enumerable` (P5) or `destination_not_named` (F6: the destination came from content, not the person). `blocking_sources` lists only the caller's own cited sources that cause a P4 or P5 block; nothing names or lists the readers who lack access. `autofixes` says what P6 changed (`{"field", "change": "truncated" | "mention_removed" | "link_removed"}`).
+- `policy.reason` when blocked: `sources_changed` (P1: a cited source can no longer be opened; which one is not said, and the plan is redrafted), `no_write_permission` (P3), `audience_wider_than_sources` (P4), `audience_not_enumerable` (P5), `destination_not_named` (F6: the destination came from content, not the person), `action_not_allowed` (not in the skill's allowlist, or the wrong platform for the destination), `referenced_operation_blocked` or `bad_reference` (the operation names an item of an earlier operation that is blocked, or of one that is not earlier). `no_such_destination` (P2) never appears in an operation: it is the uniform refusal below. `blocking_sources` lists only the caller's own cited sources that cause a P4 or P5 block, and `blocking_refs` the indexes of earlier operations whose items cause one; `blocked_readers` is how many readers lack access. Nothing names or lists those readers. `autofixes` says what P6 changed (`{"field", "change": "truncated" | "mention_removed" | "link_removed"}`).
 - A failed P1 never appears: those sources are dropped before drafting, exactly as for `/ask`. A failed P2 (the destination does not exist or the caller cannot see it) is the uniform refusal: `200` with `{"refused": true, "plan_id": null, "operations": [], "notes": [], "payload_hash": null, "expires_at": null}`, the same shape and similar timing for a forbidden destination and a nonexistent one. Every reply is held to the floor latency (`BRAIN_FLOOR_LATENCY_MS`).
 - `duplicate_of` (F8): the `doc_id` of a likely duplicate the caller may open in the destination project; the operation is then proposed as a link, not a create. `drafted_not_from_source` names fields the grounding check could not support; the UI marks them. `notes` holds plan-level messages, such as a plan cut to `max_ops`.
 - `assignee` and mentions are display names. The account is resolved by the policy plane and never returned.

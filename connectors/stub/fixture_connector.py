@@ -3,12 +3,15 @@
 It is NOT a real or simulated platform: permissions are the token-overlap rule only.
 Real connectors and simulators must pass the same contract tests with richer semantics.
 """
+import hashlib
+import json
 import re
 
 from connectors import workflow
 from connectors.base import (
     AccessDecision,
     AclEvidence,
+    Audience,
     Change,
     ChangeBatch,
     Document,
@@ -132,3 +135,39 @@ class FixtureConnector:
         d.update(body=body, fields={**fields, "status": to}, updated_at=now, version=f"{now}#moved{moves}", moves=moves)
         self._log.append(Change("upsert", doc_id, now))
         return self.fetch(doc_id)
+
+    # -- (0.6) creating: who may create, and who reads what is created ----------------------------
+    def _destination_tokens(self, destination: str) -> set[str] | None:
+        """The ACL an item created at `destination` would get: an existing document's (an issue to comment on, a thread
+        to reply in) or its container's. A container's documents share one ACL in the fixtures; the union is taken so
+        that a mixed container could only look wider, never narrower. None for a destination that does not exist."""
+        if not destination.startswith(f"{self.source}:"):
+            return None
+        doc = self.state.docs.get(destination)
+        if doc is not None:
+            return set(doc["acl"]["tokens"])
+        inside = [d for d in self.state.docs.values() if d["source"] == self.source and d["parent_id"] == destination]
+        return set().union(*(d["acl"]["tokens"] for d in inside)) if inside else None
+
+    def can_create(self, identity: PlatformIdentity, destination: str) -> bool:
+        """A reader who also holds a membership there (a project role, the channel, a group, a share). Reading a public
+        channel or project is not enough. A public Confluence space lets any full member add a page. Fail closed."""
+        tokens = self._destination_tokens(destination)
+        p = persona_by_email(self.state.data, identity.email)
+        if tokens is None or p is None:
+            return False
+        held = self.state.persona_tokens[p["id"]] & tokens
+        if self.source == "confluence":
+            return bool(held)
+        return bool(held - {"public:org"})
+
+    def audience(self, destination: str) -> Audience:
+        tokens = self._destination_tokens(destination)
+        if tokens is None:
+            raise DocumentNotFound(destination)
+        readers = [p for p in self.state.data["personas"] if self.state.persona_tokens[p["id"]] & tokens]
+        principals = tuple(sorted(p["email"] for p in readers))
+        external = any("public:org" not in self.state.persona_tokens[p["id"]]
+                       or any(t.startswith("external:") for t in self.state.persona_tokens[p["id"]]) for p in readers)
+        snapshot = json.dumps({"principals": principals, "has_external": external}, sort_keys=True)
+        return Audience(principals, external, "sha256:" + hashlib.sha256(snapshot.encode()).hexdigest())

@@ -241,7 +241,7 @@ Rewrite "Writes" to cover the general case: P1–P6, the audience rule with a wo
 
 ## 11. Build order (each step is its own small pull request, contract first)
 1. **ADR-010 and contract bumps** (skills-format 0.4, connector-interface 0.6, acl-model 0.3, api 0.6, audit schema 0.2), with examples and no code. Update AGENTS.md. *Done 14 Oct; ADR-010 accepted with Q1 to Q7 decided.*
-2. **Policy plane:** `brain/policy/writes.py` P1–P6 and `audience` expansion, with unit tests including the downgrade matrix over fixture places. No UI yet.
+2. **Policy plane:** `brain/policy/writes.py` P1–P6 and `audience` expansion, with unit tests including the downgrade matrix over fixture places. No UI yet. *Done 14 Oct: `WritePolicy`; P4 checks each reader's tokens and then the live `check_access`; `can_create` and `audience` on the fixture connector.*
 3. **Simulator and fixture create endpoints, and the fixture connector's `create`**, with contract tests 9–12.
 4. **Executor and API:** `/actions/plan`, `PATCH`, `/confirm`, idempotency, ingestion upsert, audit events. Move `/issues/move` onto it, keeping its tests green.
 5. **`/jira` and `/slack`** skills end to end on the fixture runtime (simplest: one operation).
