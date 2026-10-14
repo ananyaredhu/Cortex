@@ -1,6 +1,6 @@
 # Audit event schema
 
-version: 0.1
+version: 0.2 (0.2, 14 Oct: the action events, ADR-010; not built)
 Producer: the Brain (audit service). Consumers: the console, the evals and the audit agent.
 
 The log must be **tamper-evident**, **complete** (who, what, retrieved IDs, final answer, time, allow/deny per document) and **queryable**.
@@ -106,7 +106,43 @@ Four new event types and one new value, all in the hash chain like any other eve
 
 Event types then read: `ask`, `search`, `mcp_call`, `audit_query`, `admin_view`, `acl_change_observed`, `alert_sent`, `checkpoint`, `identity_snapshot`, `issue_transition`, `conversation_title`, `routine_change`, `routine_skipped`.
 
+## Events added for actions *(0.2, 14 Oct; not built yet)*
+Five event types for [api](api.md) 0.6's `/v1/actions` ([ADR-010](../05-decisions/ADR-010-actions.md)), all in the hash chain. Each carries `plan_id`; together they answer "what did X create or post through Cortex, from which sources, and was any of it blocked?"
+
+**`action_proposed`**: a plan was drafted, or changed by a `PATCH`.
+```json
+{"event_type": "action_proposed", "request_id": "req_...", "conversation_id": "c_1", "plan_id": "pl_7c1e",
+ "actor": {"user_id": "priya@companya.com", "roles": ["engineer"], "client": "ui"},
+ "query": {"text": "/breakdown @\"DB migration cutover plan\" in:DBMIG", "skill": "breakdown", "skill_version": 1, "skill_sha256": "<hash>"},
+ "decisions": [{"doc_id": "confluence:ENG/db-cutover-plan", "allowed": true, "proof_path": ["..."], "...": "as on ask"}],
+ "action": {"plan_sha256": "sha256:...", "payload_hash": "sha256:...", "operations": 6, "cited": ["confluence:ENG/db-cutover-plan"],
+            "acl_label_sha256": "sha256:...", "revision": 0, "injection_flagged": false}}
+```
+- `decisions` are the read decisions for the sources (P1), as on `ask`: a source the caller may not open is a salted hash.
+- `revision` is 0 for the first plan and counts each `PATCH`. `injection_flagged` is true when an operation was rejected for a destination the person did not name (F6).
+
+**`action_decided`**: the policy result for each operation, written with every `action_proposed`.
+```json
+{"event_type": "action_decided", "plan_id": "pl_7c1e", "actor": {...},
+ "action": {"policy_version": "pol-0.4", "operations": [
+   {"index": 0, "type": "jira.create_issue", "destination": "jira:DBMIG", "allowed": true,
+    "checks": {"P1": "pass", "P2": "pass", "P3": "pass", "P4": "pass", "P5": "pass", "P6": "pass"},
+    "reason": null, "blocking_sources": [], "autofixes": [], "audience_snapshot_hash": "sha256:..."}]}}
+```
+- A destination the caller cannot see, or one that does not exist, is stored as `destination_hash` (salted), never in plain, as for denied documents. Audience members are never logged: only `audience_snapshot_hash`, which lets replay check P4 against the audience recorded then.
+
+**`action_confirmed`**: `{"event_type": "action_confirmed", "plan_id": "...", "actor": {...}, "action": {"payload_hash": "sha256:...", "accepted": true | false, "reason": null | "plan_changed" | "plan_expired"}}`. A refused confirm is logged too.
+
+**`action_executed`**: one per confirm that ran, `{"event_type": "action_executed", "plan_id": "...", "actor": {...}, "action": {"outcomes": [{"index": 0, "outcome": "created", "doc_id": "jira:DBMIG-160", "url": "...", "platform_status": 201, "indexed": true}]}}`. `outcome` has the values of the confirm response.
+
+**`action_undone`** *(P1)*: `{"event_type": "action_undone", "plan_id": "...", "actor": {...}, "action": {"outcomes": [{"index": 0, "doc_id": "...", "outcome": "deleted" | "refused" | "failed"}]}}`.
+
+None of them carries drafted text or field values, only hashes of them, so a blocked plan's text is not kept in the log; the conversation holds the plan for its owner. No write credential or token is ever written to an event.
+
+Event types then read: `ask`, `search`, `mcp_call`, `audit_query`, `admin_view`, `acl_change_observed`, `alert_sent`, `checkpoint`, `identity_snapshot`, `issue_transition`, `conversation_title`, `routine_change`, `routine_skipped`, `action_proposed`, `action_decided`, `action_confirmed`, `action_executed`, `action_undone`.
+
 ## Changelog
+- 0.2, 14 Oct (not built yet): `action_proposed`, `action_decided`, `action_confirmed`, `action_executed` and `action_undone`. ADR-010.
 - 0.1, 13 Oct (proposed): `trust` on `ask` events.
 - 0.1, 12 Oct: `issue_transition`, `conversation_title`, `routine_change` and `routine_skipped` events; `actor.client: "routine"` and `routine_id` on `ask` events.
 - 0.1, 11 Oct: `checks.fields` (`pass`, `fail` or `nothing_to_check`: whether what the claims said about structured fields matched the documents') and `checks.field_mismatches` (`[{field, doc_ids}]` for each claim dropped, without the values) (fix F23).
