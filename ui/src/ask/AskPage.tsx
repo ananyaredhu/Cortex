@@ -58,6 +58,7 @@ export function AskPage() {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [conversationId, setConversationId] = useState<string | undefined>();
   const [load, setLoad] = useState<Load>("idle");
+  const [unavailable, setUnavailable] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
   const [trustOpen, setTrustOpen] = useState(initialTrustOpen);
   const [whyLit, setWhyLit] = useState(false);
@@ -69,13 +70,25 @@ export function AskPage() {
   // The refs make each reset and each "ask again" happen once per navigation, even when effects run twice.
   const resetFor = useRef("");
   const askedFor = useRef("");
+  const personaFor = useRef(persona.id);
   useEffect(() => {
     const key = `${persona.id}|${location.key}`;
     if (resetFor.current === key) return;
     resetFor.current = key;
+    const switched = personaFor.current !== persona.id;
+    personaFor.current = persona.id;
     setTurns([]);
-    setConversationId(routeId);
     setSelected(null);
+    // The notice is for a link the person opened, carried over the redirect below; a persona switch never shows it.
+    setUnavailable(!switched && Boolean((location.state as { unavailable?: boolean } | null)?.unavailable));
+    if (routeId && switched) {
+      // The conversation in the address was the previous persona's: start the new one clean, without asking for it.
+      setConversationId(undefined);
+      setLoad("idle");
+      navigate("/ask", { replace: true });
+      return;
+    }
+    setConversationId(routeId);
     setLoad(routeId ? "loading" : "idle");
     if (!routeId) return;
     const asker = persona.id;
@@ -101,8 +114,9 @@ export function AskPage() {
         if (resetFor.current !== key) return;
         setLoad("idle");
         if (e instanceof ApiError && e.status === 404) {
-          // Not the caller's, or gone (the two look the same): a plain new question, with the address to match.
-          navigate("/ask", { replace: true });
+          // Not the caller's, or gone (the two look the same): a new question with the address to match, and one
+          // notice so an opened link does not fail silently. The dead id is not kept.
+          navigate("/ask", { replace: true, state: { unavailable: true } });
           return;
         }
         setTurns([{ id: nextId.current++, question: "", times: {}, error: (e as Error).message }]);
@@ -195,7 +209,14 @@ export function AskPage() {
               Opening the conversation…
             </p>
           ) : turns.length === 0 ? (
-            <EmptyState />
+            <>
+              {unavailable && (
+                <p role="alert" className="banner banner--stale">
+                  That conversation isn’t available. Start a new question below.
+                </p>
+              )}
+              <EmptyState />
+            </>
           ) : (
             turns.map((t) => (
               <section
