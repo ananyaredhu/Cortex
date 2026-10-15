@@ -22,8 +22,25 @@ SURFACES = ("ask", "audit")
 MAX_EVIDENCE = 12
 ADDS = frozenset({"my_issues"})          # the lookups a skill may name; each is code in the pipeline, not text a model reads
 KEYS = {"name", "version", "description", "triggers", "sources", "tools_allowlist", "output_schema", "max_evidence", "surface",
-        "roles", "adds"}
+        "roles", "adds", "self_topics"}
 FRONT = re.compile(r"\A---\n(.*?)\n---\n(.*)\Z", re.S)
+# The asker speaking about themselves: "my", "for me", "I'm", "I have", "should I". A bare "I" or "me" is not enough
+# ("can I see the migration tickets", "show me the open tickets" are about the project, not the asker's own work).
+SELF = re.compile(r"\b(?:my|mine|myself)\b|\b(?:for|to|on|at|assigned)\s+me\b|\bi'(?:m|ve|ll|d)\b"
+                  r"|\bi\s+(?:have|need|should|must|own|am|was|will|work|do|got|gotta|ought)\b|\b(?:should|must|shall|am|need)\s+i\b")
+
+
+def _term(topic: str) -> str:
+    """A topic and its plural: "task" also matches "tasks", "priority" also "priorities"."""
+    t = re.escape(topic.lower())
+    return rf"{t[:-1]}(?:y|ies)" if t.endswith("y") else rf"{t}(?:s|es)?"
+
+
+def about_self(question: str, topics: tuple[str, ...]) -> bool:
+    """True when the question is the asker speaking about themselves and names one of `topics`. Plain code, no model."""
+    low = question.lower().replace("’", "'")
+    return bool(topics and SELF.search(low)
+                and any(re.search(rf"(?<![a-z0-9]){_term(t)}(?![a-z0-9])", low) for t in topics))
 
 
 class SkillError(ValueError):
@@ -44,6 +61,7 @@ class Skill:
     procedure: str
     sha256: str
     adds: tuple[str, ...] = ()
+    self_topics: tuple[str, ...] = ()
 
     def allows(self, roles: tuple[str, ...] | list[str]) -> bool:
         """A skill restricted to some roles is never used for anyone else. It grants nothing; it only declines to apply."""
@@ -108,6 +126,9 @@ def load_skill(directory: Path) -> Skill:
     adds = meta.get("adds") or []
     if not isinstance(adds, list) or not set(adds) <= ADDS:
         raise SkillError(f"{directory.name}: adds must be a list from {sorted(ADDS)}")
+    topics = meta.get("self_topics") or []
+    if not isinstance(topics, list) or not all(isinstance(t, str) and t.strip() for t in topics):
+        raise SkillError(f"{directory.name}: self_topics must be a list of text")
     if len(procedure) < 40:
         raise SkillError(f"{directory.name}: the procedure is empty")
     files = sorted(p for p in directory.rglob("*") if p.is_file())
@@ -115,7 +136,8 @@ def load_skill(directory: Path) -> Skill:
     for file in files:                                            # the hash covers every file, so a template change shows too
         digest.update(file.relative_to(directory).as_posix().encode() + b"\0" + file.read_bytes() + b"\0")
     return Skill(directory.name, meta["version"], meta["description"], tuple(t.strip() for t in triggers), tuple(sources),
-                 tuple(tools), limit, surface, tuple(meta.get("roles") or ()), procedure, digest.hexdigest(), tuple(adds))
+                 tuple(tools), limit, surface, tuple(meta.get("roles") or ()), procedure, digest.hexdigest(), tuple(adds),
+                 tuple(t.strip() for t in topics))
 
 
 @dataclass
@@ -136,6 +158,7 @@ class Registry:
     def select(self, question: str, roles: tuple[str, ...] | list[str] = (), *, hint: str | None = None,
                surface: str = "ask") -> Skill | None:
         """The skill whose triggers appear most often in the question, or None. An explicit `hint` that names a usable skill wins.
+        A question about the asker that names one of a skill's `self_topics` counts as one more trigger for it.
         A skill for another surface or role is never chosen, and a hint for one is ignored, not obeyed."""
         usable = [s for s in self.skills.values() if s.surface == surface and s.allows(roles)]
         if hint:
@@ -146,6 +169,7 @@ class Registry:
         best, best_score = None, 0
         for skill in usable:
             score = sum(1 for t in skill.triggers if re.search(rf"(?<![a-z0-9]){re.escape(t.lower())}(?![a-z0-9])", low))
+            score += about_self(question, skill.self_topics)
             if score > best_score:
                 best, best_score = skill, score
         return best

@@ -1,8 +1,9 @@
 ---
 name: my-work
-version: 1
+version: 2
 description: Brief a person on their own work, from the tickets assigned to them and what was said about those
 triggers: ["my open tickets", "my tickets", "my issues", "my tasks", "my work", "assigned to me", "my brief", "my stand-up", "my standup", "my week", "my day", "my focus", "my deadlines", "my status update", "waiting on me", "on my plate", "should i do first"]
+self_topics: ["task", "ticket", "issue", "work", "focus", "priority", "prioritise", "prioritize", "deadline", "due", "plate", "assigned", "todo", "to-do", "to do", "standup", "stand-up", "backlog", "sprint", "today", "tomorrow", "this week", "next", "first", "finish", "end of day", "eod", "monday", "tuesday", "wednesday", "thursday", "friday"]
 sources: [jira, slack, confluence, gdrive]
 tools_allowlist: [search, get_source, explain_access]
 output_schema: claims_with_citations_v1

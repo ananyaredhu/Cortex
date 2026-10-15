@@ -64,7 +64,7 @@ def test_the_skills_load_with_pinned_hashes():
     registry = Registry.load()
     assert sorted(registry.skills) == ["audit-inquiry", "design-discussion-summary", "incident-investigation", "my-work",
                                        "status-and-blockers"]
-    assert all(len(s.sha256) == 64 and s.version == 1 and s.procedure.startswith("# Procedure") for s in registry.skills.values())
+    assert all(len(s.sha256) == 64 and s.version >= 1 and s.procedure.startswith("# Procedure") for s in registry.skills.values())
     assert Registry.load().skills["status-and-blockers"].sha256 == registry.skills["status-and-blockers"].sha256
 
 
@@ -91,6 +91,7 @@ def test_lists_may_be_quoted_or_bare_and_a_good_file_loads(tmp_path):
     ("output_schema: claims_with_citations_v1", "output_schema: free_text"),
     ("max_evidence: 4", "max_evidence: 99"),
     ('triggers: ["demo thing"]', "triggers: []"),
+    ("max_evidence: 4", "max_evidence: 4\nself_topics: oops"),      # not a list
     ("description: A demo skill", "colour: red"),                   # unknown key
     ("# Procedure\n1. Do the demo thing, citing every claim you make from the evidence given.", "# Procedure\nno"),
 ])
@@ -190,3 +191,16 @@ def test_the_adp_system_role_carries_the_procedure(rt):
     body = AdpGenerator("key").request_body(packet)
     assert "root cause only if a cited source states it" in body["SystemRole"].lower() or "root cause" in body["SystemRole"].lower()
     assert "Procedure for this question (skill incident-investigation)" in body["SystemRole"]
+
+
+def test_self_topics_route_a_question_about_the_asker_however_it_is_worded(tmp_path):
+    skill = load_skill(write(tmp_path, FRONT.replace("max_evidence: 4", 'max_evidence: 4\nself_topics: ["task", "priority"]')))
+    assert skill.self_topics == ("task", "priority")
+    registry = Registry({"demo": skill})
+    assert registry.select("What are the task I have to focus on today?") is skill      # "I have" + a topic
+    assert registry.select("What should I tackle first? My priorities, please") is skill  # plural of a topic
+    assert registry.select("Which of these tasks are mine?") is skill                 # "mine"
+    assert registry.select("I’m stuck, which task is next?") is skill                  # "I'm" with a curly apostrophe
+    assert registry.select("Can I see the migration tasks?") is None                       # a bare "I" is not about the asker
+    assert registry.select("Show me the open tasks in the migration project") is None      # nor a bare "me"
+    assert registry.select("What should I read about the auth service?") is None           # about the asker, no topic
